@@ -1,0 +1,155 @@
+@import "tailwindcss";
+
+body {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+  scroll-behavior: smooth;
+  overflow-x: hidden;
+  scroll-behavior: smooth;
+  transition: all 0.5s ease;
+}
+
+body::-webkit-scrollbar-track {
+  width: 0;
+}
+body::-webkit-scrollbar-thumb {
+  width: 5px;
+}
+
+html {
+  background: #000;
+}
+
+body::-webkit-scrollbar {
+  width: 4px;
+}
+
+/* Track */
+body::-webkit-scrollbar-track {
+  background: #000000;
+}
+
+/* Handle */
+body::-webkit-scrollbar-thumb {
+  background: linear-gradient(black, #00f2ff);
+  border-radius: 5px;
+}
+
+/* Handle on hover */
+body::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(#00f2ff, black);
+  cursor: grabbing;
+  transition: all 1s ease;
+}
+
+/* Custom Scrollbar */
+.custom-scrollbar::-webkit-scrollbar {
+  width: 3px;
+  height: 3px; /* For horizontal scrollbar */
+}
+
+/* Track */
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: #000000;
+  border-radius: 20px;
+}
+
+/* Handle */
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: black;
+  border-radius: 20px; /* Increased for fuller rounding */
+  width: 3px;
+}
+
+/* Handle on hover */
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(to right, #00f2ff, black);
+  cursor: grabbing;
+  transition: all 1s ease;
+}
+
+/* For Firefox */
+.custom-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: #00f2ff #000000;
+}
+
+.react-datepicker {
+  background-color: #1f2937 !important;
+  border-color: #374151 !important;
+  font-family: inherit !important;
+}
+
+.react-datepicker__header {
+  background-color: #111827 !important;
+  border-bottom-color: #374151 !important;
+}
+
+.react-datepicker__current-month,
+.react-datepicker__day-name,
+.react-datepicker__day {
+  color: #e5e7eb !important;
+}
+
+.react-datepicker__day:hover {
+  background-color: #374151 !important;
+}
+
+.react-datepicker__day--selected {
+  background-color: #06b6d4 !important;
+  color: white !important;
+}
+
+.react-datepicker__day--keyboard-selected {
+  background-color: #0891b2 !important;
+}
+
+.react-datepicker__year-dropdown,
+.react-datepicker__month-dropdown {
+  background-color: #1f2937 !important;
+  border-color: #374151 !important;
+}
+
+.react-datepicker__year-option:hover,
+.react-datepicker__month-option:hover {
+  background-color: #374151 !important;
+}
+
+.react-datepicker__year-option,
+.react-datepicker__month-option {
+  color: #e5e7eb !important;
+}
+
+.react-datepicker__navigation-icon::before {
+  border-color: #e5e7eb !important;
+}
+
+.react-datepicker__day--outside-month {
+  color: #6b7280 !important;
+}
+
+::selection {
+  background-color: #22d3ee; /* cyan-400 */
+  color: #000000; /* black */
+}
+
+::-moz-selection {
+  background-color: #22d3ee; /* cyan-400 */
+  color: #000000; /* black */
+}
+
+.btn-primary {
+  @apply px-7 py-2 my-5 mx-10 bg-[#5CE1E6] text-white rounded hover:bg-[#7E8589] transition-all duration-300 hover:translate-x-3;
+}
+
+.payButton {
+  @apply bg-[#3d7d12] hover:bg-[#8fff44]  text-white hover:text-black font-bold rounded-3xl px-6 py-3 mt-6;
+}
+
+img {
+  -webkit-user-drag: none;
+  -khtml-user-drag: none;
+  -moz-user-drag: none;
+  -o-user-drag: none;
+}

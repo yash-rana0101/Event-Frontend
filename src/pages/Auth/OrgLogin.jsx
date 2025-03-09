@@ -1,18 +1,19 @@
 import React, { useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { loginOrganizer } from '../../redux/user/organizer';
 import { Lock, Mail, Eye, EyeOff, Zap } from 'lucide-react';
 
 const OrgLogin = () => {
   const dispatch = useDispatch();
   const navigate = useNavigate();
-  const { loading, error } = useSelector((state) => state.organizer || {});
+  const { loading } = useSelector((state) => state.organizer || {});
   const [formData, setFormData] = useState({
     email: '',
     password: ''
   });
   const [showPassword, setShowPassword] = useState(false);
+  const [errorMsg, setErrorMsg] = useState(''); // Added for proper error handling
 
   const { email, password } = formData;
 
@@ -22,11 +23,26 @@ const OrgLogin = () => {
 
   const onSubmit = async e => {
     e.preventDefault();
-    dispatch(loginOrganizer(formData)).unwrap()
-      .then(() => {
-        navigate('/');
-      })
-      .catch(() => { });
+
+    try {
+      await dispatch(loginOrganizer(formData)).unwrap();
+      navigate('/organizer/profile');
+    } catch (err) {
+      // Handle different error formats
+      if (typeof err === 'object') {
+        if (err.message) {
+          setErrorMsg(err.message);
+        } else if (err.code === 'ERR_NETWORK') {
+          setErrorMsg('Cannot connect to server. Please check if the backend is running.');
+        } else {
+          setErrorMsg('Login failed. Please try again.');
+        }
+      } else if (typeof err === 'string') {
+        setErrorMsg(err);
+      } else {
+        setErrorMsg('An unknown error occurred');
+      }
+    }
   };
 
   const togglePasswordVisibility = () => {
@@ -101,10 +117,10 @@ const OrgLogin = () => {
                 </button>
               </div>
 
-              {/* Error Message */}
-              {error && (
+              {/* Error Message - FIXED: Now using errorMsg string instead of error object */}
+              {errorMsg && (
                 <div className="bg-red-500/10 border border-red-500/30 text-red-300 px-4 py-3 rounded-lg text-center uppercase tracking-wider">
-                  {error}
+                  {errorMsg}
                 </div>
               )}
 
@@ -141,12 +157,12 @@ const OrgLogin = () => {
               <div className="text-center mt-4">
                 <p className="text-sm text-cyan-300/70 uppercase tracking-wider">
                   NO ACCESS? {' '}
-                  <a
-                    href="/signup"
+                  <Link
+                    to="/organizer/register"
                     className="text-cyan-500 hover:text-cyan-300 font-bold transition-colors"
                   >
                     Sign Up
-                  </a>
+                  </Link>
                 </p>
               </div>
             </form>

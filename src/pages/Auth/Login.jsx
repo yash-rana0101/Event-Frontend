@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
 import { useDispatch } from 'react-redux';
-import { useNavigate } from 'react-router-dom';
-import { loginSuccess } from '../../redux/user/userSlice';
+import { Link, useNavigate } from 'react-router-dom';
+import { login } from '../../redux/user/userSlice';
 import { Lock, Mail, Eye, EyeOff, Zap } from 'lucide-react';
-import axios from 'axios';
+import { toast } from 'react-toastify';
 
 const Login = () => {
   const dispatch = useDispatch();
@@ -18,8 +18,11 @@ const Login = () => {
 
   const { email, password } = formData;
 
+
   const onChange = e => {
-    setFormData({ ...formData, [e.target.name]: e.target.value });
+    // If the field is password, trim whitespace
+    const value = e.target.name === 'password' ? e.target.value.trim() : e.target.value;
+    setFormData({ ...formData, [e.target.name]: value });
     setError('');
   };
 
@@ -29,21 +32,23 @@ const Login = () => {
     setError('');
 
     try {
-      const res = await axios.post(`${import.meta.env.VITE_API_URL}/users/login`, formData);
-      const userData = {
-        user: {
-          _id: res.data._id,
-          name: res.data.name,
-          email: res.data.email,
-          role: res.data.role
-        },
-        token: res.data.token
-      };
-      dispatch(loginSuccess(userData));
-      navigate('/');
+      console.log("Login attempt with email:", email);
+
+      // Try direct login without the preliminary check
+      const result = await dispatch(login(email, password));
+
+      if (result.error) {
+        setError(result.error);
+        console.error('Login error from Redux action:', result.error);
+      } else {
+        console.log('Login successful, navigating to home');
+        toast.success('Login successful');
+        navigate('/');
+      }
     } catch (error) {
-      setError(error.response?.data?.message || 'Login failed. Please try again.');
-      console.error(error.response?.data);
+      console.error("Login submission error:", error);
+      setError(error.message || 'An unexpected error occurred');
+      toast.error(error.message || 'An unexpected error occurred');
     } finally {
       setIsLoading(false);
     }
@@ -157,16 +162,16 @@ const Login = () => {
                 )}
               </button>
 
-              {/* Sign Up */}
-              <div className="text-center mt-4">
+              {/* Sign Up - Fixed HTML structure */}
+              <div className="text-center">
                 <p className="text-sm text-cyan-300/70 uppercase tracking-wider">
                   NO ACCESS? {' '}
-                  <a
-                    href="/signup"
+                  <Link
+                    to="/auth/register"
                     className="text-cyan-500 hover:text-cyan-300 font-bold transition-colors"
                   >
-                    Sign Up
-                  </a>
+                    SIGN UP
+                  </Link>
                 </p>
               </div>
             </form>

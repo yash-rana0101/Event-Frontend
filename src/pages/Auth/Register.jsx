@@ -1,4 +1,6 @@
 import React, { useState } from "react";
+import { useDispatch } from 'react-redux';
+import { loginSuccess } from '../../redux/user/userSlice';
 import axios from "axios";
 import {
   User,
@@ -7,12 +9,15 @@ import {
   Phone,
   Zap,
   Eye,
-  EyeOff
+  EyeOff,
 } from 'lucide-react';
+import { Link, useNavigate } from "react-router-dom";
 
 const Register = () => {
+  const dispatch = useDispatch();
+  const navigate = useNavigate();
   const [formData, setFormData] = useState({
-    name: "",
+    name: "",  // Changed from username to name to match API expectations
     email: "",
     password: "",
     phone: "",
@@ -28,6 +33,11 @@ const Register = () => {
     setError('');
   };
 
+  // Add the missing togglePasswordVisibility function
+  const togglePasswordVisibility = () => {
+    setShowPassword(!showPassword);
+  };
+
   const onSubmit = async (e) => {
     e.preventDefault();
     setIsLoading(true);
@@ -41,19 +51,35 @@ const Register = () => {
     }
 
     try {
-      const res = await axios.post(`${import.meta.env.VITE_API_URL}/users/register`, formData);
-      console.log(res.data);
-      // Handle successful registration (e.g., redirect, show success message)
+      // Prepare data according to server expectations
+      const submitData = {
+        name: name, // Using name field as API expects
+        email: email,
+        password: password,
+        phone: phone
+      };
+
+      const res = await axios.post(`${import.meta.env.VITE_API_URL}/users/register`, submitData);
+
+      // Structure user data for Redux
+      const userData = {
+        user: {
+          _id: res.data.user?.id || null,
+          name: res.data.user?.name || name, // Fall back to form data if needed
+          email: res.data.user?.email || email,
+          role: res.data.user?.role || 'user'
+        },
+        token: res.data.token
+      };
+
+      dispatch(loginSuccess(userData));
+      navigate('/');
     } catch (error) {
       setError(error.response?.data?.message || 'REGISTRATION FAILED');
       console.error(error.response?.data);
     } finally {
       setIsLoading(false);
     }
-  };
-
-  const togglePasswordVisibility = () => {
-    setShowPassword(!showPassword);
   };
 
   return (
@@ -81,7 +107,7 @@ const Register = () => {
             </div>
 
             <form onSubmit={onSubmit} className="space-y-6">
-              {/* Name Input */}
+              {/* Name Input - changed to name */}
               <div className="relative group">
                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                   <User className="h-5 w-5 text-cyan-500 group-focus-within:text-cyan-300 transition-colors" />
@@ -182,16 +208,16 @@ const Register = () => {
                 )}
               </button>
 
-              {/* Login Link */}
+              {/* Fixed Login Link - fixed the closing and opening tag structure */}
               <div className="text-center mt-4">
                 <p className="text-sm text-cyan-300/70 uppercase tracking-wider">
                   ALREADY HAVE CREDENTIALS? {' '}
-                  <a
-                    href="/login"
+                  <Link
+                    to="/auth/login"
                     className="text-cyan-500 hover:text-cyan-300 font-bold transition-colors"
                   >
                     LOGIN
-                  </a>
+                  </Link>
                 </p>
               </div>
             </form>

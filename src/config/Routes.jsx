@@ -22,6 +22,8 @@ import Contact from '../pages/Home/Contact';
 // Guards
 import { AuthGuard, AdminGuard, PublicRoute } from '../routes/Guard';
 import OrgLogin from '../pages/Auth/OrgLogin';
+import Profile from '../pages/Organizer/OrganizerProfile';
+import OrganizerDashboard from '../pages/Organizer/OrganizerDashboard.jsx';
 
 export const router = createBrowserRouter([
   {
@@ -73,6 +75,14 @@ export const router = createBrowserRouter([
       {
         path: 'login',
         element: <PublicRoute><OrgLogin /></PublicRoute>,
+      },
+      {
+        path: "profile",
+        element: <Profile />,
+      },
+      {
+        path: "dashboard",
+        element: <OrganizerDashboard />,
       },
       // Add other organizer routes
     ],

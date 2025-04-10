@@ -102,7 +102,7 @@ const Register = () => {
               <div className="flex justify-center mb-4">
                 <Zap className="h-12 w-12 text-cyan-500 animate-pulse" />
               </div>
-              <h2 className="text-2xl font-bold text-cyan-500 tracking-tight">SYSTEM REGISTRATION</h2>
+              <h2 className="text-2xl font-bold text-cyan-500 tracking-tight">REGISTER AS CANDIDATE</h2>
               <p className="text-cyan-300/70 mt-2 tracking-wider">CREATE NEW CREDENTIALS</p>
             </div>
 
@@ -222,7 +222,21 @@ const Register = () => {
               </div>
             </form>
           </div>
+        <div className="w-full flex justify-center mb-4 px-4">
+          <div className="bg-black border border-cyan-500/30 rounded-2xl p-6 w-full max-w-md shadow-lg transition-transform duration-300 hover:scale-105">
+            <p className="text-center text-sm md:text-base text-cyan-300/80 tracking-wider">
+              Want to <span className="text-cyan-500 font-semibold">Register</span> as an Organizer?{' '}
+              <Link
+                  to="/organizer/register"
+                className="text-cyan-500 hover:text-cyan-300 font-bold underline underline-offset-4 transition-colors duration-200"
+              >
+                Click here
+              </Link>
+            </p>
+          </div>
         </div>
+        </div>
+
       </div>
     </div>
   );

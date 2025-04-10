@@ -75,7 +75,7 @@ const Register = () => {
               <div className="flex justify-center mb-4">
                 <Zap className="h-12 w-12 text-cyan-500 animate-pulse" />
               </div>
-              <h2 className="text-2xl font-bold text-cyan-500 tracking-tight">SYSTEM REGISTRATION</h2>
+              <h2 className="text-2xl font-bold text-cyan-500 tracking-tight">REGISTER AS ORGANIZER</h2>
               <p className="text-cyan-300/70 mt-2 tracking-wider">CREATE NEW CREDENTIALS</p>
             </div>
 

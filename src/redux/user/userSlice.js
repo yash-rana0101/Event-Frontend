@@ -22,7 +22,7 @@ export const verifyUserToken = createAsyncThunk(
       };
 
       const response = await axios.get(
-        `${import.meta.env.VITE_API_URL}/users/me`,
+        `${import.meta.env.VITE_API_URL}/users/profile`, // Updated endpoint
         config
       );
 
@@ -113,7 +113,7 @@ export const login = (email, password) => async (dispatch) => {
     const response = await axios.post(
       `${apiUrl}/users/login`,
       {
-        email: email.trim(),
+        email: email,
         password,
       },
       axiosConfig

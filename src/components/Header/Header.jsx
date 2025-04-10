@@ -222,8 +222,8 @@ export default function Header() {
             }}
             aria-label="Navigate to home page"
           >
-            <span className="text-[#00D8FF]">Cyber</span>{" "}
-            <span className="drop-shadow-[0px_0px_5px_#00D8FF]">Hunter</span>
+            <span className="text-[#00D8FF]">Event</span>{" "}
+            <span className="drop-shadow-[0px_0px_5px_#00D8FF]">System</span>
           </button>
           <div className="h-40 w-40 bg-[#00D8FF] overflow-hidden absolute top-0 -translate-y-1/2 right-0 translate-x-1/4 rounded-full opacity-45 blur-2xl"></div>
         </div>

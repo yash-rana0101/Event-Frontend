@@ -1,194 +1,234 @@
-import React, { useState } from 'react';
-import { useDispatch } from 'react-redux';
-import { Link, useNavigate } from 'react-router-dom';
-import { login } from '../../redux/user/userSlice';
-import { Lock, Mail, Eye, EyeOff, Zap } from 'lucide-react';
+/* eslint-disable no-unused-vars */
+import React, { useState, useEffect } from 'react';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
+import { useDispatch, useSelector } from 'react-redux';
+import { loginUser } from '../../redux/user/userSlice';
+import { motion } from 'framer-motion';
 import { toast } from 'react-toastify';
+import { FaEnvelope, FaLock, FaEye, FaEyeSlash } from 'react-icons/fa';
+import { fixPersistenceIssues } from '../../utils/persistFix';
 
 const Login = () => {
-  const dispatch = useDispatch();
-  const navigate = useNavigate();
   const [formData, setFormData] = useState({
     email: '',
-    password: ''
+    password: '',
   });
   const [showPassword, setShowPassword] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState('');
 
-  const { email, password } = formData;
+  const dispatch = useDispatch();
+  const navigate = useNavigate();
+  const location = useLocation();
+  
+  // Get auth state from Redux
+  const { loading, error, token } = useSelector(state => state.auth);
+  const { token: organizerToken } = useSelector(state => state.organizer);
+  
+  // Check for redirection after login
+  const redirectTo = location.state?.from || '/dashboard';
 
+  useEffect(() => {
+    // Fix persistence issues
+    fixPersistenceIssues();
+    
+    // If already logged in, redirect
+    if (token) {
+      toast.info("You're already logged in as a user");
+      navigate(redirectTo);
+    } else if (organizerToken) {
+      toast.info("You're already logged in as an organizer");
+      navigate('/organizer/dashboard');
+    }
+  }, [token, organizerToken, navigate, redirectTo]);
 
-  const onChange = e => {
-    // If the field is password, trim whitespace
-    const value = e.target.name === 'password' ? e.target.value.trim() : e.target.value;
-    setFormData({ ...formData, [e.target.name]: value });
-    setError('');
+  const handleChange = (e) => {
+    setFormData({
+      ...formData,
+      [e.target.name]: e.target.value,
+    });
   };
 
-  const onSubmit = async e => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    setIsLoading(true);
-    setError('');
-
+    
+    // Quick validation
+    if (!formData.email || !formData.password) {
+      toast.error("Please fill in all fields");
+      return;
+    }
+    
     try {
-      console.log("Login attempt with email:", email);
-
-      // Try direct login without the preliminary check
-      const result = await dispatch(login(email, password));
-
-      if (result.error) {
-        setError(result.error);
-        console.error('Login error from Redux action:', result.error);
-      } else {
-        console.log('Login successful, navigating to home');
-        toast.success('Login successful');
-        navigate('/');
+      const resultAction = await dispatch(loginUser(formData));
+      
+      // Check if login was successful
+      if (loginUser.fulfilled.match(resultAction)) {
+        toast.success('Welcome back!');
+        navigate(redirectTo);
       }
-    } catch (error) {
-      console.error("Login submission error:", error);
-      setError(error.message || 'An unexpected error occurred');
-      toast.error(error.message || 'An unexpected error occurred');
-    } finally {
-      setIsLoading(false);
+    } catch (err) {
+      console.error("Login error:", err);
     }
   };
 
-  const togglePasswordVisibility = () => {
-    setShowPassword(!showPassword);
-  };
+  const togglePasswordVisibility = () => setShowPassword(!showPassword);
 
   return (
-    <div className="min-h-screen bg-black flex items-center justify-center p-4 overflow-hidden relative">
-      {/* Cyber Grid Background Effect */}
-      <div className="absolute inset-0 pointer-events-none">
-        <div className="absolute inset-0 bg-gradient-to-br from-transparent via-transparent to-cyan-500/10 opacity-20"></div>
-        <div className="absolute inset-0 opacity-5" style={{
-          backgroundImage: 'linear-gradient(0deg, transparent 24%, rgba(6, 255, 252, 0.04) 25%, rgba(6, 255, 252, 0.04) 26%, transparent 27%, transparent 74%, rgba(6, 255, 252, 0.04) 75%, rgba(6, 255, 252, 0.04) 76%, transparent 77%, transparent), linear-gradient(90deg, transparent 24%, rgba(6, 255, 252, 0.04) 25%, rgba(6, 255, 252, 0.04) 26%, transparent 27%, transparent 74%, rgba(6, 255, 252, 0.04) 75%, rgba(6, 255, 252, 0.04) 76%, transparent 77%, transparent)',
-          backgroundSize: '50px 50px'
-        }}></div>
-      </div>
+    <div className="min-h-screen bg-black flex flex-col justify-center items-center p-4">
+      <div className="max-w-md w-full space-y-8">
+        <motion.div 
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5 }}
+          className="text-center"
+        >
+          <h1 className="text-3xl font-extrabold text-white">Welcome Back</h1>
+          <p className="mt-2 text-gray-400">Sign in to your user account</p>
+        </motion.div>
 
-      {/* Login Container */}
-      <div className="w-full max-w-md z-10 relative">
-        <div className="bg-black border-2 border-cyan-500 rounded-2xl shadow-2xl shadow-cyan-500/20 overflow-hidden">
-          <div className="p-8">
-            {/* Header */}
-            <div className="text-center mb-10">
-              <div className="flex justify-center mb-4">
-                <Zap className="h-12 w-12 text-cyan-500 animate-pulse" />
-              </div>
-              <h2 className="text-4xl font-bold text-cyan-500 tracking-tight">Welcome Back</h2>
-              <p className="text-cyan-300/70 mt-2 tracking-wider">SECURE AUTHENTICATION REQUIRED</p>
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ duration: 0.5, delay: 0.2 }}
+          className="bg-gray-900 rounded-xl shadow-xl overflow-hidden"
+        >
+          {error && (
+            <div className="bg-red-500/10 border-l-4 border-red-500 p-4">
+              <p className="text-red-400 text-sm">{error}</p>
             </div>
+          )}
 
-            <form onSubmit={onSubmit} className="space-y-6">
-              {/* Email Input */}
-              <div className="relative group">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <Mail className="h-5 w-5 text-cyan-500 group-focus-within:text-cyan-300 transition-colors" />
+          <div className="p-8">
+            <form className="space-y-6" onSubmit={handleSubmit}>
+              <div>
+                <label htmlFor="email" className="block text-sm font-medium text-gray-400">
+                  Email Address
+                </label>
+                <div className="mt-1 relative">
+                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                    <FaEnvelope className="h-5 w-5 text-gray-500" />
+                  </div>
+                  <input
+                    id="email"
+                    name="email"
+                    type="email"
+                    autoComplete="email"
+                    required
+                    value={formData.email}
+                    onChange={handleChange}
+                    className="appearance-none block w-full pl-10 pr-3 py-2 border border-gray-700 rounded-md bg-gray-800 placeholder-gray-500 text-white focus:outline-none focus:ring-cyan-500 focus:border-cyan-500 focus:z-10 sm:text-sm"
+                    placeholder="name@example.com"
+                  />
                 </div>
-                <input
-                  type="email"
-                  name="email"
-                  value={email}
-                  onChange={onChange}
-                  placeholder="ENTER EMAIL"
-                  required
-                  className="w-full pl-10 pr-4 py-3 bg-black border border-cyan-500/30 text-cyan-300 rounded-lg focus:outline-none focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/50 transition-all duration-300  tracking-wider placeholder-cyan-500/50"
-                />
               </div>
 
-              {/* Password Input */}
-              <div className="relative group">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <Lock className="h-5 w-5 text-cyan-500 group-focus-within:text-cyan-300 transition-colors" />
+              <div>
+                <label htmlFor="password" className="block text-sm font-medium text-gray-400">
+                  Password
+                </label>
+                <div className="mt-1 relative">
+                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                    <FaLock className="h-5 w-5 text-gray-500" />
+                  </div>
+                  <input
+                    id="password"
+                    name="password"
+                    type={showPassword ? "text" : "password"}
+                    autoComplete="current-password"
+                    required
+                    value={formData.password}
+                    onChange={handleChange}
+                    className="appearance-none block w-full pl-10 pr-10 py-2 border border-gray-700 rounded-md bg-gray-800 placeholder-gray-500 text-white focus:outline-none focus:ring-cyan-500 focus:border-cyan-500 focus:z-10 sm:text-sm"
+                    placeholder="••••••••"
+                  />
+                  <div className="absolute inset-y-0 right-0 pr-3 flex items-center">
+                    <button
+                      type="button"
+                      onClick={togglePasswordVisibility}
+                      className="text-gray-500 hover:text-gray-400 focus:outline-none"
+                    >
+                      {showPassword ? (
+                        <FaEyeSlash className="h-5 w-5" />
+                      ) : (
+                        <FaEye className="h-5 w-5" />
+                      )}
+                    </button>
+                  </div>
                 </div>
-                <input
-                  type={showPassword ? "text" : "password"}
-                  name="password"
-                  value={password}
-                  onChange={onChange}
-                  placeholder="ENTER PASSWORD"
-                  required
-                  className="w-full pl-10 pr-10 py-3 bg-black border border-cyan-500/30 text-cyan-300 rounded-lg focus:outline-none focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/50 transition-all duration-300  tracking-wider placeholder-cyan-500/50"
-                />
+              </div>
+
+              <div className="flex items-center justify-between">
+                <div className="flex items-center">
+                  <input
+                    id="remember_me"
+                    name="remember_me"
+                    type="checkbox"
+                    className="h-4 w-4 text-cyan-600 focus:ring-cyan-500 border-gray-600 rounded bg-gray-800"
+                  />
+                  <label htmlFor="remember_me" className="ml-2 block text-sm text-gray-400">
+                    Remember me
+                  </label>
+                </div>
+
+                <div className="text-sm">
+                  <Link to="/auth/forgot-password" className="font-medium text-cyan-400 hover:text-cyan-300">
+                    Forgot your password?
+                  </Link>
+                </div>
+              </div>
+
+              <div>
                 <button
-                  type="button"
-                  onClick={togglePasswordVisibility}
-                  className="absolute inset-y-0 right-0 pr-3 flex items-center"
+                  type="submit"
+                  disabled={loading}
+                  className={`group relative w-full flex justify-center py-2 px-4 border border-transparent rounded-md text-white font-medium ${
+                    loading
+                      ? "bg-cyan-700 cursor-not-allowed"
+                      : "bg-cyan-600 hover:bg-cyan-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-cyan-500"
+                  }`}
                 >
-                  {showPassword ? (
-                    <EyeOff className="h-5 w-5 text-cyan-500 hover:text-cyan-300 transition-colors" />
+                  {loading ? (
+                    <span className="flex items-center">
+                      <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                      </svg>
+                      Signing in...
+                    </span>
                   ) : (
-                    <Eye className="h-5 w-5 text-cyan-500 hover:text-cyan-300 transition-colors" />
+                    "Sign in"
                   )}
                 </button>
               </div>
-
-              {/* Error Message */}
-              {error && (
-                <div className="bg-red-500/10 border border-red-500/30 text-red-300 px-4 py-3 rounded-lg text-center uppercase tracking-wider">
-                  {error}
-                </div>
-              )}
-
-              {/* Forgot Password */}
-              <div className="text-right">
-                <a
-                  href="/forgot-password"
-                  className="text-sm text-cyan-500 hover:text-cyan-300 transition-colors uppercase tracking-wider"
-                >
-                  FORGOT PASSWORD?
-                </a>
-              </div>
-
-              {/* Submit Button */}
-              <button
-                type="submit"
-                disabled={isLoading}
-                className="w-full bg-cyan-500 text-black py-3 rounded-lg hover:bg-black transition-all duration-300 flex items-center justify-center space-x-2 uppercase font-bold tracking-wider group hover:cursor-pointer hover:shadow-lg hover:border-cyan-500 hover:border hover:text-cyan-500"
-              >
-                {isLoading ? (
-                  <svg className="animate-spin h-5 w-5 text-black" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                  </svg>
-                ) : (
-                  <>
-                    <span>LOGIN</span>
-                    <Zap className="h-5 w-5 group-hover:animate-pulse" />
-                  </>
-                )}
-              </button>
-
-              {/* Sign Up - Fixed HTML structure */}
-              <div className="text-center">
-                <p className="text-sm text-cyan-300/70 uppercase tracking-wider">
-                  NO ACCESS? {' '}
-                  <Link
-                    to="/auth/signup"
-                    className="text-cyan-500 hover:text-cyan-300 font-bold transition-colors"
-                  >
-                    SIGN UP
-                  </Link>
-                </p>
-              </div>
             </form>
-          </div>
-          <div className="w-full flex justify-center mb-4 px-4">
-            <div className="bg-black border border-cyan-500/30 rounded-2xl p-6 w-full max-w-md shadow-lg transition-transform duration-300 hover:scale-105">
-              <p className="text-center text-sm md:text-base text-cyan-300/80 tracking-wider">
-                Want to <span className="text-cyan-500 font-semibold">Login</span> as an Organizer?{' '}
+
+            <div className="mt-6">
+              <div className="relative">
+                <div className="absolute inset-0 flex items-center">
+                  <div className="w-full border-t border-gray-700"></div>
+                </div>
+                <div className="relative flex justify-center text-sm">
+                  <span className="px-2 bg-gray-900 text-gray-400">Or continue with</span>
+                </div>
+              </div>
+
+              <div className="mt-6">
                 <Link
-                  to="/organizer/login"
-                  className="text-cyan-500 hover:text-cyan-300 font-bold underline underline-offset-4 transition-colors duration-200"
+                  to="/auth/organizer-login"
+                  className="w-full flex justify-center py-2 px-4 border border-cyan-700 rounded-md shadow-sm text-sm font-medium text-cyan-400 bg-gray-800 hover:bg-gray-700"
                 >
-                  Click here
+                  Sign in as an organizer
                 </Link>
-              </p>
+              </div>
             </div>
           </div>
+        </motion.div>
+
+        <div className="text-center mt-4">
+          <p className="text-gray-400">
+            Don't have an account?{" "}
+            <Link to="/auth/signup" className="font-medium text-cyan-400 hover:text-cyan-300">
+              Sign up
+            </Link>
+          </p>
         </div>
       </div>
     </div>

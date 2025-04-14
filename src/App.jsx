@@ -1,32 +1,34 @@
 import React, { useEffect } from 'react';
-import { BrowserRouter } from 'react-router-dom';
-import { ToastContainer } from 'react-toastify';
-import 'react-toastify/dist/ReactToastify.css';
-import AppRoutes from './config/Routes'; // Change from import { router } to import AppRoutes
+import { useDispatch } from 'react-redux';
+import { verifyUserToken } from './redux/user/userSlice';
+import { verifyOrganizerToken } from './redux/user/organizer';
+import AppRoutes from './config/Routes';
+import { AuthProvider } from './context/AuthContext';
 import { fixPersistenceIssues } from './utils/persistFix';
 
 function App() {
-  // Fix localStorage persistence issues on mount
+  const dispatch = useDispatch();
+
   useEffect(() => {
+    // Clean up any persistence issues
     fixPersistenceIssues();
-  }, []);
+    
+    // Try to verify both user and organizer tokens
+    const userToken = localStorage.getItem('token');
+    if (userToken && userToken !== 'null') {
+      dispatch(verifyUserToken());
+    }
+    
+    const organizerToken = localStorage.getItem('organizer_token');
+    if (organizerToken && organizerToken !== 'null') {
+      dispatch(verifyOrganizerToken());
+    }
+  }, [dispatch]);
 
   return (
-    <BrowserRouter>
-      <AppRoutes /> {/* Use the imported component directly */}
-      <ToastContainer
-        position="top-right"
-        autoClose={5000}
-        hideProgressBar={false}
-        newestOnTop
-        closeOnClick
-        rtl={false}
-        pauseOnFocusLoss
-        draggable
-        pauseOnHover
-        theme="dark"
-      />
-    </BrowserRouter>
+    <AuthProvider>
+      <AppRoutes />
+    </AuthProvider>
   );
 }
 

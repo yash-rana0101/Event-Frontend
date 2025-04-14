@@ -1,58 +1,54 @@
 import { useEffect } from 'react';
-import { useDispatch, useSelector } from 'react-redux';
 import { useNavigate } from 'react-router-dom';
+import { useDispatch, useSelector } from 'react-redux';
 import { logout as userLogout } from '../../redux/user/userSlice';
 import { logout as organizerLogout } from '../../redux/user/organizer';
-import { thoroughAuthCleanup } from '../../utils/persistFix';
+import { fullLogout } from '../../utils/persistFix';
+import { toast } from 'react-toastify';
 
 const Logout = () => {
-  const dispatch = useDispatch();
   const navigate = useNavigate();
+  const dispatch = useDispatch();
   
-  // Check which type of user is logged in
-  const userAuth = useSelector(state => state.auth);
-  const organizerAuth = useSelector(state => state.organizer);
+  // Check what type of user is logged in
+  const userToken = useSelector(state => state.auth?.token);
+  const organizerToken = useSelector(state => state.organizer?.token);
 
   useEffect(() => {
-    // Determine which type of user to log out
-    const hasUserAuth = userAuth?.token && userAuth?.isAuthenticated;
-    const hasOrganizerAuth = organizerAuth?.token && organizerAuth?.isAuthenticated;
-    
-    console.log("Logging out user:", { hasUserAuth, hasOrganizerAuth });
-    
-    // Perform complete logout actions
-    if (hasUserAuth) {
-      thoroughAuthCleanup('user');
-      dispatch(userLogout());
-    }
-    
-    if (hasOrganizerAuth) {
-      thoroughAuthCleanup('organizer');
-      dispatch(organizerLogout());
-    }
-    
-    // If no specific auth found, clean everything just to be sure
-    if (!hasUserAuth && !hasOrganizerAuth) {
-      thoroughAuthCleanup('all');
-      dispatch(userLogout());
-      dispatch(organizerLogout());
-    }
-    
-    // Redirect to home page
-    setTimeout(() => {
-      navigate('/');
-    }, 500);
-  }, [dispatch, navigate, userAuth, organizerAuth]);
+    const performLogout = () => {
+      try {
+        // Use fullLogout utility to clean localStorage thoroughly
+        fullLogout();
+        
+        // Dispatch appropriate logout actions
+        if (userToken) {
+          dispatch(userLogout());
+          toast.success('You have been logged out from your user account');
+        }
+        
+        if (organizerToken) {
+          dispatch(organizerLogout());
+          toast.success('You have been logged out from your organizer account');
+        }
+        
+        // If no tokens found, show generic message
+        if (!userToken && !organizerToken) {
+          toast.info('You were already logged out');
+        }
+        
+        // Redirect to home page
+        navigate('/', { replace: true });
+      } catch (error) {
+        console.error('Logout error:', error);
+        toast.error('There was a problem logging you out. Please try again.');
+      }
+    };
 
-  return (
-    <div className="h-screen flex items-center justify-center bg-black">
-      <div className="text-center">
-        <div className="w-16 h-16 border-4 border-cyan-500 border-t-transparent rounded-full mx-auto mb-4 animate-spin"></div>
-        <h1 className="text-2xl font-bold text-white mb-2">Logging out...</h1>
-        <p className="text-gray-400">Please wait while we securely log you out.</p>
-      </div>
-    </div>
-  );
+    performLogout();
+  }, [dispatch, navigate, userToken, organizerToken]);
+
+  // This component doesn't render anything, it just performs the logout
+  return null;
 };
 
 export default Logout;

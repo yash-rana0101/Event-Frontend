@@ -15,7 +15,7 @@ import { MdMiscellaneousServices } from 'react-icons/md';
 import { PiRankingFill } from 'react-icons/pi';
 import { FaPhoneAlt } from 'react-icons/fa';
 import { NavLink, useNavigate } from 'react-router-dom';
-import { thoroughAuthCleanup } from '../../utils/persistFix'; // Import the new utility
+import { thoroughAuthCleanup } from '../../utils/persistFix';
 
 export default function Header() {
   const [isScrolled, setIsScrolled] = React.useState(false);
@@ -61,12 +61,12 @@ export default function Header() {
   const userNav = [
     {
       name2: "Profile",
-      link2: "/dashboard/profile",
+      link2: "/user/profile",
       icon: <BsPersonCircle />,
     },
     {
       name2: "Dashboard",
-      link2: "/dashboard",
+      link2: "/user/dashboard",
       icon: <BsGrid3X3Gap />,
     },
   ];
@@ -246,7 +246,7 @@ export default function Header() {
           {activeUser ? (
             <>
               <NavLink
-                to={currentOrganizer ? organizerProfileLink : "/dashboard/profile"}
+                to={currentOrganizer ? organizerProfileLink : "/user/profile"}
                 className={({ isActive }) =>
                   `group relative px-4 py-2 rounded-lg transition-all duration-300 hover:cursor-pointer ${isActive
                     ? "text-[#00D8FF]"
@@ -265,7 +265,7 @@ export default function Header() {
               </NavLink>
 
               <NavLink
-                to={currentOrganizer ? "/organizer/dashboard" : "/dashboard"}
+                to={currentOrganizer ? "/organizer/dashboard" : "/user/dashboard"}
                 end
                 className={({ isActive }) =>
                   `group relative px-4 py-2 rounded-lg transition-all duration-300 ${isActive

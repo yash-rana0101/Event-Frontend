@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { useDispatch } from 'react-redux';
-import { loginSuccess } from '../../redux/user/userSlice';
+import loginSuccess  from '../../redux/user/userSlice';
 import axios from "axios";
 import {
   User,

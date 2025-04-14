@@ -1,167 +1,99 @@
-import React from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
-import { OrganizerGuard, PublicRoute, ProfileCompletedGuard, AuthGuard, AdminGuard } from '../routes/Guard';
+import Layout from '../layout/Layout';
+import AdminLayout from '../layout/AdminLayout';
+import Guard, { GUARD_TYPES } from '../routes/Guard';
 
-// Page imports
+// Public Pages
 import Home from '../pages/Home/Home';
-import Event from '../pages/Events/Events';
-import EventDetail from '../pages/Events/EventDetail';
+import Contact from '../pages/Home/Contact';
+
+// Auth Pages
 import Login from '../pages/Auth/Login';
-import Register from '../pages/Auth/Register';
 import OrgLogin from '../pages/Auth/OrgLogin';
+import Register from '../pages/Auth/Register';
 import OrgRegister from '../pages/Auth/OrgRegister';
+import ForgotPassword from '../pages/Auth/ForgotPassword';
+import ResetPassword from '../pages/Auth/ResetPassword';
+import Logout from '../pages/Auth/Logout';
+
+// Event Pages
+import Events from '../pages/Events/Events';
+import EventDetail from '../pages/Events/EventDetail';
+import CreateEvent from '../pages/Events/CreateEvent';
+import EditEvent from '../pages/Events/EditEvent';
+import EventListPage from '../pages/Events/EventListPage';
+
+
+// Organizer Pages
 import OrganizerDashboard from '../pages/Organizer/OrganizerDashboard';
 import OrganizerDetails from '../pages/Organizer/OrganizerDetails';
 import OrganizerProfile from '../pages/Organizer/OrganizerProfile';
-import CreateEditEvent from '../pages/Organizer/CreateEditEvent';
 import EventAttendees from '../pages/Organizer/EventAttendees';
-import EditEvent from '../pages/Events/EditEvent';
-import Logout from '../pages/Auth/Logout';
-import About from '../pages/Home/About';
-import Contact from '../pages/Home/Contact';
-import EventListPage from '../pages/Events/EventListPage';
+import CreateEditEvent from '../pages/Organizer/CreateEditEvent';
 
-// Layout imports
-import Layout from '../layout/Layout';
-import AdminLayout from '../layout/AdminLayout';
+// user Pages
+import UserDashboard from '../pages/User/UserDashboard';
 
-const AppRoutes = () => {
+
+function AppRoutes() {
   return (
     <Routes>
+      
       {/* Public Routes */}
       <Route path="/" element={<Layout />}>
         <Route index element={<Home />} />
-        <Route path="about" element={<About />} />
-        <Route path="event" element={<Event />} />
         <Route path="contact" element={<Contact />} />
+        
+        {/* Events */}
+        <Route path="event" element={<Events />} />
         <Route path="event/:eventId" element={<EventDetail />} />
-
+        
         {/* Auth Routes */}
         <Route path="auth">
-          <Route
-            path="login"
-            element={
-              <PublicRoute>
-                <Login />
-              </PublicRoute>
-            }
-          />
-          <Route
-            path="signup"
-            element={
-              <PublicRoute>
-                <Register />
-              </PublicRoute>
-            }
-          />
-          <Route
-            path="organizer/login"
-            element={
-              <PublicRoute>
-                <OrgLogin />
-              </PublicRoute>
-            }
-          />
-          <Route
-            path="organizer/register"
-            element={
-              <PublicRoute>
-                <OrgRegister />
-              </PublicRoute>
-            }
-          />
+          <Route path="login" element={<Login />} />
+          <Route path="organizer-login" element={<OrgLogin />} />
+          <Route path="signup" element={<Register />} />
+          <Route path="organizer-register" element={<OrgRegister />} />
+          <Route path="forgot-password" element={<ForgotPassword />} />
+          <Route path="reset-password/:token" element={<ResetPassword />} />
           <Route path="logout" element={<Logout />} />
         </Route>
-
-        {/* Organizer Routes */}
-        <Route path="organizer">
-          <Route
-            path="login"
-            element={
-              <PublicRoute>
-                <OrgLogin />
-              </PublicRoute>
-            }
-          />
-          <Route
-            path="register"
-            element={
-              <PublicRoute>
-                <OrgRegister />
-              </PublicRoute>
-            }
-          />
-          <Route
-            path="dashboard"
-            element={
-              <ProfileCompletedGuard>
-                <OrganizerDashboard />
-              </ProfileCompletedGuard>
-            }
-          />
-          <Route
-            path="details"
-            element={
-              <OrganizerGuard>
-                <OrganizerDetails />
-              </OrganizerGuard>
-            }
-          />
-          <Route
-            path="profile/:organizerId"
-            element={<OrganizerProfile />}
-          />
-          <Route
-            path="create"
-            element={
-              <ProfileCompletedGuard>
-                <CreateEditEvent />
-              </ProfileCompletedGuard>
-            }
-          />
-          <Route
-            path="edit/:eventId"
-            element={
-              <ProfileCompletedGuard>
-                <EditEvent />
-              </ProfileCompletedGuard>
-            }
-          />
-          <Route
-            path="events/:eventId/attendees"
-            element={
-              <ProfileCompletedGuard>
-                <EventAttendees />
-              </ProfileCompletedGuard>
-            }
-          />
-          <Route
-            path="events/list"
-            element={
-              <ProfileCompletedGuard>
-                <EventListPage />
-              </ProfileCompletedGuard>
-            }
-          />
-        </Route>
+      
+      
+      {/* User Protected Routes */}
+      <Route path="/user" element={
+        <Guard type={GUARD_TYPES.USER}>
+          <AdminLayout />
+        </Guard>
+      }>
+        <Route path="dashboard" element={<UserDashboard/>} />
+        <Route path="profile" element={<div>User Profile</div>} />
       </Route>
-
-      {/* Admin Routes */}
-      <Route
-        path="/admin"
-        element={
-          <AdminGuard>
-            <AdminLayout />
-          </AdminGuard>
-        }
-      >
-        {/* Add admin routes here */}
+      
+      {/* Organizer Protected Routes */}
+      <Route path="/organizer" element={
+        <Guard type={GUARD_TYPES.ORGANIZER}>
+          <AdminLayout />
+        </Guard>
+      }>
+        <Route path="dashboard" element={<OrganizerDashboard />} />
+        <Route path="profile" element={<OrganizerProfile />} />
+        <Route path="profile/:organizerId" element={<OrganizerProfile />} />
+        <Route path="details" element={<OrganizerDetails />} />
+        <Route path="events/list" element={<EventListPage />} />
+        <Route path="events/attendees/:eventId" element={<EventAttendees />} />
+        <Route path="event/create" element={<CreateEditEvent />} />
+        <Route path="event/edit/:eventId" element={<CreateEditEvent />} />
+        
+        {/* Legacy path support */}
+        <Route path="create" element={<CreateEvent />} />
       </Route>
-
-      {/* 404 Route */}
+      
+      {/* Catch-all route */}
       <Route path="*" element={<Navigate to="/" replace />} />
+    </Route>
     </Routes>
   );
-};
+}
 
 export default AppRoutes;

@@ -1,89 +1,37 @@
-import { configureStore } from "@reduxjs/toolkit";
-import {
-  persistStore,
-  persistReducer,
-  FLUSH,
-  REHYDRATE,
-  PAUSE,
-  PERSIST,
-  PURGE,
-  REGISTER,
-} from "redux-persist";
+import { configureStore, combineReducers } from "@reduxjs/toolkit";
+import { persistStore, persistReducer } from "redux-persist";
 import storage from "redux-persist/lib/storage";
-import { combineReducers } from "redux";
+import {thunk} from "redux-thunk";
+
+// Import reducers
 import authReducer from "./user/userSlice";
 import organizerReducer from "./user/organizer";
 
-// Configure persist options
-const persistConfig = {
-  key: "root",
-  storage,
-  blacklist: ["_persist"], // Don't persist the persist key itself
-};
-
-// Configure reducer-specific persist settings
+// Configure persistence for each reducer separately to avoid conflicts
 const authPersistConfig = {
   key: "auth",
   storage,
-  whitelist: ["user", "token"], // only persist these fields
-  serialize: true, // Ensure proper serialization
+  whitelist: ["token", "user"], // only persist these fields
 };
 
 const organizerPersistConfig = {
   key: "organizer",
   storage,
-  whitelist: ["user", "token"], // only persist these fields
-  serialize: true, // Ensure proper serialization
+  whitelist: ["token", "user"], // only persist these fields
 };
 
-// Create persisted reducers
-const persistedAuthReducer = persistReducer(authPersistConfig, authReducer);
-const persistedOrganizerReducer = persistReducer(
-  organizerPersistConfig,
-  organizerReducer
-);
-
-// Combine reducers
 const rootReducer = combineReducers({
-  auth: persistedAuthReducer,
-  organizer: persistedOrganizerReducer,
+  auth: persistReducer(authPersistConfig, authReducer),
+  organizer: persistReducer(organizerPersistConfig, organizerReducer),
   // Add other reducers here
 });
 
-// Apply root level persistence
-const persistedRootReducer = persistReducer(persistConfig, rootReducer);
-
-// Create store with improved middleware configuration
 export const store = configureStore({
-  reducer: persistedRootReducer,
+  reducer: rootReducer,
   middleware: (getDefaultMiddleware) =>
     getDefaultMiddleware({
-      serializableCheck: {
-        ignoredActions: [FLUSH, REHYDRATE, PAUSE, PERSIST, PURGE, REGISTER],
-        // Expand ignored paths to be more flexible with field names
-        ignoredActionPaths: [
-          "payload.user",
-          "payload.error",
-          "payload.user.name",
-          "payload.user.username",
-        ],
-        ignoredPaths: [
-          "auth.user",
-          "organizer.user",
-          "auth.user.name",
-          "auth.user.username",
-        ],
-      },
-    }),
-  devTools: import.meta.env?.PROD !== true, // Vite uses import.meta.env instead of process.env
+      serializableCheck: false, // Disable serializable check for redux-persist
+    }).concat(thunk),
 });
 
-// Initialize persistor
-export const persistor = persistStore(store, null, () => {
-  console.log("Rehydration complete");
-});
-
-// Helper function to clear persisted storage (for debugging)
-export const purgeStore = () => {
-  persistor.purge();
-};
+export const persistor = persistStore(store);

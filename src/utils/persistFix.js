@@ -60,65 +60,6 @@ export const fixPersistenceIssues = () => {
 };
 
 /**
- * Hard reset of all auth data (for emergencies/debugging)
- */
-export const resetAllAuthData = () => {
-  localStorage.removeItem("token");
-  localStorage.removeItem("organizer_token");
-
-  // You would need to dispatch logout actions here too if store is available
-  if (store) {
-    store.dispatch({ type: "auth/logout" });
-    store.dispatch({ type: "organizer/logout" });
-  }
-};
-
-/**
- * Comprehensive cleanup of all auth data (for logout)
- * @param {string} userType - 'user' or 'organizer' to specify which type to logout
- */
-export const thoroughAuthCleanup = (userType = "all") => {
-  console.log(`Performing thorough cleanup for: ${userType}`);
-
-  // Clear specific user type data
-  if (userType === "user" || userType === "all") {
-    localStorage.removeItem("token");
-    localStorage.removeItem("user");
-    localStorage.removeItem("auth_expiry");
-
-    // Find and remove any user-related items
-    Object.keys(localStorage).forEach((key) => {
-      if (key.startsWith("user_") || key.includes("auth_")) {
-        localStorage.removeItem(key);
-      }
-    });
-  }
-
-  // Clear organizer data
-  if (userType === "organizer" || userType === "all") {
-    localStorage.removeItem("organizer_token");
-    localStorage.removeItem("organizer_token_expiry");
-    localStorage.removeItem("organizer_user");
-
-    // Find and remove any organizer-related items
-    Object.keys(localStorage).forEach((key) => {
-      if (key.startsWith("organizer_")) {
-        localStorage.removeItem(key);
-      }
-    });
-  }
-
-  // Verify cleanup was successful
-  const remainingKeys = Object.keys(localStorage);
-  console.log("Remaining localStorage items after cleanup:", remainingKeys);
-
-  return {
-    success: true,
-    remaining: remainingKeys,
-  };
-};
-
-/**
  * Enhanced helper function to safely parse potentially JSON-stringified tokens
  * @param {string} token - Token that might be JSON stringified
  * @returns {string} - Properly formatted token
@@ -153,33 +94,92 @@ export const safelyParseToken = (token) => {
 };
 
 /**
- * Helper function to check if organizer profile is complete based on details
+ * Comprehensive cleanup of all auth data (for logout)
+ * @param {string} userType - 'user' or 'organizer' to specify which type to logout
  */
-export const checkProfileCompleteness = (details) => {
-  if (!details) return false;
+export const thoroughAuthCleanup = (userType = "all") => {
+  console.log(`Performing thorough cleanup for: ${userType}`);
 
-  // Define what fields are required for a complete profile
-  const requiredFields = ["title", "bio", "location"];
+  // Clear specific user type data
+  if (userType === "user" || userType === "all") {
+    localStorage.removeItem("token");
+    localStorage.removeItem("token_expiry");
+    localStorage.removeItem("user");
 
-  // Check if all required fields have values
-  return requiredFields.every(
-    (field) => details[field] && details[field].trim() !== ""
-  );
+    // Find and remove any user-related items
+    Object.keys(localStorage).forEach((key) => {
+      if (key.startsWith("user_") || key.includes("auth_")) {
+        localStorage.removeItem(key);
+      }
+    });
+  }
+
+  // Clear organizer data
+  if (userType === "organizer" || userType === "all") {
+    localStorage.removeItem("organizer_token");
+    localStorage.removeItem("organizer_token_expiry");
+    localStorage.removeItem("organizer_user");
+    localStorage.removeItem("organizer_profile_complete");
+
+    // Find and remove any organizer-related items
+    Object.keys(localStorage).forEach((key) => {
+      if (key.startsWith("organizer_")) {
+        localStorage.removeItem(key);
+      }
+    });
+  }
+
+  // Verify cleanup was successful
+  const remainingKeys = Object.keys(localStorage);
+  console.log("Remaining localStorage items after cleanup:", remainingKeys);
+
+  return {
+    success: true,
+    remaining: remainingKeys,
+  };
 };
 
 /**
- * Get stored profile completion status
+ * Logout from both user and organizer accounts
+ * Useful to fully reset auth state when there are conflicts
  */
-export const getStoredProfileStatus = () => {
-  return localStorage.getItem("organizer_profile_complete") === "true";
+export const fullLogout = () => {
+  thoroughAuthCleanup("all");
+
+  // Dispatch logout actions for both auth types
+  try {
+    store.dispatch({ type: "auth/logout" });
+    store.dispatch({ type: "organizer/logout" });
+  } catch (e) {
+    console.error("Error dispatching logout actions:", e);
+  }
+
+  return { success: true };
 };
 
 /**
- * Reset profile completion status (for debugging/testing)
+ * Checks if a user is authenticated (either as regular user or organizer)
+ * @returns {Object} Authentication status details
  */
-export const resetProfileCompletionStatus = () => {
-  localStorage.removeItem("organizer_profile_complete");
-  localStorage.removeItem("organizer_details_last_shown");
-  console.log("Profile completion status reset");
-  return true;
+export const checkAuthStatus = () => {
+  // Check Redux store
+  const state = store.getState();
+
+  // Check user authentication
+  const userToken = state.auth?.token || localStorage.getItem("token");
+  const userAuthenticated = !!userToken && userToken !== "null";
+
+  // Check organizer authentication
+  const organizerToken =
+    state.organizer?.token || localStorage.getItem("organizer_token");
+  const organizerAuthenticated = !!organizerToken && organizerToken !== "null";
+
+  return {
+    userAuthenticated,
+    organizerAuthenticated,
+    userToken: userToken ? safelyParseToken(userToken) : null,
+    organizerToken: organizerToken ? safelyParseToken(organizerToken) : null,
+    anyAuthenticated: userAuthenticated || organizerAuthenticated,
+    bothAuthenticated: userAuthenticated && organizerAuthenticated,
+  };
 };

@@ -4,10 +4,8 @@ import { useNavigate } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
 import { motion } from 'framer-motion';
 import axios from 'axios';
-import { 
-  checkOrganizerProfileCompletion, 
-  updateProfileCompletionStatus 
-} from '../../redux/user/organizer';
+import updateProfileCompletionStatus  from '../../redux/user/organizer';
+import checkOrganizerProfileCompletion  from '../../redux/user/organizer';
 import { safelyParseToken } from '../../utils/persistFix';
 import { toast } from 'react-toastify';
 

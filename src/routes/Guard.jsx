@@ -1,132 +1,91 @@
-/* eslint-disable no-unused-vars */
-import React, { useEffect } from 'react';
-import { Navigate, useLocation, Outlet } from 'react-router-dom';
+import { useEffect, useState } from 'react';
+import { Navigate, useLocation } from 'react-router-dom';
 import { useSelector, useDispatch } from 'react-redux';
-import { verifyOrganizerToken, checkOrganizerProfileCompletion } from '../redux/user/organizer';
+import { verifyUserToken } from '../redux/user/userSlice';
+import { verifyOrganizerToken } from '../redux/user/organizer';
+import { fixPersistenceIssues } from '../utils/persistFix';
 
-// Public routes - accessible when not logged in
-export const PublicRoute = ({ children }) => {
-  const { isAuthenticated } = useSelector((state) => state.organizer || {});
-
-  if (isAuthenticated) {
-    return <Navigate to="/organizer/dashboard" replace />;
-  }
-
-  return children || <Outlet />;
+// Types of guards
+const GUARD_TYPES = {
+  USER: 'user',
+  ORGANIZER: 'organizer',
+  ANY: 'any',
 };
 
-// Auth guard for organizer routes
-export const OrganizerGuard = ({ children }) => {
-  const dispatch = useDispatch();
+const Guard = ({ children, type = GUARD_TYPES.USER, redirectTo }) => {
   const location = useLocation();
-  const { isAuthenticated, loading, profileComplete, token } = useSelector((state) => state.organizer || {});
+  const dispatch = useDispatch();
+  const [isVerifying, setIsVerifying] = useState(true);
   
-  // Track if we're currently on the details page to prevent redirect loops
-  const isOnDetailsPage = location.pathname.includes('/organizer/details');
-
-  // Check if we've shown the details page in the current session
-  const hasShownDetailsRecently = () => {
-    const lastShown = localStorage.getItem('organizer_details_last_shown');
-    if (!lastShown) return false;
-    
-    // If shown in the last 5 minutes, don't show again
-    const fiveMinutesAgo = new Date().getTime() - 5 * 60 * 1000;
-    return parseInt(lastShown) > fiveMinutesAgo;
+  // Get authentication state from Redux
+  const userAuth = useSelector(state => state.auth);
+  const organizerAuth = useSelector(state => state.organizer);
+  
+  // Default redirect paths
+  const defaultRedirects = {
+    [GUARD_TYPES.USER]: '/auth/login',
+    [GUARD_TYPES.ORGANIZER]: '/auth/organizer-login',
+    [GUARD_TYPES.ANY]: '/auth/login',
   };
+  
+  // Determine final redirect path
+  const finalRedirectTo = redirectTo || defaultRedirects[type] || '/auth/login';
 
   useEffect(() => {
-    // Always verify token first
-    if (!loading && token) {
-      dispatch(verifyOrganizerToken()).then(() => {
-        // After token verification, force a fresh profile completion check
-        dispatch(checkOrganizerProfileCompletion());
-      });
+    const verifyAuth = async () => {
+      try {
+        // Fix any persistence issues with tokens
+        fixPersistenceIssues();
+        
+        // Verify tokens based on guard type
+        if (type === GUARD_TYPES.USER || type === GUARD_TYPES.ANY) {
+          if (userAuth.token) {
+            await dispatch(verifyUserToken()).unwrap();
+          }
+        }
+        
+        if (type === GUARD_TYPES.ORGANIZER || type === GUARD_TYPES.ANY) {
+          if (organizerAuth.token) {
+            await dispatch(verifyOrganizerToken()).unwrap();
+          }
+        }
+      } catch (error) {
+        console.error('Token verification failed:', error);
+      } finally {
+        setIsVerifying(false);
+      }
+    };
+
+    verifyAuth();
+  }, [dispatch, type, userAuth.token, organizerAuth.token]);
+
+  // Show nothing while verifying to prevent flashes of redirect
+  if (isVerifying) {
+    return null;
+  }
+
+  // Check if user is authenticated based on guard type
+  const isAuthenticated = (() => {
+    switch (type) {
+      case GUARD_TYPES.USER:
+        return !!userAuth.token && !!userAuth.user;
+      case GUARD_TYPES.ORGANIZER:
+        return !!organizerAuth.token && !!organizerAuth.user;
+      case GUARD_TYPES.ANY:
+        return (!!userAuth.token && !!userAuth.user) || (!!organizerAuth.token && !!organizerAuth.user);
+      default:
+        return false;
     }
-  }, [dispatch, token]);
-
-  // Log the current state for debugging
-  console.log("OrganizerGuard - Auth state:", { 
-    isAuthenticated, 
-    profileComplete, 
-    path: location.pathname,
-    isOnDetailsPage,
-    hasShownDetailsRecently: hasShownDetailsRecently(),
-  });
-
-  // If not authenticated, redirect to login
-  if (!isAuthenticated) {
-    console.log("Not authenticated, redirecting to login");
-    return <Navigate to="/organizer/login" state={{ from: location }} replace />;
-  }
-
-  // Only redirect to details page if:
-  // 1. Profile is not complete
-  // 2. Not already on the details page
-  // 3. Not trying to logout
-  // 4. Haven't just shown the details page recently
-  if (isAuthenticated && 
-      profileComplete === false && 
-      !isOnDetailsPage &&
-      !location.pathname.includes('/auth/logout') &&
-      !hasShownDetailsRecently()) {
-    console.log("Profile not complete, redirecting to details page");
-    return <Navigate to="/organizer/details" replace />;
-  }
-
-  return children || <Outlet />;
-};
-
-// For routes that require profile completion
-export const ProfileCompletedGuard = ({ children }) => {
-  const dispatch = useDispatch();
-  const location = useLocation();
-  const { isAuthenticated, profileComplete, token } = useSelector((state) => state.organizer || {});
-
-  // Force a profile completion check on mount
-  useEffect(() => {
-    if (token) {
-      dispatch(checkOrganizerProfileCompletion());
-    }
-  }, [dispatch, token]);
-
-  console.log("ProfileCompletedGuard - State:", { isAuthenticated, profileComplete });
+  })();
 
   if (!isAuthenticated) {
-    console.log("ProfileCompletedGuard: Not authenticated, redirecting to login");
-    return <Navigate to="/organizer/login" replace />;
+    // Redirect to login with current location saved for later redirect back
+    return <Navigate to={finalRedirectTo} state={{ from: location.pathname }} replace />;
   }
 
-  if (isAuthenticated && profileComplete === false) {
-    console.log("ProfileCompletedGuard: Profile not complete, redirecting to details");
-    return <Navigate to="/organizer/details" replace />;
-  }
-
-  return children || <Outlet />;
+  return children;
 };
 
-// Admin guard - unchanged
-export const AdminGuard = ({ children }) => {
-  const { isAuthenticated, user } = useSelector((state) => state.user);
-
-  if (!isAuthenticated) {
-    return <Navigate to="/admin/login" replace />;
-  }
-
-  if (user && user.role !== 'admin') {
-    return <Navigate to="/" replace />;
-  }
-
-  return children || <Outlet />;
-};
-
-// Auth guard - unchanged
-export const AuthGuard = ({ children }) => {
-  const { isAuthenticated } = useSelector((state) => state.user);
-  const location = useLocation();
-
-  if (!isAuthenticated) {
-    return <Navigate to="/auth/login" state={{ from: location }} replace />;
-  }
-
-  return children || <Outlet />;
-};
+// Export guard types for convenience
+export { GUARD_TYPES };
+export default Guard;

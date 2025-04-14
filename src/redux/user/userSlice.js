@@ -1,207 +1,164 @@
+/* eslint-disable no-unused-vars */
 import { createSlice, createAsyncThunk } from "@reduxjs/toolkit";
 import axios from "axios";
+import { safelyParseToken } from "../../utils/persistFix";
 
-// Proper token retrieval helper
-const getStoredToken = () => {
-  const token = localStorage.getItem("token");
-  // Make sure we don't return "null" as a string
-  return token && token !== "null" ? token : null;
+// Get API URL from environment or use default
+const API_URL = import.meta.env.VITE_API_URL || "http://localhost:3000/api/v1";
+
+// Helper to handle token expiration
+const isTokenExpired = (expiryTime) => {
+  if (!expiryTime) return true;
+  return new Date().getTime() > expiryTime;
 };
 
-// Verify user token (similar to verifyOrganizerToken)
-export const verifyUserToken = createAsyncThunk(
-  "auth/verify",
-  async (_, { getState, rejectWithValue }) => {
+// Initial state with proper typing
+const initialState = {
+  user: null,
+  token: null,
+  loading: false,
+  error: null,
+  tokenExpiry: null,
+};
+
+// Async thunk for login
+export const loginUser = createAsyncThunk(
+  "auth/login",
+  async (credentials, { rejectWithValue }) => {
     try {
-      const token = getState().auth?.token || getStoredToken();
+      const response = await axios.post(`${API_URL}/users/login`, credentials);
 
-      if (!token) return rejectWithValue("No token found");
+      // Set expiry time for token (1 day from now)
+      const expiryTime = new Date().getTime() + 24 * 60 * 60 * 1000;
 
-      const config = {
-        headers: { Authorization: `Bearer ${token}` },
+      // Save to localStorage for backup/direct access
+      localStorage.setItem("token", response.data.token);
+      localStorage.setItem("token_expiry", expiryTime.toString());
+
+      return {
+        token: response.data.token,
+        user: response.data.user,
+        tokenExpiry: expiryTime,
       };
-
-      const response = await axios.get(
-        `${import.meta.env.VITE_API_URL}/users/profile`, // Updated endpoint
-        config
-      );
-
-      if (!response.data) {
-        throw new Error("Empty response data");
-      }
-
-      return { user: response.data, token };
     } catch (error) {
-      console.error("User token verification failed:", error);
-      localStorage.removeItem("token");
       return rejectWithValue(
-        error.response?.data?.message || "Session expired"
+        error.response?.data?.message || "Login failed. Please try again."
       );
     }
   }
 );
 
-const initialState = {
-  user: null,
-  token: getStoredToken(),
-  loading: false,
-  error: null,
-};
+// Verify token validity
+export const verifyUserToken = createAsyncThunk(
+  "auth/verifyToken",
+  async (_, { getState, rejectWithValue }) => {
+    try {
+      // Get current state
+      const { auth } = getState();
 
+      // First check if we have a token in state, otherwise try localStorage
+      let token = auth.token;
+      if (!token) {
+        token = localStorage.getItem("token");
+
+        // Handle case where token might be JSON stringified
+        token = safelyParseToken(token);
+      }
+
+      if (!token) {
+        return rejectWithValue("No authentication token found");
+      }
+
+      // Check if token is expired
+      const tokenExpiry =
+        auth.tokenExpiry || localStorage.getItem("token_expiry");
+      if (isTokenExpired(tokenExpiry)) {
+        // Clear expired token and reject
+        localStorage.removeItem("token");
+        localStorage.removeItem("token_expiry");
+        return rejectWithValue("Token expired");
+      }
+
+      // Verify token by calling profile endpoint
+      const response = await axios.get(`${API_URL}/users/profile`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      return {
+        token,
+        user: response.data.user,
+        tokenExpiry,
+      };
+    } catch (error) {
+      // Token verification failed - clean up
+      localStorage.removeItem("token");
+      localStorage.removeItem("token_expiry");
+
+      return rejectWithValue(
+        error.response?.data?.message || "Token verification failed"
+      );
+    }
+  }
+);
+
+// User slice
 const authSlice = createSlice({
   name: "auth",
   initialState,
   reducers: {
-    loginSuccess: (state, action) => {
-      if (!action.payload || typeof action.payload !== "object") {
-        console.error("Invalid payload in loginSuccess:", action.payload);
-        return;
-      }
-      state.user = action.payload.user || null;
-      state.token = action.payload.token || null;
-      if (action.payload.token) {
-        localStorage.setItem("token", action.payload.token);
-      }
-    },
     logout: (state) => {
+      // Clear state
       state.user = null;
       state.token = null;
-      state.organizer = null;
+      state.tokenExpiry = null;
+      state.error = null;
+
+      // Clear localStorage
       localStorage.removeItem("token");
+      localStorage.removeItem("token_expiry");
     },
-    // Special action to fix "null" string problems
     fixNullValues: (state) => {
       if (state.user === "null") state.user = null;
       if (state.token === "null") state.token = null;
     },
   },
   extraReducers: (builder) => {
-    builder
-      .addCase(verifyUserToken.pending, (state) => {
-        state.loading = true;
-      })
-      .addCase(verifyUserToken.fulfilled, (state, action) => {
-        state.loading = false;
-        state.user = action.payload.user;
-        state.token = action.payload.token;
-      })
-      .addCase(verifyUserToken.rejected, (state) => {
-        state.loading = false;
-        state.user = null;
-        state.token = null;
-      });
+    // Handle login actions
+    builder.addCase(loginUser.pending, (state) => {
+      state.loading = true;
+      state.error = null;
+    });
+    builder.addCase(loginUser.fulfilled, (state, action) => {
+      state.loading = false;
+      state.user = action.payload.user;
+      state.token = action.payload.token;
+      state.tokenExpiry = action.payload.tokenExpiry;
+    });
+    builder.addCase(loginUser.rejected, (state, action) => {
+      state.loading = false;
+      state.error = action.payload || "Login failed";
+    });
+
+    // Handle token verification
+    builder.addCase(verifyUserToken.pending, (state) => {
+      state.loading = true;
+      state.error = null;
+    });
+    builder.addCase(verifyUserToken.fulfilled, (state, action) => {
+      state.loading = false;
+      state.user = action.payload.user;
+      state.token = action.payload.token;
+      state.tokenExpiry = action.payload.tokenExpiry;
+    });
+    builder.addCase(verifyUserToken.rejected, (state, action) => {
+      state.loading = false;
+      state.user = null;
+      state.token = null;
+      state.tokenExpiry = null;
+    });
   },
 });
 
-export const { loginSuccess, logout, fixNullValues } = authSlice.actions;
-
-export const login = (email, password) => async (dispatch) => {
-  try {
-    const apiUrl = import.meta.env.VITE_API_URL;
-    console.log("Using API URL:", apiUrl);
-    console.log("Attempting login with email:", email);
-
-    // Clear any potential cached responses
-    const axiosConfig = {
-      headers: {
-        "Cache-Control": "no-cache",
-        Pragma: "no-cache",
-        Expires: "0",
-      },
-    };
-
-    // Make the login request
-    const response = await axios.post(
-      `${apiUrl}/users/login`,
-      {
-        email: email,
-        password,
-      },
-      axiosConfig
-    );
-
-    console.log("Login response status:", response.status);
-
-    // Validate response contains expected data
-    if (!response.data || !response.data.success) {
-      console.error("Login failed:", response.data?.message || "Unknown error");
-      return { error: response.data?.message || "Login failed" };
-    }
-
-    // Map server response to expected format
-    const userData = {
-      user: {
-        _id: response.data.user?.id || response.data.user?._id,
-        name: response.data.user?.name || "User",
-        email: response.data.user?.email,
-        role: response.data.user?.role || "user",
-      },
-      token: response.data.token,
-    };
-
-    // Validate essential data
-    if (!userData.user || !userData.token) {
-      console.error("Login response missing user or token", response.data);
-      return { error: "Invalid server response" };
-    }
-
-    console.log("Login successful, dispatching loginSuccess");
-
-    // Save token to localStorage
-    localStorage.setItem("token", userData.token);
-
-    // Update Redux state
-    dispatch(loginSuccess(userData));
-    return { success: true, userData };
-  } catch (error) {
-    const errorMsg = error.response?.data?.message || "Login failed";
-    console.error(
-      "Login failed:",
-      error.message,
-      "Status:",
-      error.response?.status,
-      "Details:",
-      error.response?.data
-    );
-    return { error: errorMsg };
-  }
-};
-
-export const register = (name, email, password, phone) => async (dispatch) => {
-  try {
-    const response = await axios.post(
-      `${import.meta.env.VITE_API_URL}/users/register`,
-      {
-        name, // Send as name since API expects name
-        email,
-        password,
-        phone,
-      }
-    );
-
-    // Map server response to expected format
-    const userData = {
-      user: {
-        _id: response.data.user?.id || response.data._id,
-        name: response.data.user?.name || response.data.name,
-        email: response.data.user?.email || response.data.email,
-        role: response.data.user?.role || response.data.role,
-      },
-      token: response.data.token,
-    };
-
-    // Validate essential data
-    if (!userData.user || !userData.token) {
-      console.error("Registration response missing user or token");
-      return { error: "Invalid server response" };
-    }
-
-    dispatch(loginSuccess(userData));
-    return userData;
-  } catch (error) {
-    console.error("Registration failed:", error);
-    return { error: error.response?.data?.message || "Registration failed" };
-  }
-};
-
+// Export actions and reducer
+export const { logout, fixNullValues } = authSlice.actions;
 export default authSlice.reducer;

@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { useDispatch, useSelector } from 'react-redux';
-import { registerOrganizer } from '../../redux/user/organizer';
+import registerOrganizer  from '../../redux/user/organizer';
 import {
   User,
   Mail,

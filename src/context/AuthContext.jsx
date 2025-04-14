@@ -1,94 +1,72 @@
-import React, { createContext, useContext, useEffect, useState } from 'react';
+import { createContext, useContext, useEffect, useState } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import { verifyUserToken } from '../redux/user/userSlice';
 import { verifyOrganizerToken } from '../redux/user/organizer';
-import { safelyParseToken } from '../utils/persistFix';
+import { fixPersistenceIssues } from '../utils/persistFix';
 
 // Create context
-const AuthContext = createContext(null);
+const AuthContext = createContext();
 
-// Context provider component
 export const AuthProvider = ({ children }) => {
+  const [isInitialized, setIsInitialized] = useState(false);
   const dispatch = useDispatch();
-  const [loading, setLoading] = useState(true);
   
   // Get auth state from Redux
-  const userAuth = useSelector(state => state.auth || {});
-  const organizerAuth = useSelector(state => state.organizer || {});
+  const userAuth = useSelector(state => state.auth);
+  const organizerAuth = useSelector(state => state.organizer);
 
-  // Current user state (combined from both possible auth types)
-  const [currentUser, setCurrentUser] = useState(null);
-  const [currentOrganizer, setCurrentOrganizer] = useState(null);
-  const [userToken, setUserToken] = useState(null);
-  const [organizerToken, setOrganizerToken] = useState(null);
-
-  // On mount, check tokens and verify auth if needed
   useEffect(() => {
-    const verifyAuth = async () => {
-      setLoading(true);
-      
+    const initializeAuth = async () => {
       try {
-        // Check localStorage for tokens
-        const storedUserToken = localStorage.getItem('token');
-        const storedOrganizerToken = localStorage.getItem('organizer_token');
+        // Fix persistence issues first
+        fixPersistenceIssues();
         
-        // Safely parse tokens (handle JSON string format)
-        const parsedUserToken = safelyParseToken(storedUserToken);
-        const parsedOrganizerToken = safelyParseToken(storedOrganizerToken);
-        
-        setUserToken(parsedUserToken);
-        setOrganizerToken(parsedOrganizerToken);
-        
-        // Verify tokens if they exist
-        if (parsedOrganizerToken) {
-          await dispatch(verifyOrganizerToken());
+        // Check for user token
+        const userToken = localStorage.getItem('token');
+        if (userToken && userToken !== 'null') {
+          await dispatch(verifyUserToken()).unwrap();
         }
         
-        if (parsedUserToken) {
-          await dispatch(verifyUserToken());
+        // Check for organizer token
+        const organizerToken = localStorage.getItem('organizer_token');
+        if (organizerToken && organizerToken !== 'null') {
+          await dispatch(verifyOrganizerToken()).unwrap();
         }
       } catch (error) {
-        console.error('Auth verification error:', error);
+        console.error('Error initializing authentication:', error);
       } finally {
-        setLoading(false);
+        setIsInitialized(true);
       }
     };
-    
-    verifyAuth();
+
+    initializeAuth();
   }, [dispatch]);
 
-  // Update local state when Redux state changes
-  useEffect(() => {
-    setCurrentUser(userAuth.user || null);
-    setUserToken(userAuth.token || null);
-  }, [userAuth]);
-
-  useEffect(() => {
-    setCurrentOrganizer(organizerAuth.user || null);
-    setOrganizerToken(organizerAuth.token || null);
-  }, [organizerAuth]);
-
-  // Determine if the user is authenticated
-  const isAuthenticated = Boolean(currentUser || currentOrganizer);
+  // Derive combined auth state
+  const isAuthenticated = !!userAuth.token || !!organizerAuth.token;
+  const isUserAuthenticated = !!userAuth.token;
+  const isOrganizerAuthenticated = !!organizerAuth.token;
   
-  // Get current active user (either organizer or regular user)
-  const activeUser = currentOrganizer || currentUser;
-  
-  // Determine user role
-  const userRole = currentOrganizer ? 'organizer' : (currentUser?.role || 'user');
+  const currentUser = userAuth.user;
+  const currentOrganizer = organizerAuth.user;
+  const activeUser = currentUser || currentOrganizer;
 
-  // Context value
+  // Auth context value
   const value = {
     currentUser,
     currentOrganizer,
-    userToken,
-    organizerToken,
-    isAuthenticated,
     activeUser,
-    userRole,
-    isOrganizer: Boolean(currentOrganizer),
-    isUser: Boolean(currentUser),
-    loading
+    isAuthenticated,
+    isUserAuthenticated,
+    isOrganizerAuthenticated,
+    isInitialized,
+    // Additional derived values for convenience
+    userRole: currentUser?.role || null,
+    organizerId: currentOrganizer?._id || currentOrganizer?.id || null,
+    userId: currentUser?._id || currentUser?.id || null,
+    userToken: userAuth.token,
+    organizerToken: organizerAuth.token,
+    userType: isOrganizerAuthenticated ? 'organizer' : (isUserAuthenticated ? 'user' : 'guest')
   };
 
   return (
@@ -98,14 +76,12 @@ export const AuthProvider = ({ children }) => {
   );
 };
 
-// Custom hook to use the auth context
+// Custom hook for using auth context
 export const useAuth = () => {
   const context = useContext(AuthContext);
-  
   if (!context) {
     throw new Error('useAuth must be used within an AuthProvider');
   }
-  
   return context;
 };
 

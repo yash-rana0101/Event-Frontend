@@ -28,43 +28,37 @@ export const checkApiStatus = async () => {
   for (const baseUrl of apiBaseUrls) {
     try {
       // Make a simple request to check if server is available
-      const checkUrl = baseUrl.endsWith('/') ? `${baseUrl}health` : `${baseUrl}/health`;
+      const checkUrl = baseUrl.endsWith("/")
+        ? `${baseUrl}health`
+        : `${baseUrl}/health`;
       const isAvailable = await checkServerStatus(checkUrl);
 
       if (isAvailable) {
-        console.log(`API server available at ${baseUrl}`);
+        console.log(`API available at: ${baseUrl}`);
         return baseUrl;
       }
     } catch (error) {
-      console.log(`Error checking ${baseUrl}:`, error.message);
+      console.log(`Failed to connect to ${baseUrl}: ${error.message}`);
     }
   }
 
-  return null; // No server available
+  return null; // No available API found
 };
 
-// Helper to get stored API URL or check for available one
-export const getWorkingApiUrl = async () => {
-  // Try from localStorage first (if we've previously found a working URL)
-  const storedUrl = localStorage.getItem("working_api_url");
-  if (storedUrl) {
-    const isAvailable = await checkServerStatus(storedUrl);
-    if (isAvailable) return storedUrl;
+// Helper to get base API URL without /api/v1 suffix
+export const getBaseApiUrl = () => {
+  const apiUrl = import.meta.env.VITE_API_URL || "http://localhost:5000/api/v1";
+
+  // If URL already has /api/v1, return the base part
+  if (apiUrl.endsWith("/api/v1")) {
+    return apiUrl.substring(0, apiUrl.length - 8);
   }
 
-  // Otherwise check for available server
-  const workingUrl = await checkApiStatus();
-  if (workingUrl) {
-    localStorage.setItem("working_api_url", workingUrl);
-    return workingUrl;
-  }
-
-  // Fallback to env variable even if not confirmed working
-  return import.meta.env.VITE_API_URL || "http://localhost:3000/api/v1";
+  return apiUrl;
 };
 
 export default {
   checkServerStatus,
   checkApiStatus,
-  getWorkingApiUrl,
+  getBaseApiUrl,
 };

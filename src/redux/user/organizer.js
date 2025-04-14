@@ -1,19 +1,32 @@
+/* eslint-disable no-prototype-builtins */
+/* eslint-disable no-unused-vars */
 import { createSlice, createAsyncThunk } from "@reduxjs/toolkit";
 import axios from "axios";
 
-// Proper token retrieval helper
+// Proper token retrieval helper - improve this function
 const getStoredToken = () => {
   const token = localStorage.getItem("organizer_token");
   // Make sure we don't return "null" as a string
-  return token && token !== "null" ? token : null;
+  if (!token || token === "null") return null;
+
+  // Handle case where token is stored as JSON string with quotes
+  if (token.startsWith('"') && token.endsWith('"')) {
+    try {
+      return JSON.parse(token);
+    } catch (e) {
+      console.error("Failed to parse token:", e);
+      // If parsing fails, return without quotes
+      return token.substring(1, token.length - 1);
+    }
+  }
+
+  return token;
 };
 
 // Helper function to get the current API URL with fallback
 const getApiUrl = () => {
-  // Try the environment variable first
   const envApiUrl = import.meta.env.VITE_API_URL;
 
-  // If it's not available, try these common development server URLs in sequence
   const fallbackUrls = [
     "http://localhost:3000/api/v1",
     "http://127.0.0.1:3000/api/v1",
@@ -28,10 +41,121 @@ const getApiUrl = () => {
   return fallbackUrls[0]; // Default to first fallback
 };
 
-// Add token verification and user data fetching capabilities
+// Fix the checkOrganizerProfileCompletion function to properly detect profile completion
+export const checkOrganizerProfileCompletion = createAsyncThunk(
+  "organizer/checkProfileCompletion",
+  async (_, { getState, rejectWithValue }) => {
+    try {
+      // Get token from state or localStorage as fallback
+      const token = getState().organizer?.token || getStoredToken();
+
+      if (!token) return rejectWithValue("No token found");
+
+      // First check if we have a local flag indicating completion
+      const localProfileComplete = localStorage.getItem(
+        "organizer_profile_complete"
+      );
+      if (localProfileComplete === "true") {
+        console.log("Found local profile complete flag, skipping API check");
+        return {
+          profileComplete: true,
+          details: getState().organizer?.profileDetails || null,
+        };
+      }
+
+      // Set authorization header
+      const config = {
+        headers: { Authorization: `Bearer ${token}` },
+      };
+
+      const apiUrl = getApiUrl();
+
+      // Try to fetch organizer details with the organizerId from the state
+      const organizer = getState().organizer?.user;
+      let organizerId;
+
+      // Extract organizer ID from potentially stringified user object
+      if (typeof organizer === "string") {
+        try {
+          const parsed = JSON.parse(organizer);
+          organizerId = parsed?._id || parsed?.id || parsed?._doc?._id;
+        } catch (e) {
+          console.error("Error parsing organizer data:", e);
+        }
+      } else if (organizer) {
+        organizerId = organizer._id || organizer.id || organizer?._doc?._id;
+      }
+
+      if (!organizerId) {
+        console.log("No organizerId found in state");
+        return {
+          profileComplete: false,
+          details: null,
+        };
+      }
+
+      console.log(`Checking profile completion for organizer: ${organizerId}`);
+
+      // Try both endpoints for fetching organizer details
+      try {
+        const response = await axios.get(
+          `${apiUrl}/organizer/${organizerId}/details`,
+          config
+        );
+
+        // Check if we have required fields for a complete profile
+        const details = response.data;
+
+        // Enhanced check for profile completion - make sure ALL required fields are present and not empty
+        const isProfileComplete = !!(
+          details &&
+          details.title &&
+          details.title.trim() !== "" &&
+          details.bio &&
+          details.bio.trim() !== "" &&
+          details.location &&
+          details.location.trim() !== ""
+        );
+
+        console.log("Profile completion check result:", isProfileComplete);
+
+        // If profile is complete, set the localStorage flag
+        if (isProfileComplete) {
+          localStorage.setItem("organizer_profile_complete", "true");
+          localStorage.setItem(
+            "organizer_details_last_shown",
+            new Date().getTime().toString()
+          );
+        }
+
+        return {
+          profileComplete: isProfileComplete,
+          details: details || null,
+        };
+      } catch (err) {
+        if (err.response?.status === 404) {
+          console.log("Organizer details not found");
+          return {
+            profileComplete: false,
+            details: null,
+          };
+        }
+        throw err;
+      }
+    } catch (error) {
+      console.log("Profile completion check failed:", error.message);
+      return {
+        profileComplete: false,
+        details: null,
+      };
+    }
+  }
+);
+
+// Modify verifyOrganizerToken to also check profile completion
 export const verifyOrganizerToken = createAsyncThunk(
   "organizer/verify",
-  async (_, { getState, rejectWithValue }) => {
+  async (_, { getState, rejectWithValue, dispatch }) => {
     try {
       // Get token from state or localStorage as fallback
       const token = getState().organizer?.token || getStoredToken();
@@ -43,19 +167,27 @@ export const verifyOrganizerToken = createAsyncThunk(
         headers: { Authorization: `Bearer ${token}` },
       };
 
-      // Try primary endpoint first
+      // Try different endpoints for verification
       let response;
+      const apiUrl = getApiUrl();
+
       try {
-        // Updated path to match your backend route structure
-        response = await axios.get(
-          `${import.meta.env.VITE_API_URL}/organizer/profile`,
-          config
+        // First try the profile endpoint
+        response = await axios.get(`${apiUrl}/organizer/profile`, config);
+      } catch (err) {
+        // If that fails, try the /me endpoint
+        console.log(
+          "Primary endpoint failed, trying /me endpoint...",
+          err.message
         );
-      } catch {
-        // Fallback to alternative endpoints
-        console.log("Primary endpoint failed, trying alternative...");
+        response = await axios.get(`${apiUrl}/organizer/me`, config);
+      }
+
+      // If still no data, try dashboard stats as last resort
+      if (!response || !response.data) {
+        console.log("Second endpoint failed, trying dashboard-stats...");
         response = await axios.get(
-          `${import.meta.env.VITE_API_URL}/organizer/dashboard-stats`,
+          `${apiUrl}/organizer/dashboard-stats`,
           config
         );
       }
@@ -68,17 +200,25 @@ export const verifyOrganizerToken = createAsyncThunk(
       // Extract user data - handle different response formats
       const userData = response.data.user || response.data || {};
 
+      // After successful verification, check profile completion immediately
+      const profileAction = await dispatch(checkOrganizerProfileCompletion());
+
       return {
         user: userData,
         token,
+        profileComplete: profileAction.payload?.profileComplete || false,
       };
     } catch (error) {
       console.error("Token verification failed:", error);
-      console.log(
-        "API endpoint used:",
-        `${import.meta.env.VITE_API_URL}/organizer/profile`
-      );
-      localStorage.removeItem("organizer_token");
+
+      // Only remove token if it's truly an auth failure (401/403)
+      if (
+        error.response &&
+        (error.response.status === 401 || error.response.status === 403)
+      ) {
+        localStorage.removeItem("organizer_token");
+      }
+
       return rejectWithValue(
         error.response?.data?.message || "Session expired"
       );
@@ -90,14 +230,13 @@ export const verifyOrganizerToken = createAsyncThunk(
 export const loginOrganizer = createAsyncThunk(
   "organizer/login",
   async (formData, { dispatch, rejectWithValue }) => {
-    const apiUrl = getApiUrl();
-    console.log(`Attempting login to: ${apiUrl}/organizer/login`);
-
     try {
+      const apiUrl = getApiUrl();
+      console.log(`Attempting login to: ${apiUrl}/organizer/login`);
+
       const response = await axios.post(`${apiUrl}/organizer/login`, formData, {
         // Add timeout and retry configuration
         timeout: 10000,
-        // Add CORS headers if needed
         headers: {
           "Content-Type": "application/json",
           Accept: "application/json",
@@ -106,43 +245,27 @@ export const loginOrganizer = createAsyncThunk(
 
       console.log("Login response data:", response.data);
 
-      // Store token if it exists
-      if (response.data?.token) {
+      // Store token if it exists and it's not "null" string
+      if (response.data?.token && response.data.token !== "null") {
         localStorage.setItem("organizer_token", response.data.token);
-      }
 
-      // Handle different response formats
-      let userData = response.data;
+        // Check profile completion status after successful login
+        dispatch(checkOrganizerProfileCompletion());
 
-      // If the API returns just a token or doesn't include user data
-      if (!response.data.user && response.data.token) {
-        // Create a minimal user object with what we have
-        userData = {
+        return {
+          user: response.data.user || {},
           token: response.data.token,
-          user: formData.email ? { email: formData.email } : {},
         };
-
-        // Try to extract user info from token
-        try {
-          const tokenPayload = JSON.parse(
-            atob(response.data.token.split(".")[1])
-          );
-          if (tokenPayload && tokenPayload.id) {
-            userData.user.id = tokenPayload.id;
-          }
-        } catch (e) {
-          console.log("Could not parse token payload", e);
-        }
-
-        // Queue a verification to get complete user data later
-        dispatch(verifyOrganizerToken());
       }
 
-      return userData;
+      return rejectWithValue("Login successful but no token received");
     } catch (error) {
       // Enhanced error handling with network connectivity detection
       if (error.code === "ERR_NETWORK") {
         console.error("Network error - server might be down or CORS issue");
+
+        // Get the current API URL
+        const apiUrl = getApiUrl();
 
         // Try with different API URLs if available
         const fallbacks = [
@@ -173,24 +296,52 @@ export const loginOrganizer = createAsyncThunk(
 // Async thunk for organizer registration
 export const registerOrganizer = createAsyncThunk(
   "organizer/register",
-  async (formData, { rejectWithValue }) => {
+  async (formData, { dispatch, rejectWithValue }) => {
     try {
+      const apiUrl = getApiUrl();
       const response = await axios.post(
-        `${import.meta.env.VITE_API_URL}/organizer/register`,
+        `${apiUrl}/organizers/register`,
         formData
       );
 
-      // Store token in localStorage with proper key
       if (response.data?.token) {
         localStorage.setItem("organizer_token", response.data.token);
+
+        // Set initial profile completion status to false for new registrations
+        return {
+          user: response.data.user || {},
+          token: response.data.token,
+          profileComplete: false,
+        };
       }
 
-      return response.data;
+      return rejectWithValue("Registration successful but no token received");
     } catch (error) {
       return rejectWithValue(
         error.response?.data?.message || "Registration failed"
       );
     }
+  }
+);
+
+// Add a new action to directly set profile completion status
+export const updateProfileCompletionStatus = createAsyncThunk(
+  "organizer/updateProfileCompletionStatus",
+  async (isComplete, { dispatch }) => {
+    // Store completion status in localStorage too
+    if (isComplete) {
+      localStorage.setItem("organizer_profile_complete", "true");
+      localStorage.setItem(
+        "organizer_details_last_shown",
+        new Date().getTime().toString()
+      );
+    } else {
+      localStorage.removeItem("organizer_profile_complete");
+    }
+
+    // Force a check after marking complete
+    await dispatch(checkOrganizerProfileCompletion());
+    return { profileComplete: isComplete };
   }
 );
 
@@ -201,25 +352,73 @@ const organizerSlice = createSlice({
     token: getStoredToken(),
     loading: false,
     error: null,
+    isAuthenticated: false,
+    profileComplete: false,
+    profileDetails: null,
   },
   reducers: {
     logout: (state) => {
+      // Clear Redux state
       state.user = null;
       state.token = null;
+      state.isAuthenticated = false;
+      state.profileComplete = false;
+      state.profileDetails = null;
+      state.error = null;
+
+      // Clear localStorage - be thorough and clear all related items
       localStorage.removeItem("organizer_token");
+      localStorage.removeItem("organizer_token_expiry");
+      localStorage.removeItem("organizer_user");
+
+      // Any other organizer-related items that might be stored
+      const keysToRemove = Object.keys(localStorage).filter(
+        (key) => key.startsWith("organizer_") || key.includes("organizer")
+      );
+
+      keysToRemove.forEach((key) => localStorage.removeItem(key));
+
+      // Log the logout operation
+      console.log("Organizer logged out successfully - all data cleared");
     },
     // Add manual setter for testing/debugging
     setOrganizerData: (state, action) => {
       state.user = action.payload.user;
       state.token = action.payload.token;
-      if (action.payload.token) {
+      if (action.payload.token && action.payload.token !== "null") {
         localStorage.setItem("organizer_token", action.payload.token);
       }
     },
-    // Special action to fix "null" string problems
+    // Enhanced fixNullValues to also handle quoted tokens
     fixNullValues: (state) => {
       if (state.user === "null") state.user = null;
-      if (state.token === "null") state.token = null;
+      if (state.token === "null") {
+        state.token = null;
+        localStorage.removeItem("organizer_token");
+      }
+
+      // If token is a JSON string (starts and ends with quotes), parse it
+      if (
+        typeof state.token === "string" &&
+        state.token.startsWith('"') &&
+        state.token.endsWith('"')
+      ) {
+        try {
+          state.token = JSON.parse(state.token);
+          localStorage.setItem("organizer_token", state.token);
+        } catch (e) {
+          console.error("Failed to parse token in reducer:", e);
+        }
+      }
+
+      // Same for user object
+      if (typeof state.user === "string" && state.user !== "null") {
+        try {
+          state.user = JSON.parse(state.user);
+        } catch (e) {
+          console.error("Failed to parse user data in reducer:", e);
+        }
+      }
     },
   },
   extraReducers: (builder) => {
@@ -231,15 +430,36 @@ const organizerSlice = createSlice({
       })
       .addCase(loginOrganizer.fulfilled, (state, action) => {
         state.loading = false;
+
         // Make sure we handle both formats of response
-        state.user = action.payload.user || {};
+        state.user = action.payload.user || action.payload.organizer || {};
         state.token = action.payload.token;
+        state.isAuthenticated = true;
+
+        // Save token to localStorage as a direct string, not JSON stringified
+        if (action.payload.token) {
+          // Make sure we're not saving double-quoted JSON strings
+          const tokenToSave =
+            typeof action.payload.token === "string" &&
+            action.payload.token.startsWith('"') &&
+            action.payload.token.endsWith('"')
+              ? JSON.parse(action.payload.token)
+              : action.payload.token;
+
+          localStorage.setItem("organizer_token", tokenToSave);
+
+          // Also store token expiry time (default 24h)
+          const expiryTime = new Date();
+          expiryTime.setHours(expiryTime.getHours() + 24);
+          localStorage.setItem("organizer_token_expiry", expiryTime.toString());
+        }
       })
       .addCase(loginOrganizer.rejected, (state, action) => {
         state.loading = false;
         state.error = action.payload;
         state.user = null;
         state.token = null;
+        state.isAuthenticated = false;
       })
       // Registration cases
       .addCase(registerOrganizer.pending, (state) => {
@@ -250,6 +470,9 @@ const organizerSlice = createSlice({
         state.loading = false;
         state.user = action.payload.user;
         state.token = action.payload.token;
+        state.isAuthenticated = true;
+        state.error = null;
+        state.profileComplete = false; // New registration, profile is not complete
       })
       .addCase(registerOrganizer.rejected, (state, action) => {
         state.loading = false;
@@ -263,12 +486,45 @@ const organizerSlice = createSlice({
         state.loading = false;
         state.user = action.payload.user;
         state.token = action.payload.token;
+        state.isAuthenticated = true;
+
+        // Set profile completion status from verification if available
+        if (action.payload.hasOwnProperty("profileComplete")) {
+          state.profileComplete = action.payload.profileComplete;
+        }
       })
       .addCase(verifyOrganizerToken.rejected, (state) => {
         state.loading = false;
         state.user = null;
         state.token = null;
+        state.isAuthenticated = false;
         localStorage.removeItem("organizer_token");
+      })
+      // Profile completion check cases
+      .addCase(checkOrganizerProfileCompletion.pending, (state) => {
+        // Don't change the status while checking
+      })
+      .addCase(checkOrganizerProfileCompletion.fulfilled, (state, action) => {
+        state.profileComplete = action.payload.profileComplete;
+        state.profileDetails = action.payload.details;
+
+        // Log the profile completion status change
+        console.log(
+          "Updated profile completion status:",
+          state.profileComplete
+        );
+      })
+      .addCase(checkOrganizerProfileCompletion.rejected, (state) => {
+        state.profileComplete = false;
+        state.profileDetails = null;
+      })
+      // Add case for direct profile completion update
+      .addCase(updateProfileCompletionStatus.fulfilled, (state, action) => {
+        state.profileComplete = action.payload.profileComplete;
+        console.log(
+          "Profile completion status manually updated to:",
+          state.profileComplete
+        );
       });
   },
 });

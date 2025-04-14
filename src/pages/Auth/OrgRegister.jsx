@@ -16,6 +16,7 @@ import { Link, useNavigate } from "react-router-dom";
 
 const Register = () => {
   const dispatch = useDispatch();
+  const navigate = useNavigate();
   const { loading = false, error = null } = useSelector((state) => state.organizer || {});
   const [formData, setFormData] = useState({
     name: "",
@@ -25,7 +26,7 @@ const Register = () => {
     organization: "",
   });
   const [showPassword, setShowPassword] = useState(false);
-  const navigate = useNavigate();
+  const [registered, setRegistered] = useState(false);
   const { name, email, password, phone } = formData;
 
   const onChange = (e) => {
@@ -41,9 +42,13 @@ const Register = () => {
     dispatch(registerOrganizer(formData)).unwrap()
       .then((response) => {
         console.log("Registration successful:", response);
-        toast.success("Registration successful");
-        navigate('/organizer/login');
-        // Handle successful registration (e.g., redirect, show success message)
+        toast.success("Registration successful! Please complete your profile details.");
+        setRegistered(true);
+
+        // Redirect to the details page after a short delay
+        setTimeout(() => {
+          navigate('/organizer/details');
+        }, 1500);
       })
       .catch((err) => {
         console.error("Registration failed:", err);
@@ -54,6 +59,35 @@ const Register = () => {
   const togglePasswordVisibility = () => {
     setShowPassword(!showPassword);
   };
+
+  // Show success message if registered
+  if (registered) {
+    return (
+      <div className="min-h-screen bg-black flex items-center justify-center p-4 overflow-hidden relative">
+        <div className="w-full max-w-md z-10 relative">
+          <div className="bg-black border-2 border-cyan-500 rounded-2xl shadow-2xl shadow-cyan-500/20 overflow-hidden p-8">
+            <div className="text-center">
+              <div className="flex justify-center mb-4">
+                <div className="h-20 w-20 rounded-full bg-cyan-500/20 flex items-center justify-center">
+                  <Zap className="h-10 w-10 text-cyan-500 animate-pulse" />
+                </div>
+              </div>
+              <h2 className="text-2xl font-bold text-cyan-500 tracking-tight mb-2">REGISTRATION SUCCESSFUL</h2>
+              <p className="text-cyan-300/70 mt-2 tracking-wider mb-6">
+                Your account has been created. Please complete your profile details to continue.
+              </p>
+              <div className="mt-6">
+                <p className="text-gray-400 text-sm">Redirecting to profile details...</p>
+                <div className="w-full bg-gray-800 h-1 mt-2 rounded overflow-hidden">
+                  <div className="bg-cyan-500 h-full animate-pulse" style={{ width: "100%" }}></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-black flex items-center justify-center p-4 overflow-hidden relative">

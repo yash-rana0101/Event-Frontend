@@ -1,47 +1,78 @@
-import React, { useState } from 'react';
+/* eslint-disable no-unused-vars */
+import React, { useState, useEffect } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { Link, useNavigate } from 'react-router-dom';
-import { loginOrganizer } from '../../redux/user/organizer';
+import { loginOrganizer, fixNullValues, checkOrganizerProfileCompletion } from '../../redux/user/organizer';
 import { Lock, Mail, Eye, EyeOff, Zap } from 'lucide-react';
+import { toast } from 'react-toastify';
+import { fixPersistenceIssues } from '../../utils/persistFix';
 
 const OrgLogin = () => {
   const dispatch = useDispatch();
   const navigate = useNavigate();
-  const { loading } = useSelector((state) => state.organizer || {});
+  const { loading, error, isAuthenticated, profileComplete } = useSelector((state) => state.organizer || {});
   const [formData, setFormData] = useState({
     email: '',
     password: ''
   });
   const [showPassword, setShowPassword] = useState(false);
-  const [errorMsg, setErrorMsg] = useState(''); // Added for proper error handling
+  const [errorMsg, setErrorMsg] = useState(''); // For local error handling
 
   const { email, password } = formData;
 
+  // Fix persistence issues on mount
+  useEffect(() => {
+    // Clean up any "null" string issues before login
+    fixPersistenceIssues();
+    dispatch(fixNullValues());
+  }, [dispatch]);
+
+  // Handle redirection after authentication based on profile completion
+  useEffect(() => {
+    if (isAuthenticated) {
+      dispatch(checkOrganizerProfileCompletion())
+        .then((result) => {
+          if (result.payload && result.payload.profileComplete) {
+            navigate('/organizer/dashboard');
+          } else {
+            navigate('/organizer/details');
+          }
+        });
+    }
+  }, [isAuthenticated, dispatch, navigate]);
+
   const onChange = e => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
+    setErrorMsg(''); // Clear error on input change
   };
 
   const onSubmit = async e => {
     e.preventDefault();
+    setErrorMsg(''); // Clear any previous errors
 
     try {
-      await dispatch(loginOrganizer(formData)).unwrap();
-      navigate('/organizer/profile');
-    } catch (err) {
-      // Handle different error formats
-      if (typeof err === 'object') {
-        if (err.message) {
-          setErrorMsg(err.message);
-        } else if (err.code === 'ERR_NETWORK') {
-          setErrorMsg('Cannot connect to server. Please check if the backend is running.');
-        } else {
-          setErrorMsg('Login failed. Please try again.');
-        }
-      } else if (typeof err === 'string') {
-        setErrorMsg(err);
-      } else {
-        setErrorMsg('An unknown error occurred');
+      const resultAction = await dispatch(loginOrganizer(formData));
+
+      if (loginOrganizer.fulfilled.match(resultAction)) {
+        toast.success('Login successful!');
+        // The redirection will be handled by the useEffect above
+      } else if (loginOrganizer.rejected.match(resultAction)) {
+        // Handle the error from the rejected action
+        const errorMessage = resultAction.payload || 'Login failed';
+        setErrorMsg(errorMessage);
+        toast.error(errorMessage);
       }
+    } catch (err) {
+      // Handle any uncaught errors
+      console.error("Login error:", err);
+
+      // Format the error message based on its type
+      const errorMessage = typeof err === 'object' && err.message
+        ? err.message
+        : 'An unexpected error occurred';
+
+      setErrorMsg(errorMessage);
+      toast.error(errorMessage);
     }
   };
 
@@ -51,7 +82,7 @@ const OrgLogin = () => {
 
   return (
     <div className="min-h-screen bg-black flex items-center justify-center p-4 overflow-hidden relative">
-      {/* Cyber Grid Background Effect */}
+      {/* Existing background effects */}
       <div className="absolute inset-0 pointer-events-none">
         <div className="absolute inset-0 bg-gradient-to-br from-transparent via-transparent to-cyan-500/10 opacity-20"></div>
         <div className="absolute inset-0 opacity-5" style={{
@@ -117,21 +148,21 @@ const OrgLogin = () => {
                 </button>
               </div>
 
-              {/* Error Message - FIXED: Now using errorMsg string instead of error object */}
-              {errorMsg && (
+              {/* Error Message */}
+              {(errorMsg || error) && (
                 <div className="bg-red-500/10 border border-red-500/30 text-red-300 px-4 py-3 rounded-lg text-center uppercase tracking-wider">
-                  {errorMsg}
+                  {errorMsg || error}
                 </div>
               )}
 
               {/* Forgot Password */}
               <div className="text-right">
-                <a
-                  href="/forgot-password"
+                <Link
+                  to="/forgot-password"
                   className="text-sm text-cyan-500 hover:text-cyan-300 transition-colors uppercase tracking-wider"
                 >
                   FORGOT PASSWORD?
-                </a>
+                </Link>
               </div>
 
               {/* Submit Button */}

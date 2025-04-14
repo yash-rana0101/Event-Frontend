@@ -66,6 +66,7 @@ const authSlice = createSlice({
     logout: (state) => {
       state.user = null;
       state.token = null;
+      state.organizer = null;
       localStorage.removeItem("token");
     },
     // Special action to fix "null" string problems

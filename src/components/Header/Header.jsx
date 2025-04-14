@@ -1,8 +1,8 @@
+/* eslint-disable no-unused-vars */
 import React, { useEffect, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { logout, verifyUserToken, fixNullValues as fixUserNullValues } from '../../redux/user/userSlice';
 import { logout as organizerLogout, verifyOrganizerToken, fixNullValues as fixOrganizerNullValues } from '../../redux/user/organizer';
-// eslint-disable-next-line no-unused-vars
 import { motion, useAnimation } from 'framer-motion';
 import { BsPersonCircle, BsGrid3X3Gap } from 'react-icons/bs';
 import { SiFreelancer } from 'react-icons/si';
@@ -15,6 +15,7 @@ import { MdMiscellaneousServices } from 'react-icons/md';
 import { PiRankingFill } from 'react-icons/pi';
 import { FaPhoneAlt } from 'react-icons/fa';
 import { NavLink, useNavigate } from 'react-router-dom';
+import { thoroughAuthCleanup } from '../../utils/persistFix'; // Import the new utility
 
 export default function Header() {
   const [isScrolled, setIsScrolled] = React.useState(false);
@@ -22,9 +23,6 @@ export default function Header() {
   const [isUserDropdownOpen, setIsUserDropdownOpen] = React.useState(false);
   const [debugAuthInfo, setDebugAuthInfo] = useState(null);
 
-  // Enhanced state access with more robust checks
-  // const auth = useSelector((state) => state.auth);
-  // const organizer = useSelector((state) => state.organizer);
   const currentUser = useSelector((state) => state.auth?.user);
   const currentOrganizer = useSelector((state) => state.organizer?.user);
   const authToken = useSelector((state) => state.auth?.token);
@@ -73,10 +71,33 @@ export default function Header() {
     },
   ];
 
+  const getOrganizerId = () => {
+    if (!currentOrganizer) return null;
+    
+    if (typeof currentOrganizer === 'string') {
+      try {
+        const parsed = JSON.parse(currentOrganizer);
+        return parsed?._id || parsed?.id || parsed?._doc?._id;
+      } catch (e) {
+        console.error('Error parsing organizer data:', e);
+        return null;
+      }
+    }
+    
+    return currentOrganizer?._id || currentOrganizer?.id || 
+           currentOrganizer?._doc?._id; 
+  };
+
+  const organizerId = getOrganizerId();
+  
+  const organizerProfileLink = organizerId ? 
+    `/organizer/profile/${organizerId}` : 
+    '/organizer/profile';
+
   const organizerNav = [
     {
       name2: "Organizer Profile",
-      link2: "/organizer/profile",
+      link2: organizerProfileLink,
       icon: <BsPersonCircle />,
     },
     {
@@ -86,7 +107,6 @@ export default function Header() {
     },
   ];
 
-  // Choose the correct navigation based on who is logged in
   const newNav = currentOrganizer ? organizerNav : userNav;
 
   const navigate = useNavigate();
@@ -102,10 +122,14 @@ export default function Header() {
 
   const handleLogout = () => {
     if (currentOrganizer) {
+      thoroughAuthCleanup('organizer');
       dispatch(organizerLogout());
     } else {
+      thoroughAuthCleanup('user');
       dispatch(logout());
     }
+    
+    setIsUserDropdownOpen(false);
     navigate("/");
   };
 
@@ -129,13 +153,10 @@ export default function Header() {
     visible: { x: 0, opacity: 1 },
   };
 
-  // Fix the "null" string issue on component mount
   useEffect(() => {
-    // Dispatch fixes for possible "null" string values
     dispatch(fixUserNullValues());
     dispatch(fixOrganizerNullValues());
 
-    // Then try to verify tokens
     const organizerToken = localStorage.getItem("organizer_token");
     if (organizerToken && organizerToken !== "null") {
       console.log("Found organizer token, verifying...");
@@ -149,9 +170,7 @@ export default function Header() {
     }
   }, [dispatch]);
 
-  // Debug effect to log auth state on every render or auth change
   useEffect(() => {
-    // Create a debug object for inspection
     const debug = {
       authState: {
         user: currentUser,
@@ -178,17 +197,14 @@ export default function Header() {
     setDebugAuthInfo(debug);
     console.log("Auth Debug Info:", debug);
 
-    // Force UI update if we detect token but no user - auto refresh user data
     if (organizerToken && !currentOrganizer) {
       console.log("Organizer token exists but user is null - fetching organizer data");
       dispatch(verifyOrganizerToken());
     }
   }, [currentUser, currentOrganizer, authToken, organizerToken, dispatch]);
 
-  // Determine the active user (either regular user or organizer) with more robust check
   const activeUser = currentUser || currentOrganizer || null;
 
-  // Function to check if we have valid auth
   const hasValidAuthentication = () => {
     return Boolean(
       (authToken && typeof authToken === 'string' && authToken.startsWith('ey')) ||
@@ -203,7 +219,6 @@ export default function Header() {
       initial={{ backgroundColor: "black" }}
       transition={{ duration: 0.3 }}
     >
-      {/* Optional: Debug indicator (remove in production) */}
       {debugAuthInfo && (
         <div className="fixed bottom-0 right-0 bg-black/80 text-xs text-white p-2 max-w-xs z-50" style={{ display: 'none' }}>
           Auth: {debugAuthInfo.authState.tokenExists ? '✓' : '✗'}
@@ -213,7 +228,6 @@ export default function Header() {
       )}
 
       <div className="w-full h-full flex justify-between items-center border-b-2 border-[#00D8FF]">
-        {/* Logo */}
         <div className="text-2xl flex items-center gap-2 font-bold relative">
           <button
             className="z-10 cursor-pointer bg-transparent border-none p-0 font-inherit"
@@ -228,13 +242,11 @@ export default function Header() {
           <div className="h-40 w-40 bg-[#00D8FF] overflow-hidden absolute top-0 -translate-y-1/2 right-0 translate-x-1/4 rounded-full opacity-45 blur-2xl"></div>
         </div>
 
-        {/* Desktop Menu */}
         <nav className="hidden md:flex items-center space-x-1">
           {activeUser ? (
             <>
-              {/* Profile Link */}
               <NavLink
-                to={currentOrganizer ? "/organizer/profile" : "/dashboard/profile"}
+                to={currentOrganizer ? organizerProfileLink : "/dashboard/profile"}
                 className={({ isActive }) =>
                   `group relative px-4 py-2 rounded-lg transition-all duration-300 hover:cursor-pointer ${isActive
                     ? "text-[#00D8FF]"
@@ -252,7 +264,6 @@ export default function Header() {
                 <div className="absolute inset-0 bg-[#00D8FF]/0 group-hover:bg-[#00D8FF]/10 rounded-lg transition-all duration-300" />
               </NavLink>
 
-              {/* Dashboard Link */}
               <NavLink
                 to={currentOrganizer ? "/organizer/dashboard" : "/dashboard"}
                 end
@@ -273,7 +284,6 @@ export default function Header() {
                 <div className="absolute inset-0 bg-[#00D8FF]/0 group-hover:bg-[#00D8FF]/10 rounded-lg transition-all duration-300" />
               </NavLink>
 
-              {/* Only show Freelance link for regular users */}
               {currentUser && (
                 <NavLink
                   to="/freelancer"
@@ -296,7 +306,6 @@ export default function Header() {
                 </NavLink>
               )}
 
-              {/* Filtered nav items (Leaderboard, Event, Contact) */}
               {nav
                 .filter((item) => !item.guestOnly)
                 .map((item) => (
@@ -312,7 +321,7 @@ export default function Header() {
                   >
                     <div className="flex items-center space-x-3">
                       <span className="flex items-center justify-center">
-                        {React.cloneElement(item.icon, { size: 24 })}  {/* Explicitly set icon size to 24px */}
+                        {React.cloneElement(item.icon, { size: 24 })}
                       </span>
                       <span className="relative">
                         {item.name}
@@ -324,7 +333,6 @@ export default function Header() {
                 ))}
             </>
           ) : (
-            // Guest navigation
             nav.map((item) => (
               <NavLink
                 key={item.name}
@@ -350,7 +358,6 @@ export default function Header() {
         </nav>
 
         <div className="flex items-center relative">
-          {/* User Profile / Buttons */}
           {activeUser || hasValidAuthentication() ? (
             <div id="user-dropdown" className="relative">
               <div
@@ -358,12 +365,10 @@ export default function Header() {
                 className="md:flex hidden items-center gap-3 border border-[#00D8FF]/30 rounded-full p-1 pr-4 text-white cursor-pointer backdrop-blur-sm bg-black/30 hover:text-[#00D8FF] hover:border-[#00D8FF] hover:bg-[#00D8FF]/5 transform transition-all duration-300 ease-out hover:shadow-[0_0_15px_rgba(0,216,255,0.3)] group relative overflow-hidden"
                 title="User Menu"
               >
-                {/* Glow effect behind image */}
                 <div
                   className="absolute inset-0 bg-gradient-to-r from-[#00D8FF]/0 via-[#00D8FF]/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"
                 />
 
-                {/* Profile Image Container */}
                 <div className="relative">
                   <div
                     className="absolute inset-0 bg-[#00D8FF] rounded-full blur-md opacity-0 group-hover:opacity-20 transition-opacity duration-300"
@@ -377,36 +382,33 @@ export default function Header() {
                   />
                 </div>
 
-                {/* Username with User Type Badge */}
                 <div className="flex flex-col">
                   <span className="font-semibold relative">
                     <span className="relative z-10 group-hover:text-[#00D8FF] transition-colors duration-300">
-                      {currentOrganizer ? currentOrganizer.name : currentUser?.name || " "}
+                      {currentOrganizer ?
+                        (currentOrganizer.name || currentOrganizer._doc?.name || 'Organizer') :
+                        (currentUser?.name || 'User')}
                     </span>
                     <span
                       className="absolute bottom-0 left-0 w-0 h-[1px] bg-[#00D8FF] group-hover:w-full transition-all duration-300"
                     />
                   </span>
-                  {/* User type indicator */}
                   <span className="text-xs text-[#00D8FF]/70">
                     {currentOrganizer ? "Organizer" : "User"}
                   </span>
                 </div>
 
-                {/* Dropdown Icon with Animation */}
                 <span
                   className="w-4 h-4 transform transition-transform duration-300 group-hover:translate-y-[2px] relative z-10"
                 >
                   <FaAngleDown className="text-[#00D8FF]/70 group-hover:text-[#00D8FF]" />
                 </span>
 
-                {/* Hover Animation Border */}
                 <div
                   className="absolute bottom-0 left-0 w-full h-[1px] bg-gradient-to-r from-transparent via-[#00D8FF]/50 to-transparent transform scale-x-0 group-hover:scale-x-100 transition-transform duration-500"
                 />
               </div>
 
-              {/* Dropdown Menu */}
               {isUserDropdownOpen && (
                 <div className="absolute right-0 mt-2 w-56 bg-black border border-[#00D8FF] rounded-lg shadow-lg z-50">
                   <div className="px-4 py-2 font-bold text-[#00D8FF] border-b border-[#00D8FF]">
@@ -447,7 +449,6 @@ export default function Header() {
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
               >
-                {/* Background gradient effect */}
                 <motion.div
                   className="absolute inset-0 bg-gradient-to-r from-[#00D8FF]/0 via-[#00D8FF]/10 to-[#00D8FF]/0"
                   animate={{
@@ -460,14 +461,12 @@ export default function Header() {
                   }}
                 />
 
-                {/* Icon and text */}
                 <TbSignRight className="text-[#00D8FF] group-hover:scale-110 transition-transform duration-300" />
                 <span className="text-white font-bold relative">
                   Sign Up
                   <span className="absolute bottom-0 left-0 w-0 h-[1px] bg-[#00D8FF] group-hover:w-full transition-all duration-300" />
                 </span>
 
-                {/* Glow effect */}
                 <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
                   <div className="absolute inset-0 bg-[#00D8FF]/10 blur-md" />
                 </div>
@@ -479,7 +478,6 @@ export default function Header() {
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
               >
-                {/* Animated background particles */}
                 <motion.div
                   className="absolute inset-0"
                   animate={{
@@ -495,20 +493,17 @@ export default function Header() {
                   }}
                 />
 
-                {/* Icon and text */}
                 <TbLogin className="text-cyan-500 group-hover:rotate-12 transition-transform duration-300" />
                 <span className="text-white font-bold relative">
                   Login
                   <span className="absolute bottom-0 left-0 w-0 h-[1px] bg-cyan-500 group-hover:w-full transition-all duration-300" />
                 </span>
 
-                {/* Shine effect */}
                 <div className="absolute top-0 -inset-full h-full w-1/2 z-5 block transform -skew-x-12 bg-gradient-to-r from-transparent to-white opacity-20 group-hover:animate-shine" />
               </motion.button>
             </div>
           )}
 
-          {/* Mobile Menu Button */}
           <div className="md:hidden">
             <button
               className="text-[#00D8FF] focus:outline-none transition-all duration-300"
@@ -522,7 +517,6 @@ export default function Header() {
             </button>
           </div>
 
-          {/* Updated Mobile Menu */}
           <motion.div
             className={`fixed top-0 right-0 h-full w-full md:w-1/2 lg:w-1/3 bg-black/95 backdrop-blur-lg 
             border-l border-[#00D8FF]/20 z-50 ${isMenuOpen ? "block" : "hidden"}`}
@@ -530,7 +524,6 @@ export default function Header() {
             initial="hidden"
             animate={isMenuOpen ? "visible" : "hidden"}
           >
-            {/* Close Button */}
             <motion.button
               className="absolute top-4 right-4 p-2 rounded-full bg-[#00D8FF]/10 text-[#00D8FF]
               hover:bg-[#00D8FF]/20 transition-colors duration-200 z-50"
@@ -544,7 +537,6 @@ export default function Header() {
             </motion.button>
 
             <div className="h-full flex flex-col p-6 overflow-y-auto">
-              {/* Profile Section */}
               <motion.div
                 className="flex flex-col items-center space-y-4 py-8"
                 variants={itemVariants}
@@ -586,7 +578,6 @@ export default function Header() {
                 </div>
               </motion.div>
 
-              {/* Navigation Links */}
               <div className="flex-1 space-y-6">
                 {activeUser && (
                   <motion.div className="space-y-4" variants={itemVariants}>
@@ -599,7 +590,7 @@ export default function Header() {
                       >
                         <NavLink
                           to={link2}
-                          end={link2.endsWith("dashboard")} // Add end prop for exact matching
+                          end={link2.endsWith("dashboard")}
                           className={({ isActive }) =>
                             `block py-2 px-4 rounded-lg transition-colors duration-200 ${isActive
                               ? "bg-[#00D8FF]/20 text-[#00D8FF]"
@@ -647,7 +638,6 @@ export default function Header() {
                 </motion.div>
               </div>
 
-              {/* Login/Logout Button */}
               <motion.div
                 className="pt-6 border-t border-[#00D8FF]/20"
                 variants={itemVariants}

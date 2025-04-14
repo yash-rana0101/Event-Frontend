@@ -1,5 +1,8 @@
 import { store } from "../redux/store";
 import { parseJwt } from "../utils/auth";
+import { logout as userLogout } from "../redux/user/userSlice";
+import { logout as organizerLogout } from "../redux/user/organizer";
+import { thoroughAuthCleanup } from "../utils/persistFix";
 
 // Function to check and log the current auth state
 export const debugAuth = () => {
@@ -11,6 +14,48 @@ export const debugAuth = () => {
 
   console.group("🔍 Auth Debugger");
 
+  // Check for token format issues
+  const userTokenIsQuoted =
+    typeof userToken === "string" &&
+    userToken?.startsWith('"') &&
+    userToken?.endsWith('"');
+  const organizerTokenIsQuoted =
+    typeof organizerToken === "string" &&
+    organizerToken?.startsWith('"') &&
+    organizerToken?.endsWith('"');
+
+  if (userTokenIsQuoted || organizerTokenIsQuoted) {
+    console.warn(
+      "⚠️ DETECTED QUOTED TOKENS - This can cause authentication issues!"
+    );
+    console.log("User token quoted:", userTokenIsQuoted);
+    console.log("Organizer token quoted:", organizerTokenIsQuoted);
+  }
+
+  // Check localStorage token format
+  const lsUserToken = localStorage.getItem("token");
+  const lsOrganizerToken = localStorage.getItem("organizer_token");
+
+  const lsUserTokenIsQuoted =
+    typeof lsUserToken === "string" &&
+    lsUserToken?.startsWith('"') &&
+    lsUserToken?.endsWith('"');
+  const lsOrganizerTokenIsQuoted =
+    typeof lsOrganizerToken === "string" &&
+    lsOrganizerToken?.startsWith('"') &&
+    lsOrganizerToken?.endsWith('"');
+
+  if (lsUserTokenIsQuoted || lsOrganizerTokenIsQuoted) {
+    console.warn(
+      "⚠️ DETECTED QUOTED TOKENS IN LOCALSTORAGE - This can cause authentication issues!"
+    );
+    console.log("LocalStorage user token quoted:", lsUserTokenIsQuoted);
+    console.log(
+      "LocalStorage organizer token quoted:",
+      lsOrganizerTokenIsQuoted
+    );
+  }
+
   console.log("User auth state:", {
     hasToken: !!userToken,
     tokenType: typeof userToken,
@@ -18,6 +63,7 @@ export const debugAuth = () => {
       userToken && typeof userToken === "string" && userToken.startsWith("ey"),
     hasUser: !!auth?.user,
     userType: typeof auth?.user,
+    tokenIsQuoted: userTokenIsQuoted,
   });
 
   console.log("Organizer auth state:", {
@@ -29,12 +75,15 @@ export const debugAuth = () => {
       organizerToken.startsWith("ey"),
     hasUser: !!organizer?.user,
     userType: typeof organizer?.user,
+    tokenIsQuoted: organizerTokenIsQuoted,
   });
 
   // Check localStorage
   console.log("LocalStorage tokens:", {
-    user: localStorage.getItem("token"),
-    organizer: localStorage.getItem("organizer_token"),
+    user: lsUserToken,
+    organizer: lsOrganizerToken,
+    userIsQuoted: lsUserTokenIsQuoted,
+    organizerIsQuoted: lsOrganizerTokenIsQuoted,
   });
 
   // If we have tokens, try to decode them
@@ -84,9 +133,38 @@ export const debugAuth = () => {
   };
 };
 
+// Add a method to force logout for debugging purposes
+export const forceLogout = (userType = "all") => {
+  console.group("🧹 Auth Force Logout");
+
+  // Clear localStorage
+  const cleanupResult = thoroughAuthCleanup(userType);
+  console.log("LocalStorage cleanup result:", cleanupResult);
+
+  // Dispatch Redux actions
+  if (userType === "user" || userType === "all") {
+    store.dispatch(userLogout());
+    console.log("User logout action dispatched");
+  }
+
+  if (userType === "organizer" || userType === "all") {
+    store.dispatch(organizerLogout());
+    console.log("Organizer logout action dispatched");
+  }
+
+  console.log("Logout complete");
+  console.groupEnd();
+
+  return {
+    success: true,
+    message: `Forced logout for ${userType}`,
+  };
+};
+
 // Add a global helper for easier debugging from console
 if (typeof window !== "undefined") {
   window.debugAuth = debugAuth;
+  window.forceLogout = forceLogout;
 }
 
 export default debugAuth;

@@ -1,97 +1,126 @@
+/* eslint-disable no-unused-vars */
 import React, { useState, useEffect } from 'react';
-import { Calendar, Mail, MapPin, Phone, Award, Users, Star, ArrowRight, Clock, ExternalLink, Globe, Zap } from 'lucide-react';
+import { useParams, useNavigate } from 'react-router-dom';
+import { useSelector } from 'react-redux';
+import axios from 'axios';
+import { 
+  Calendar, Mail, MapPin, Phone, Award, Users, Star, ArrowRight, 
+  Clock, ExternalLink, Globe, Zap, Twitter, Linkedin, Instagram, 
+  Facebook, AlertTriangle, User, Building
+} from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { safelyParseToken } from '../../utils/persistFix';
+import { toast } from 'react-toastify';
 
 const OrganizerProfile = () => {
+  const { organizerId } = useParams();
+  const navigate = useNavigate();
   const [activeSection, setActiveSection] = useState('about');
   const [isLoaded, setIsLoaded] = useState(false);
   const [expandedEvent, setExpandedEvent] = useState(null);
 
-  // Mock data for the organizer
-  const organizer = {
-    name: "Alex Morgan",
-    title: "Senior Event Director",
-    company: "Nexus Events",
-    location: "San Francisco, CA",
-    email: "alex@nexusevents.com",
-    phone: "+1 (415) 555-7890",
-    bio: "Award-winning event organizer with 10+ years of experience in corporate and entertainment events. Specializing in immersive experiences that blend technology with human connection.",
-    expertise: ["Tech Conferences", "Music Festivals", "Corporate Retreats", "Product Launches"],
-    stats: {
-      eventsHosted: 124,
-      totalAttendees: "50K+",
-      clientSatisfaction: "98%",
-      awards: 15
-    },
-    socials: ["twitter", "linkedin", "instagram"],
-    events: [
-      {
-        id: 1,
-        name: "Tech Innovators Summit",
-        date: "March 15, 2025",
-        location: "Moscone Center",
-        attendees: 2500,
-        category: "Conference",
-        status: "upcoming",
-        description: "Annual gathering of technology leaders and innovators showcasing cutting-edge developments in AI, blockchain, and quantum computing.",
-        highlights: ["25+ Speakers", "10 Workshop Sessions", "Networking Events"]
-      },
-      {
-        id: 2,
-        name: "Annual Charity Gala",
-        date: "April 2, 2025",
-        location: "Palace Hotel",
-        attendees: 800,
-        category: "Gala",
-        status: "upcoming",
-        description: "Exclusive black-tie fundraising event supporting education initiatives in underserved communities.",
-        highlights: ["Live Auction", "Celebrity Performances", "Gourmet Dinner"]
-      },
-      {
-        id: 3,
-        name: "Music Industry Conference",
-        date: "January 10, 2025",
-        location: "Davies Symphony Hall",
-        attendees: 1500,
-        category: "Conference",
-        status: "past",
-        description: "Bringing together music professionals to discuss the future of the industry in the digital age.",
-        highlights: ["Panel Discussions", "Live Demonstrations", "Networking Mixers"]
-      },
-      {
-        id: 4,
-        name: "Product Launch Event",
-        date: "December 5, 2024",
-        location: "SF Design Center",
-        attendees: 1200,
-        category: "Corporate",
-        status: "past",
-        description: "Exclusive launch event for the revolutionary new product that's changing the industry.",
-        highlights: ["Product Demos", "Media Coverage", "VIP Reception"]
+  // State for the profile data
+  const [profile, setProfile] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [events, setEvents] = useState([]);
+  const [eventsLoading, setEventsLoading] = useState(true);
+
+  // Get organizer from Redux store
+  const organizerData = useSelector(state => state.organizer);
+  const loggedInUser = organizerData?.user;
+
+  // Extract user ID from possibly nested JSON structure
+  const getUserId = () => {
+    if (!loggedInUser) return null;
+    
+    if (typeof loggedInUser === 'string') {
+      try {
+        const parsed = JSON.parse(loggedInUser);
+        return parsed?._id || parsed?.id || parsed?._doc?._id;
+      } catch (e) {
+        return null;
       }
-    ],
-    testimonials: [
-      {
-        name: "Sarah Johnson",
-        position: "CMO, TechGiant Inc.",
-        comment: "Alex organized our company conference flawlessly. The attention to detail and creative elements made it our best event yet.",
-        rating: 5
-      },
-      {
-        name: "Michael Chen",
-        position: "Founder, Startup Ventures",
-        comment: "Working with Alex was the best decision we made for our product launch. Professional, creative, and delivers beyond expectations.",
-        rating: 5
-      }
-    ],
-    certifications: ["Certified Meeting Professional (CMP)", "Digital Event Strategist (DES)"]
+    }
+    
+    return loggedInUser._id || loggedInUser.id || loggedInUser?._doc?._id;
   };
 
+  const loggedInUserId = getUserId();
+  const isOwnProfile = organizerId === loggedInUserId;
+
   useEffect(() => {
-    // Simulate loading
-    setTimeout(() => {
-      setIsLoaded(true);
-    }, 500);
-  }, []);
+    const fetchOrganizerProfile = async () => {
+      setLoading(true);
+      setError(null);
+
+      try {
+        const idToFetch = organizerId || loggedInUserId;
+
+        if (!idToFetch) {
+          setError("No organizer ID found");
+          setLoading(false);
+          return;
+        }
+
+        // Get API URL from environment or use fallback
+        const apiUrl = import.meta.env.VITE_API_URL || '/api/v1';
+
+        const token = organizerData?.token || localStorage.getItem('organizer_token');
+        const cleanToken = safelyParseToken(token);
+
+        const config = cleanToken ? {
+          headers: { Authorization: `Bearer ${cleanToken}` }
+        } : {};
+
+        // First try to get detailed profile if available
+        try {
+          const detailsResponse = await axios.get(`${apiUrl}/organizer/${idToFetch}/details`, config);
+
+          if (detailsResponse.data) {
+            // If basic user info is not included in details, fetch it separately
+            if (!detailsResponse.data.name || !detailsResponse.data.email) {
+              const basicResponse = await axios.get(`${apiUrl}/organizer/profile/${idToFetch}`, config);
+              setProfile({
+                ...basicResponse.data,
+                ...detailsResponse.data
+              });
+            } else {
+              setProfile(detailsResponse.data);
+            }
+          }
+        } catch (detailsErr) {
+          // If detailed profile not found, fall back to basic profile
+          const basicResponse = await axios.get(`${apiUrl}/organizer/profile/${idToFetch}`, config);
+          setProfile(basicResponse.data);
+        }
+
+        // Fetch events for this organizer
+        try {
+          const eventsResponse = await axios.get(`${apiUrl}/events/organizer/${idToFetch}`, config);
+          if (eventsResponse.data && Array.isArray(eventsResponse.data)) {
+            setEvents(eventsResponse.data);
+          } else {
+            setEvents([]);
+          }
+        } catch (eventsErr) {
+          console.error("Error fetching events:", eventsErr);
+          setEvents([]);
+        } finally {
+          setEventsLoading(false);
+        }
+
+        setIsLoaded(true);
+        setLoading(false);
+      } catch (err) {
+        console.error("Error fetching organizer profile:", err);
+        setError("Failed to load organizer profile. " + err.message);
+        setLoading(false);
+      }
+    };
+
+    fetchOrganizerProfile();
+  }, [organizerId, loggedInUserId]);
 
   const handleEventClick = (eventId) => {
     if (expandedEvent === eventId) {
@@ -101,8 +130,109 @@ const OrganizerProfile = () => {
     }
   };
 
-  const upcomingEvents = organizer.events.filter(event => event.status === 'upcoming');
-  const pastEvents = organizer.events.filter(event => event.status === 'past');
+  const formatPhoneNumber = (phoneNumber) => {
+    if (!phoneNumber) return '';
+    // Simple formatting, modify as needed
+    return phoneNumber.replace(/(\d{3})(\d{3})(\d{4})/, '($1) $2-$3');
+  };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-black text-white flex items-center justify-center">
+        <motion.div
+          className="w-16 h-16 border-4 border-cyan-500 border-t-transparent rounded-full"
+          animate={{ rotate: 360 }}
+          transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+        />
+        <span className="ml-4 text-xl font-medium">Loading profile...</span>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="min-h-screen bg-black text-white p-8">
+        <div className="max-w-3xl mx-auto bg-gray-900/50 border border-red-500/30 rounded-xl p-8">
+          <div className="flex items-start">
+            <AlertTriangle className="text-red-500 mr-4 mt-1" size={24} />
+            <div>
+              <h2 className="text-xl font-bold text-red-400 mb-2">Error Loading Profile</h2>
+              <p className="text-gray-300">{error}</p>
+              <button 
+                onClick={() => navigate(-1)} 
+                className="mt-6 px-4 py-2 bg-gray-800 hover:bg-gray-700 rounded-lg transition-colors"
+              >
+                Go Back
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (!profile) {
+    return (
+      <div className="min-h-screen bg-black text-white p-8">
+        <div className="max-w-3xl mx-auto bg-gray-900/50 border border-gray-800 rounded-xl p-8 text-center">
+          <User className="mx-auto text-gray-500 mb-4" size={48} />
+          <h2 className="text-xl font-bold text-gray-400 mb-2">Profile Not Found</h2>
+          <p className="text-gray-500">The organizer profile you're looking for doesn't exist or is private.</p>
+          <button 
+            onClick={() => navigate(-1)} 
+            className="mt-6 px-4 py-2 bg-gray-800 hover:bg-gray-700 rounded-lg transition-colors"
+          >
+            Go Back
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // Get basic information, with fallbacks
+  const name = profile.name || profile?.user?.name || 'Unnamed Organizer';
+  const company = profile.company || profile.organization || '';
+  const email = profile.email || profile?.user?.email || '';
+  const location = profile.location || '';
+  const phone = profile.phone || '';
+  const bio = profile.bio || 'No bio provided';
+
+  // Process events
+  const upcomingEvents = events.filter(event => {
+    const eventDate = new Date(event.date || event.startDate);
+    return eventDate > new Date();
+  });
+  
+  const pastEvents = events.filter(event => {
+    const eventDate = new Date(event.date || event.startDate);
+    return eventDate <= new Date();
+  });
+
+  // Extract profile data with fallbacks
+  const expertise = profile.expertise || [];
+  const certifications = profile.certifications || [];
+  const socials = profile.socials || [];
+  const testimonials = profile.testimonials || [];
+  
+  // Add default stats if not available
+  const stats = profile.stats || {
+    eventsHosted: events.length || 0,
+    totalAttendees: "0",
+    clientSatisfaction: "N/A",
+    awards: 0
+  };
+
+  // Function to get icon for social media
+  const getSocialIcon = (url) => {
+    if (!url) return <Globe size={16} />;
+    
+    if (url.includes('twitter') || url.includes('x.com')) return <Twitter size={16} />;
+    if (url.includes('linkedin')) return <Linkedin size={16} />;
+    if (url.includes('instagram')) return <Instagram size={16} />;
+    if (url.includes('facebook')) return <Facebook size={16} />;
+    
+    return <Globe size={16} />;
+  };
 
   return (
     <div className="min-h-screen bg-black text-white font-sans">
@@ -114,9 +244,9 @@ const OrganizerProfile = () => {
 
       <div className="relative z-10 container mx-auto px-4 py-12">
         {/* Navigation Sidebar */}
-        <div className={`fixed top-0 left-0 h-screen w-16 md:w-20 bg-gray-900 border-r border-gray-800 flex flex-col items-center py-8 transition-all duration-500 transform ${isLoaded ? 'translate-x-0' : '-translate-x-full'}`}>
+        <div className={`fixed top-0 left-0 h-screen w-12 md:w-14  border-r border-gray-800 flex flex-col items-center py-8 transition-all duration-500 transform ${isLoaded ? 'translate-x-0' : '-translate-x-full'}`}>
           <div className="w-10 h-10 bg-cyan-500 rounded-full flex items-center justify-center mb-12">
-            <span className="text-black font-bold text-lg">{organizer.name[0]}</span>
+            <span className="text-black font-bold text-lg">{name[0]}</span>
           </div>
 
           <nav className="flex flex-col items-center space-y-8">
@@ -148,7 +278,7 @@ const OrganizerProfile = () => {
               <div className="relative">
                 <div className="relative w-32 h-32 bg-gradient-to-br from-cyan-500 to-black rounded-2xl overflow-hidden shadow-lg transform rotate-3">
                   <div className="absolute inset-0 flex items-center justify-center text-5xl font-bold">
-                    {organizer.name.split(' ').map(n => n[0]).join('')}
+                    {name.split(' ').map(n => n[0]).join('')}
                   </div>
                   <div className="absolute inset-0 bg-gradient-to-br from-transparent to-black opacity-40"></div>
                 </div>
@@ -159,32 +289,60 @@ const OrganizerProfile = () => {
 
               {/* Organizer Info */}
               <div className="flex-grow">
-                <h1 className="text-5xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-white to-gray-500">{organizer.name}</h1>
+                <h1 className="text-5xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-white to-gray-500">{name}</h1>
                 <div className="flex items-center mt-2 space-x-2">
-                  <span className="text-xl text-cyan-500">{organizer.title}</span>
-                  <span className="text-gray-500">•</span>
-                  <span className="text-xl">{organizer.company}</span>
+                  <span className="text-xl text-cyan-500">{profile.title || 'Event Organizer'}</span>
+                  {company && (
+                    <>
+                      <span className="text-gray-500">•</span>
+                      <span className="text-xl">{company}</span>
+                    </>
+                  )}
                 </div>
 
-                <div className="flex flex-wrap gap-2 mt-4">
-                  {organizer.expertise.map((skill, index) => (
-                    <span key={index} className="px-3 py-1 bg-black border border-cyan-500 rounded-full text-sm">
-                      {skill}
-                    </span>
-                  ))}
-                </div>
+                {expertise.length > 0 && (
+                  <div className="flex flex-wrap gap-2 mt-4">
+                    {expertise.map((skill, index) => (
+                      <span key={index} className="px-3 py-1 bg-black border border-cyan-500 rounded-full text-sm">
+                        {skill}
+                      </span>
+                    ))}
+                  </div>
+                )}
               </div>
 
               {/* Contact Button */}
-              <button className="md:self-center bg-cyan-500 text-black px-6 py-3 rounded-full font-bold flex items-center transform transition-transform hover:scale-105 hover:shadow-cyan-900 hover:shadow-lg">
-                <Mail className="w-5 h-5 mr-2" />
-                Contact
-              </button>
+              {!isOwnProfile && (
+                <button 
+                  onClick={() => {
+                    if (email) {
+                      window.location.href = `mailto:${email}`;
+                    } else {
+                      toast.info("Contact information not available");
+                    }
+                  }}
+                  className="md:self-center bg-cyan-500 text-black px-6 py-3 rounded-full font-bold flex items-center transform transition-transform hover:scale-105 hover:shadow-cyan-900 hover:shadow-lg"
+                >
+                  <Mail className="w-5 h-5 mr-2" />
+                  Contact
+                </button>
+              )}
+
+              {/* Edit Profile Button (for own profile) */}
+              {isOwnProfile && (
+                <button 
+                  onClick={() => navigate('/organizer/details')}
+                  className="md:self-center bg-cyan-500 text-black px-6 py-3 rounded-full font-bold flex items-center transform transition-transform hover:scale-105 hover:shadow-cyan-900 hover:shadow-lg"
+                >
+                  <ArrowRight className="w-5 h-5 mr-2" />
+                  Edit Profile
+                </button>
+              )}
             </div>
 
             {/* Stats Row */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-12">
-              {Object.entries(organizer.stats).map(([key, value], index) => (
+              {Object.entries(stats).map(([key, value], index) => (
                 <div
                   key={key}
                   className={`transition-all duration-500 delay-${index * 100} transform ${isLoaded ? 'translate-y-0 opacity-100' : 'translate-y-8 opacity-0'} bg-gray-900 border-l-2 border-cyan-500 p-6 rounded-tr-2xl rounded-br-2xl`}
@@ -214,35 +372,46 @@ const OrganizerProfile = () => {
                 {/* Bio */}
                 <div className="lg:col-span-2 bg-gray-900 rounded-2xl p-6 border-b-2 border-cyan-500">
                   <h3 className="text-xl mb-4">Biography</h3>
-                  <p className="text-gray-300 leading-relaxed">{organizer.bio}</p>
+                  <p className="text-gray-300 leading-relaxed">{bio}</p>
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-8">
                     <div>
                       <h4 className="text-cyan-500 text-sm uppercase mb-3">Contact Information</h4>
                       <ul className="space-y-3">
-                        <li className="flex items-center text-gray-300">
-                          <MapPin className="w-4 h-4 text-gray-500 mr-2" />
-                          {organizer.location}
-                        </li>
-                        <li className="flex items-center text-gray-300">
-                          <Mail className="w-4 h-4 text-gray-500 mr-2" />
-                          {organizer.email}
-                        </li>
-                        <li className="flex items-center text-gray-300">
-                          <Phone className="w-4 h-4 text-gray-500 mr-2" />
-                          {organizer.phone}
-                        </li>
+                        {location && (
+                          <li className="flex items-center text-gray-300">
+                            <MapPin className="w-4 h-4 text-gray-500 mr-2" />
+                            {location}
+                          </li>
+                        )}
+                        {email && (
+                          <li className="flex items-center text-gray-300">
+                            <Mail className="w-4 h-4 text-gray-500 mr-2" />
+                            {email}
+                          </li>
+                        )}
+                        {phone && (
+                          <li className="flex items-center text-gray-300">
+                            <Phone className="w-4 h-4 text-gray-500 mr-2" />
+                            {formatPhoneNumber(phone)}
+                          </li>
+                        )}
+                        {!location && !email && !phone && (
+                          <li className="text-gray-400">No contact information provided</li>
+                        )}
                       </ul>
                     </div>
                     <div>
                       <h4 className="text-cyan-500 text-sm uppercase mb-3">Certifications</h4>
                       <ul className="space-y-3">
-                        {organizer.certifications.map((cert, index) => (
+                        {certifications.length > 0 ? certifications.map((cert, index) => (
                           <li key={index} className="flex items-center text-gray-300">
                             <Award className="w-4 h-4 text-gray-500 mr-2" />
                             {cert}
                           </li>
-                        ))}
+                        )) : (
+                          <li className="text-gray-400">No certifications listed</li>
+                        )}
                       </ul>
                     </div>
                   </div>
@@ -253,17 +422,33 @@ const OrganizerProfile = () => {
                   <h3 className="text-xl mb-4">Social Engagement</h3>
 
                   <div className="flex flex-col space-y-4">
-                    {organizer.socials.map(social => (
-                      <a href="#" key={social} className="flex items-center justify-between group">
-                        <div className="flex items-center">
-                          <div className="w-10 h-10 rounded-full bg-gray-800 flex items-center justify-center mr-3 group-hover:bg-cyan-500 transition-colors">
-                            <span className="capitalize text-lg group-hover:text-black transition-colors">{social[0]}</span>
+                    {socials.length > 0 ? socials.map((social, index) => {
+                      if (!social) return null;
+                      
+                      // Extract domain name for display
+                      let displayName = social;
+                      try {
+                        const url = new URL(social.startsWith('http') ? social : `https://${social}`);
+                        displayName = url.hostname.replace('www.', '');
+                      } catch (e) {
+                        // If parsing fails, use original value
+                        displayName = social;
+                      }
+                      
+                      return (
+                        <a href={social.startsWith('http') ? social : `https://${social}`} key={index} target="_blank" rel="noopener noreferrer" className="flex items-center justify-between group">
+                          <div className="flex items-center">
+                            <div className="w-10 h-10 rounded-full bg-gray-800 flex items-center justify-center mr-3 group-hover:bg-cyan-500 transition-colors">
+                              {getSocialIcon(social)}
+                            </div>
+                            <span className="text-gray-300 group-hover:text-white transition-colors">{displayName}</span>
                           </div>
-                          <span className="capitalize text-gray-300 group-hover:text-white transition-colors">{social}</span>
-                        </div>
-                        <ExternalLink className="w-4 h-4 text-gray-500 group-hover:text-cyan-500 transition-colors" />
-                      </a>
-                    ))}
+                          <ExternalLink className="w-4 h-4 text-gray-500 group-hover:text-cyan-500 transition-colors" />
+                        </a>
+                      );
+                    }) : (
+                      <p className="text-gray-400">No social media links provided</p>
+                    )}
                   </div>
 
                   <div className="mt-8 pt-8 border-t border-gray-800">
@@ -296,125 +481,158 @@ const OrganizerProfile = () => {
                 <h2 className="text-2xl font-bold">Events</h2>
               </div>
 
-              {/* Upcoming Events */}
-              <div className="mb-12">
-                <h3 className="text-xl mb-4 flex items-center">
-                  <div className="w-2 h-2 bg-cyan-500 rounded-full mr-2"></div>
-                  Upcoming Events
-                </h3>
-
-                <div className="space-y-6">
-                  {upcomingEvents.map(event => (
-                    <div
-                      key={event.id}
-                      className={`relative bg-gray-900 rounded-2xl overflow-hidden transition-all duration-300 ${expandedEvent === event.id ? 'transform scale-102 shadow-lg shadow-cyan-900/20' : 'hover:transform hover:scale-101'}`}
-                    >
-                      {/* Decorative element */}
-                      <div className="absolute top-0 right-0 w-24 h-24 bg-cyan-500 opacity-10 rounded-full transform translate-x-12 -translate-y-12"></div>
-
-                      <div
-                        className="p-6 cursor-pointer"
-                        onClick={() => handleEventClick(event.id)}
-                      >
-                        <div className="flex flex-col md:flex-row md:items-center justify-between">
-                          <div className="flex-grow">
-                            <div className="flex items-center mb-2">
-                              <span className="text-xs text-cyan-500 uppercase tracking-wider px-2 py-1 bg-cyan-900/30 rounded-full mr-2">
-                                {event.category}
-                              </span>
-                              <span className="text-xs text-teal-300 uppercase tracking-wider px-2 py-1 bg-teal-900/30 rounded-full">
-                                {event.status}
-                              </span>
-                            </div>
-
-                            <h4 className="text-xl font-bold hover:text-cyan-500 transition-colors">{event.name}</h4>
-
-                            <div className="flex flex-wrap gap-x-6 text-sm text-gray-400 mt-2">
-                              <div className="flex items-center">
-                                <Calendar size={14} className="mr-1" />
-                                {event.date}
-                              </div>
-                              <div className="flex items-center">
-                                <MapPin size={14} className="mr-1" />
-                                {event.location}
-                              </div>
-                              <div className="flex items-center">
-                                <Users size={14} className="mr-1" />
-                                {event.attendees.toLocaleString()} attendees
-                              </div>
-                            </div>
-                          </div>
-
-                          <div className={`transition-transform duration-300 transform ${expandedEvent === event.id ? 'rotate-90' : ''}`}>
-                            <ArrowRight size={20} className="text-cyan-500" />
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Expanded view */}
-                      <div
-                        className={`transition-all duration-300 ease-in-out overflow-hidden ${expandedEvent === event.id ? 'max-h-96 opacity-100' : 'max-h-0 opacity-0'}`}
-                      >
-                        <div className="px-6 pb-6 pt-2">
-                          <div className="h-px bg-gradient-to-r from-transparent via-gray-700 to-transparent mb-6"></div>
-
-                          <p className="text-gray-300 mb-4">{event.description}</p>
-
-                          <h5 className="text-sm uppercase text-cyan-500 mb-3">Event Highlights</h5>
-                          <div className="flex flex-wrap gap-2">
-                            {event.highlights.map((highlight, index) => (
-                              <span key={index} className="px-3 py-1 bg-black/50 rounded-full text-sm text-gray-300">
-                                {highlight}
-                              </span>
-                            ))}
-                          </div>
-
-                          <button className="mt-6 px-4 py-2 bg-cyan-500 text-black rounded-lg font-medium flex items-center transform transition-transform hover:translate-y-px">
-                            View Event Details
-                            <ArrowRight className="w-4 h-4 ml-2" />
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
+              {eventsLoading ? (
+                <div className="flex items-center justify-center p-12">
+                  <motion.div
+                    className="w-8 h-8 border-2 border-t-transparent border-cyan-500 rounded-full"
+                    animate={{ rotate: 360 }}
+                    transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+                  />
+                  <span className="ml-3 text-gray-400">Loading events...</span>
                 </div>
-              </div>
+              ) : (
+                <>
+                  {/* Upcoming Events */}
+                  <div className="mb-12">
+                    <h3 className="text-xl mb-4 flex items-center">
+                      <div className="w-2 h-2 bg-cyan-500 rounded-full mr-2"></div>
+                      Upcoming Events
+                    </h3>
 
-              {/* Past Events */}
-              <div>
-                <h3 className="text-xl mb-4 flex items-center">
-                  <div className="w-2 h-2 bg-gray-500 rounded-full mr-2"></div>
-                  Past Events
-                </h3>
+                    {upcomingEvents.length > 0 ? (
+                      <div className="space-y-6">
+                        {upcomingEvents.map(event => (
+                          <div
+                            key={event._id}
+                            className={`relative bg-gray-900 rounded-2xl overflow-hidden transition-all duration-300 ${expandedEvent === event._id ? 'transform scale-102 shadow-lg shadow-cyan-900/20' : 'hover:transform hover:scale-101'}`}
+                          >
+                            {/* Decorative element */}
+                            <div className="absolute top-0 right-0 w-24 h-24 bg-cyan-500 opacity-10 rounded-full transform translate-x-12 -translate-y-12"></div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {pastEvents.map(event => (
-                    <div
-                      key={event.id}
-                      className="bg-gray-900/50 rounded-xl p-4 hover:bg-gray-900 transition-colors"
-                    >
-                      <div className="flex justify-between">
-                        <div>
-                          <h4 className="font-medium">{event.name}</h4>
-                          <div className="flex flex-wrap gap-x-4 text-xs text-gray-400 mt-1">
-                            <div className="flex items-center">
-                              <Calendar size={12} className="mr-1" />
-                              {event.date}
+                            <div
+                              className="p-6 cursor-pointer"
+                              onClick={() => handleEventClick(event._id)}
+                            >
+                              <div className="flex flex-col md:flex-row md:items-center justify-between">
+                                <div className="flex-grow">
+                                  <div className="flex items-center mb-2">
+                                    <span className="text-xs text-cyan-500 uppercase tracking-wider px-2 py-1 bg-cyan-900/30 rounded-full mr-2">
+                                      {event.category || "Event"}
+                                    </span>
+                                    <span className="text-xs text-teal-300 uppercase tracking-wider px-2 py-1 bg-teal-900/30 rounded-full">
+                                      upcoming
+                                    </span>
+                                  </div>
+
+                                  <h4 className="text-xl font-bold hover:text-cyan-500 transition-colors">{event.title}</h4>
+
+                                  <div className="flex flex-wrap gap-x-6 text-sm text-gray-400 mt-2">
+                                    <div className="flex items-center">
+                                      <Calendar size={14} className="mr-1" />
+                                      {new Date(event.date || event.startDate).toLocaleDateString()}
+                                    </div>
+                                    <div className="flex items-center">
+                                      <MapPin size={14} className="mr-1" />
+                                      {event.location?.address || event.venue || "No location specified"}
+                                    </div>
+                                    <div className="flex items-center">
+                                      <Users size={14} className="mr-1" />
+                                      {event.attendeesCount || 0} attendees
+                                    </div>
+                                  </div>
+                                </div>
+
+                                <div className={`transition-transform duration-300 transform ${expandedEvent === event._id ? 'rotate-90' : ''}`}>
+                                  <ArrowRight size={20} className="text-cyan-500" />
+                                </div>
+                              </div>
                             </div>
-                            <div className="flex items-center">
-                              <Users size={12} className="mr-1" />
-                              {event.attendees.toLocaleString()}
+
+                            {/* Expanded view */}
+                            <div
+                              className={`transition-all duration-300 ease-in-out overflow-hidden ${expandedEvent === event._id ? 'max-h-96 opacity-100' : 'max-h-0 opacity-0'}`}
+                            >
+                              <div className="px-6 pb-6 pt-2">
+                                <div className="h-px bg-gradient-to-r from-transparent via-gray-700 to-transparent mb-6"></div>
+
+                                <p className="text-gray-300 mb-4">{event.description || "No description available"}</p>
+
+                                {event.highlights && event.highlights.length > 0 && (
+                                  <>
+                                    <h5 className="text-sm uppercase text-cyan-500 mb-3">Event Highlights</h5>
+                                    <div className="flex flex-wrap gap-2">
+                                      {event.highlights.map((highlight, index) => (
+                                        <span key={index} className="px-3 py-1 bg-black/50 rounded-full text-sm text-gray-300">
+                                          {highlight}
+                                        </span>
+                                      ))}
+                                    </div>
+                                  </>
+                                )}
+
+                                <button 
+                                  onClick={() => navigate(`/event/${event._id}`)}
+                                  className="mt-6 px-6 py-3 rounded-xl bg-gradient-to-r bg-cyan-400 text-black font-medium transition-colors cursor-pointer flex items-center space-x-2 hover:bg-black hover:text-cyan-400 hover:border hover:border-cyan-400"
+                                >
+                                  View Event Details
+                                  <ArrowRight className="w-4 h-4 ml-2" />
+                                </button>
+                              </div>
                             </div>
                           </div>
-                        </div>
-                        <div className="w-8 h-8 rounded-full bg-black/50 flex items-center justify-center">
-                          <ArrowRight size={12} className="text-gray-500" />
-                        </div>
+                        ))}
                       </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
+                    ) : (
+                      <div className="bg-gray-900/50 rounded-xl p-6 text-center">
+                        <p className="text-gray-400">No upcoming events scheduled.</p>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Past Events */}
+                  <div>
+                    <h3 className="text-xl mb-4 flex items-center">
+                      <div className="w-2 h-2 bg-gray-500 rounded-full mr-2"></div>
+                      Past Events
+                    </h3>
+
+                    {pastEvents.length > 0 ? (
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {pastEvents.map(event => (
+                          <div
+                            key={event._id}
+                            className="bg-gray-900/50 rounded-xl p-4 hover:bg-gray-900 transition-colors"
+                            onClick={() => navigate(`/event/${event._id}`)}
+                          >
+                            <div className="flex justify-between">
+                              <div>
+                                <h4 className="font-medium">{event.title}</h4>
+                                <div className="flex flex-wrap gap-x-4 text-xs text-gray-400 mt-1">
+                                  <div className="flex items-center">
+                                    <Calendar size={12} className="mr-1" />
+                                    {new Date(event.date || event.startDate).toLocaleDateString()}
+                                  </div>
+                                  <div className="flex items-center">
+                                    <Users size={12} className="mr-1" />
+                                    {event.attendeesCount || 0}
+                                  </div>
+                                </div>
+                              </div>
+                              <div className="w-8 h-8 rounded-full bg-black/50 flex items-center justify-center">
+                                <ArrowRight size={12} className="text-gray-500" />
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="bg-gray-900/50 rounded-xl p-6 text-center">
+                        <p className="text-gray-400">No past events found.</p>
+                      </div>
+                    )}
+                  </div>
+                </>
+              )}
             </section>
 
             {/* Testimonials Section */}
@@ -430,7 +648,7 @@ const OrganizerProfile = () => {
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {organizer.testimonials.map((testimonial, index) => (
+                {testimonials.length > 0 ? testimonials.map((testimonial, index) => (
                   <div
                     key={index}
                     className="bg-gray-900 rounded-2xl overflow-hidden relative group"
@@ -462,7 +680,11 @@ const OrganizerProfile = () => {
                       </div>
                     </div>
                   </div>
-                ))}
+                )) : (
+                  <div className="col-span-full bg-gray-900/50 rounded-xl p-6 text-center">
+                    <p className="text-gray-400">No testimonials available.</p>
+                  </div>
+                )}
 
                 {/* Contact CTA Card */}
                 <div className="bg-gradient-to-br from-black to-gray-900 rounded-2xl overflow-hidden relative col-span-full">
@@ -472,16 +694,35 @@ const OrganizerProfile = () => {
 
                   <div className="p-8 md:p-12 relative z-10">
                     <h3 className="text-2xl md:text-3xl font-bold mb-4">Ready to Create Your Next Event?</h3>
-                    <p className="text-gray-300 mb-8 max-w-2xl">Contact Alex Morgan to discuss how to transform your vision into an unforgettable experience that exceeds expectations.</p>
+                    <p className="text-gray-300 mb-8 max-w-2xl">
+                      Contact {name} to discuss how to transform your vision into an unforgettable experience that exceeds expectations.
+                    </p>
 
                     <div className="flex flex-col sm:flex-row gap-4">
-                      <button className="bg-cyan-500 text-black px-6 py-3 rounded-xl font-bold flex items-center justify-center transform transition-transform hover:scale-105">
-                        <Mail className="w-5 h-5 mr-2" />
-                        Get in Touch
-                      </button>
-                      <button className="bg-transparent border border-cyan-500 text-cyan-500 px-6 py-3 rounded-xl font-bold flex items-center justify-center transform transition-transform hover:scale-105">
+                      {email ? (
+                        <a 
+                          href={`mailto:${email}`}
+                          className="bg-cyan-500 text-black px-6 py-3 rounded-xl font-bold flex items-center justify-center transform transition-transform hover:scale-105"
+                        >
+                          <Mail className="w-5 h-5 mr-2" />
+                          Get in Touch
+                        </a>
+                      ) : (
+                        <button
+                          onClick={() => toast.info("Contact information not available")}
+                          className="bg-cyan-500 text-black px-6 py-3 rounded-xl font-bold flex items-center justify-center transform transition-transform hover:scale-105"
+                        >
+                          <Mail className="w-5 h-5 mr-2" />
+                          Get in Touch
+                        </button>
+                      )}
+                      
+                      <button 
+                        onClick={() => navigate(`/organizer/events/${organizerId || loggedInUserId}`)}
+                        className="bg-transparent border border-cyan-500 text-cyan-500 px-6 py-3 rounded-xl font-bold flex items-center justify-center transform transition-transform hover:scale-105"
+                      >
                         <Calendar className="w-5 h-5 mr-2" />
-                        Schedule a Call
+                        View All Events
                       </button>
                     </div>
                   </div>

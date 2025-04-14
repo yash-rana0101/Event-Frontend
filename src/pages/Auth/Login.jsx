@@ -167,7 +167,7 @@ const Login = () => {
                 <p className="text-sm text-cyan-300/70 uppercase tracking-wider">
                   NO ACCESS? {' '}
                   <Link
-                    to="/auth/register"
+                    to="/auth/signup"
                     className="text-cyan-500 hover:text-cyan-300 font-bold transition-colors"
                   >
                     SIGN UP
@@ -175,6 +175,19 @@ const Login = () => {
                 </p>
               </div>
             </form>
+          </div>
+          <div className="w-full flex justify-center mb-4 px-4">
+            <div className="bg-black border border-cyan-500/30 rounded-2xl p-6 w-full max-w-md shadow-lg transition-transform duration-300 hover:scale-105">
+              <p className="text-center text-sm md:text-base text-cyan-300/80 tracking-wider">
+                Want to <span className="text-cyan-500 font-semibold">Login</span> as an Organizer?{' '}
+                <Link
+                  to="/organizer/login"
+                  className="text-cyan-500 hover:text-cyan-300 font-bold underline underline-offset-4 transition-colors duration-200"
+                >
+                  Click here
+                </Link>
+              </p>
+            </div>
           </div>
         </div>
       </div>

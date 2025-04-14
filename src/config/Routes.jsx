@@ -1,112 +1,158 @@
-import { createBrowserRouter } from 'react-router-dom';
+import React from 'react';
+import { Routes, Route, Navigate } from 'react-router-dom';
+import { OrganizerGuard, PublicRoute, ProfileCompletedGuard, AuthGuard, AdminGuard } from '../routes/Guard';
 
-// Layouts
-import MainLayout from '../layout/Layout';
-import AuthLayout from '../layout/AuthLayout';
-import AdminLayout from '../layout/AdminLayout';
-
-// Pages
+// Page imports
 import Home from '../pages/Home/Home';
-import Register from '../pages/Auth/Register';
+import Event from '../pages/Events/Events';
+import EventDetail from '../pages/Events/EventDetail';
 import Login from '../pages/Auth/Login';
-import AdminLogin from '../pages/Admin/AdminLogin';
-import AdminDashboard from '../components/Admin/Dashboard';
-import UserManagement from '../components/Admin/UserManagement';
-import EventManagement from '../components/Admin/EventManagement';
-import ErrorPage from '../pages/common/Error';
+import Register from '../pages/Auth/Register';
+import OrgLogin from '../pages/Auth/OrgLogin';
 import OrgRegister from '../pages/Auth/OrgRegister';
+import OrganizerDashboard from '../pages/Organizer/OrganizerDashboard';
+import OrganizerDetails from '../pages/Organizer/OrganizerDetails';
+import OrganizerProfile from '../pages/Organizer/OrganizerProfile';
+import CreateEditEvent from '../pages/Organizer/CreateEditEvent';
+import EventAttendees from '../pages/Organizer/EventAttendees';
+import EditEvent from '../pages/Events/EditEvent';
+import Logout from '../pages/Auth/Logout';
 import About from '../pages/Home/About';
-import Events from '../pages/Events/Events';
 import Contact from '../pages/Home/Contact';
 
-// Guards
-import { AuthGuard, AdminGuard, PublicRoute } from '../routes/Guard';
-import OrgLogin from '../pages/Auth/OrgLogin';
-import Profile from '../pages/Organizer/OrganizerProfile';
-import OrganizerDashboard from '../pages/Organizer/OrganizerDashboard.jsx';
+// Layout imports
+import Layout from '../layout/Layout';
+import AdminLayout from '../layout/AdminLayout';
 
-export const router = createBrowserRouter([
-  {
-    path: '/',
-    element: <MainLayout />,
-    errorElement: <ErrorPage />,
-    children: [
-      {
-        path: '',
-        element: <Home />,
-      },
-      {
-        path: "About",
-        element: <About/>,
-      },
-      {
-        path: "event",
-        element: <Events />,
-      },
-      {
-        path: "Contact",
-        element: <Contact />,
-      },
-      // Add other main routes here
-    ],
-  },
-  {
-    path: '/auth',
-    element: <AuthLayout />,
-    children: [
-      {
-        path: 'login',
-        element: <PublicRoute><Login /></PublicRoute>,
-      },
-      {
-        path: 'signup',
-        element: <PublicRoute><Register /></PublicRoute>,
-      },
-    ],
-  },
-  {
-    path: '/organizer',
-    element: <AuthLayout />,
-    children: [
-      {
-        path: 'register',
-        element: <PublicRoute><OrgRegister /></PublicRoute>,
-      },
-      {
-        path: 'login',
-        element: <PublicRoute><OrgLogin /></PublicRoute>,
-      },
-      {
-        path: "profile",
-        element: <Profile />,
-      },
-      {
-        path: "dashboard",
-        element: <OrganizerDashboard />,
-      },
-      // Add other organizer routes
-    ],
-  },
-  {
-    path: '/admin',
-    element: <AdminLayout />,
-    children: [
-      {
-        path: 'login',
-        element: <PublicRoute><AdminLogin /></PublicRoute>,
-      },
-      {
-        path: '',
-        element: <AdminGuard><AdminDashboard /></AdminGuard>,
-      },
-      {
-        path: 'users',
-        element: <AdminGuard><UserManagement /></AdminGuard>,
-      },
-      {
-        path: 'events',
-        element: <AdminGuard><EventManagement /></AdminGuard>,
-      },
-    ],
-  },
-]);
+const AppRoutes = () => {
+  return (
+    <Routes>
+      {/* Public Routes */}
+      <Route path="/" element={<Layout />}>
+        <Route index element={<Home />} />
+        <Route path="about" element={<About />} />
+        <Route path="event" element={<Event />} />
+        <Route path="contact" element={<Contact />} />
+        <Route path="event/:eventId" element={<EventDetail />} />
+
+        {/* Auth Routes */}
+        <Route path="auth">
+          <Route
+            path="login"
+            element={
+              <PublicRoute>
+                <Login />
+              </PublicRoute>
+            }
+          />
+          <Route
+            path="signup"
+            element={
+              <PublicRoute>
+                <Register />
+              </PublicRoute>
+            }
+          />
+          <Route
+            path="organizer/login"
+            element={
+              <PublicRoute>
+                <OrgLogin />
+              </PublicRoute>
+            }
+          />
+          <Route
+            path="organizer/register"
+            element={
+              <PublicRoute>
+                <OrgRegister />
+              </PublicRoute>
+            }
+          />
+          <Route path="logout" element={<Logout />} />
+        </Route>
+
+        {/* Organizer Routes */}
+        <Route path="organizer">
+          <Route
+            path="login"
+            element={
+              <PublicRoute>
+                <OrgLogin />
+              </PublicRoute>
+            }
+          />
+          <Route
+            path="register"
+            element={
+              <PublicRoute>
+                <OrgRegister />
+              </PublicRoute>
+            }
+          />
+          <Route
+            path="dashboard"
+            element={
+              <ProfileCompletedGuard>
+                <OrganizerDashboard />
+              </ProfileCompletedGuard>
+            }
+          />
+          <Route
+            path="details"
+            element={
+              <OrganizerGuard>
+                <OrganizerDetails />
+              </OrganizerGuard>
+            }
+          />
+          <Route
+            path="profile/:organizerId"
+            element={<OrganizerProfile />}
+          />
+          <Route
+            path="create"
+            element={
+              <ProfileCompletedGuard>
+                <CreateEditEvent />
+              </ProfileCompletedGuard>
+            }
+          />
+          <Route
+            path="edit/:eventId"
+            element={
+              <ProfileCompletedGuard>
+                <EditEvent />
+              </ProfileCompletedGuard>
+            }
+          />
+          <Route
+            path="events/:eventId/attendees"
+            element={
+              <ProfileCompletedGuard>
+                <EventAttendees />
+              </ProfileCompletedGuard>
+            }
+          />
+        </Route>
+      </Route>
+
+      {/* Admin Routes */}
+      <Route
+        path="/admin"
+        element={
+          <AdminGuard>
+            <AdminLayout />
+          </AdminGuard>
+        }
+      >
+        {/* Add admin routes here */}
+      </Route>
+
+      {/* 404 Route */}
+      <Route path="*" element={<Navigate to="/" replace />} />
+    </Routes>
+  );
+};
+
+export default AppRoutes;

@@ -160,7 +160,7 @@ export default function EventDetail() {
   if (error || !event) {
     return (
       <div className="min-h-screen text-white p-8">
-        <div className="max-w-4xl mx-auto mt-12 bg-gray-800 rounded-xl p-6 border border-red-500/30">
+        <div className="max-w-4xl mx-auto mt-12  rounded-xl p-6 border border-red-500/30">
           <div className="flex items-center text-red-400 mb-4">
             <AlertCircle size={24} className="mr-2" />
             <h2 className="text-xl font-bold">Error Loading Event</h2>
@@ -222,22 +222,22 @@ export default function EventDetail() {
 
 
   return (
-    <div className="bg-gray-900 min-h-screen text-white">
+    <div className=" min-h-screen text-white">
       {/* Hero Section */}
       <div className="relative">
         <div className="h-64 sm:h-80 md:h-96 lg:h-[400px] overflow-hidden">
           <img
             src={formattedEvent.image}
             alt={formattedEvent.title}
-            className="w-full h-full object-cover brightness-75 transition-all duration-500"
+            className="w-full h-full object-cover  transition-all duration-500"
           />
-          <div className="absolute inset-0 bg-gradient-to-b from-black/70 via-black/50 to-gray-900" />
+          <div className="absolute inset-0 bg-gradient-to-b from-black/10 via-black/10 to-black" />
         </div>
 
         {/* Event Title Overlay */}
         <div className="absolute bottom-0 left-0 right-0 px-4 sm:px-6 lg:px-8 transform translate-y-1/2">
           <div className="max-w-6xl mx-auto">
-            <div className="bg-gray-800 rounded-xl p-6 border border-gray-700 shadow-lg">
+            <div className="bg-gray-900 rounded-xl p-6 border border-gray-700 shadow-lg">
               <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
                 <div>
                   {formattedEvent.featured && (

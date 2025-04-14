@@ -101,7 +101,7 @@ export default function Header() {
       icon: <BsPersonCircle />,
     },
     {
-      name2: "Event Management",
+      name2: "Dashboard",
       link2: "/organizer/dashboard",
       icon: <BsGrid3X3Gap />,
     },
@@ -257,7 +257,7 @@ export default function Header() {
                 <div className="flex items-center space-x-3">
                   <BsPersonCircle size={24} />
                   <span className="relative">
-                    {currentOrganizer ? "Organizer Profile" : "Profile"}
+                    {currentOrganizer ? "Profile" : "Profile"}
                     <span className="absolute -bottom-1 left-0 w-0 h-[2px] bg-[#00D8FF] group-hover:w-full transition-all duration-300" />
                   </span>
                 </div>
@@ -277,7 +277,7 @@ export default function Header() {
                 <div className="flex items-center space-x-3">
                   <BsGrid3X3Gap size={24} />
                   <span className="relative ">
-                    {currentOrganizer ? "Event Management" : "Dashboard"}
+                    {currentOrganizer ? "Dashboard" : "Dashboard"}
                     <span className="absolute -bottom-1 left-0 w-0 h-[2px] bg-[#00D8FF] group-hover:w-full transition-all duration-300" />
                   </span>
                 </div>

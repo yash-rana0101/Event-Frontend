@@ -19,6 +19,7 @@ import EditEvent from '../pages/Events/EditEvent';
 import Logout from '../pages/Auth/Logout';
 import About from '../pages/Home/About';
 import Contact from '../pages/Home/Contact';
+import EventListPage from '../pages/Events/EventListPage';
 
 // Layout imports
 import Layout from '../layout/Layout';
@@ -131,6 +132,14 @@ const AppRoutes = () => {
             element={
               <ProfileCompletedGuard>
                 <EventAttendees />
+              </ProfileCompletedGuard>
+            }
+          />
+          <Route
+            path="events/list"
+            element={
+              <ProfileCompletedGuard>
+                <EventListPage />
               </ProfileCompletedGuard>
             }
           />

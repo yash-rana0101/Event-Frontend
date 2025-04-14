@@ -6,7 +6,6 @@ import {
   CheckCircle, X, Menu, ChevronRight, Sliders, CheckSquare, Activity,
   Sparkles, ChevronDown, MoreHorizontal, ArrowRight
 } from 'lucide-react';
-// eslint-disable-next-line no-unused-vars
 import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate, Link } from 'react-router-dom';
 
@@ -386,11 +385,13 @@ const OrganizerDashboard = () => {
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5, delay: 0.5 }}
         >
-          <div className="flex items-center justify-between mb-6">
+          <div className="flex items-center justify-between my-6">
             <h2 className="font-bold text-xl md:text-2xl bg-gradient-to-r from-white to-gray-300 bg-clip-text text-transparent">
-              Upcoming Events
+              All events
             </h2>
-            <button className="text-sm text-cyan-500 hover:text-cyan-400 transition-colors">View all</button>
+            <button className="px-3 py-2 rounded-xl bg-gradient-to-r bg-cyan-400 text-black font-medium transition-colors cursor-pointer flex  space-x-2 hover:bg-black hover:text-cyan-400 hover:border hover:border-cyan-400"
+              onClick={() => navigate('/organizer/events/list')}
+            >View all</button>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -428,11 +429,11 @@ const OrganizerDashboard = () => {
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5, delay: 0.6 }}
         >
-          <div className="flex items-center justify-between mb-6">
+          <div className="flex items-baseline justify-between mb-6">
             <h2 className="font-bold text-xl md:text-2xl bg-gradient-to-r from-white to-gray-300 bg-clip-text text-transparent">
               Tasks
             </h2>
-            <button className="text-sm text-cyan-500 hover:text-cyan-400 transition-colors">View all</button>
+            <button className="px-3 py-2 rounded-xl bg-gradient-to-r bg-cyan-400 text-black font-medium transition-colors cursor-pointer flex  space-x-2 hover:bg-black hover:text-cyan-400 hover:border hover:border-cyan-400">View all</button>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">

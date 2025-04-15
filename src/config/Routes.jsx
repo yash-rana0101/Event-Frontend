@@ -33,6 +33,7 @@ import CreateEditEvent from '../pages/Organizer/CreateEditEvent';
 
 // user Pages
 import UserDashboard from '../pages/User/UserDashboard';
+import About from '../pages/Home/About';
 
 
 function AppRoutes() {
@@ -43,6 +44,7 @@ function AppRoutes() {
       <Route path="/" element={<Layout />}>
         <Route index element={<Home />} />
         <Route path="contact" element={<Contact />} />
+        <Route path="about" element={<About />} />
         
         {/* Events */}
         <Route path="event" element={<Events />} />

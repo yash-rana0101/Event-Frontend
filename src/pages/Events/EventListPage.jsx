@@ -40,17 +40,18 @@ const EventListPage = () => {
         throw new Error('Authentication required. Please log in again.');
       }
 
+        console.log("organizerData", organizerData); 
       // Get organizer ID
       let organizerId;
       if (typeof organizerData === 'string') {
         try {
           const parsed = JSON.parse(organizerData);
-          organizerId = parsed?._id || parsed?.id;
+          organizerId = parsed?._doc._id;
         } catch (e) {
           console.error('Error parsing organizer data:', e);
         }
       } else if (organizerData) {
-        organizerId = organizerData._id || organizerData.id;
+        organizerId = organizerData._doc._id;
       }
 
       if (!organizerId) {
@@ -59,13 +60,14 @@ const EventListPage = () => {
         return;
       }
 
-      const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000/api/v1';
+      const apiUrl = import.meta.env.VITE_API_URL;
 
-      const response = await axios.get(`${apiUrl}/events/organizer/${organizerId}`, {
+      const response = await axios.get(`${apiUrl}/organizer/events/organizer/${organizerId}`, {
         headers: {
           Authorization: `Bearer ${token}`
         }
       });
+
 
       // Format the events to match our UI structure
       const formattedEvents = response.data.map(event => ({

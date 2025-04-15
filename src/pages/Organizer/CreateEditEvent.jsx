@@ -39,7 +39,7 @@ const CreateEditEvent = () => {
     price: 0,
     currency: 'USD',
     registrationDeadline: '',
-    images: [],
+    image: '',
     tags: [],
     featured: false,
     isPublished: false,
@@ -124,7 +124,7 @@ const CreateEditEvent = () => {
         price: eventData.price || 0,
         currency: eventData.currency || 'USD',
         registrationDeadline,
-        images: eventData.images || [],
+        image: eventData.image || '',
         tags: eventData.tags || [],
         featured: eventData.featured || false,
         isPublished: eventData.status === 'active' || false,
@@ -135,8 +135,8 @@ const CreateEditEvent = () => {
         faqs: eventData.faqs || []
       });
 
-      // Set preview images for already uploaded images
-      setPreviewImages(eventData.images || []);
+      // Set preview image for already uploaded image
+      setPreviewImages(eventData.image ? [eventData.image] : []);
     } catch (error) {
       console.error("Error fetching event data:", error);
       setError(error.response?.data?.message || "Failed to load event data");
@@ -228,8 +228,8 @@ const CreateEditEvent = () => {
   };
 
   const handleFileUpload = async (e) => {
-    const files = e.target.files;
-    if (!files || files.length === 0) return;
+    const file = e.target.files[0];
+    if (!file) return;
 
     setIsUploading(true);
     setError(null);
@@ -243,104 +243,95 @@ const CreateEditEvent = () => {
         throw new Error('Authentication required. Please log in again.');
       }
 
-      const apiUrl = import.meta.env.VITE_API_URL || '/api/v1';
+      // Create preview URL for display
+      const objectUrl = URL.createObjectURL(file);
+      setPreviewImages([objectUrl]); // Store single image preview
 
-      // For each file, create a preview and simulate upload progress
-      for (let i = 0; i < files.length; i++) {
-        const file = files[i];
+      // Validate file size and type
+      if (file.size > 5 * 1024 * 1024) { // 5MB
+        toast.warning(`File ${file.name} is too large (max 5MB)`);
+        setIsUploading(false);
+        return;
+      }
 
-        // Validate file size and type
-        if (file.size > 5 * 1024 * 1024) { // 5MB
-          toast.warning(`File ${file.name} is too large (max 5MB)`);
-          continue;
-        }
+      if (!file.type.startsWith('image/')) {
+        toast.warning(`File ${file.name} is not an image`);
+        setIsUploading(false);
+        return;
+      }
 
-        if (!file.type.startsWith('image/')) {
-          toast.warning(`File ${file.name} is not an image`);
-          continue;
-        }
+      // Simulate upload progress
+      const interval = setInterval(() => {
+        setUploadProgress(prev => {
+          const newProgress = prev + 5;
+          return newProgress >= 100 ? 100 : newProgress;
+        });
+      }, 100);
 
-        // Create form data for file upload
-        const formDataForUpload = new FormData();
-        formDataForUpload.append('images', file);
+      if (isEditMode) {
+        // For edit mode, upload immediately and get URL
+        const apiUrl = import.meta.env.VITE_API_URL || '/api/v1';
+        const formData = new FormData();
+        formData.append('image', file);
 
-        // Simulate upload progress
-        const interval = setInterval(() => {
-          setUploadProgress(prev => {
-            const newProgress = prev + 5;
-            return newProgress >= 100 ? 100 : newProgress;
-          });
-        }, 100);
-
-        try {
-          let uploadUrl;
-          if (isEditMode) {
-            uploadUrl = `${apiUrl}/events/${eventId}/upload-images`;
-          } else {
-            // For new events, we need a temporary endpoint or we can upload after event creation
-            uploadUrl = `${apiUrl}/uploads/temp`;
-          }
-
-          // Upload the file
-          const response = await axios.post(uploadUrl, formDataForUpload, {
+        const response = await axios.post(
+          `${apiUrl}/events/${eventId}/upload-image`,
+          formData,
+          {
             headers: {
               'Content-Type': 'multipart/form-data',
               'Authorization': `Bearer ${token}`
-            },
-            onUploadProgress: progressEvent => {
-              const percentCompleted = Math.round(
-                (progressEvent.loaded * 100) / progressEvent.total
-              );
-              setUploadProgress(percentCompleted);
             }
-          });
-
-          clearInterval(interval);
-          setUploadProgress(100);
-
-          // Get the uploaded file URL from response
-          const imageUrl = response.data.imageUrl || response.data.url || response.data.path;
-
-          if (!imageUrl) {
-            throw new Error('No image URL returned from server');
           }
+        );
 
-          // Create a preview for the uploaded image
-          const objectUrl = URL.createObjectURL(file);
-          setPreviewImages(prev => [...prev, objectUrl]);
+        clearInterval(interval);
+        setUploadProgress(100);
 
-          // Add the image URL to form data
+        // Get the uploaded file URL
+        const imageUrl = response.data.imageUrl || response.data.url;
+        if (imageUrl) {
           setFormData(prev => ({
             ...prev,
-            images: [...prev.images, imageUrl]
+            image: imageUrl
           }));
-
-          toast.success(`Image ${file.name} uploaded successfully`);
-        } catch (uploadError) {
-          clearInterval(interval);
-          console.error('Upload error:', uploadError);
-
-          // Create local preview for failed upload (for UI consistency)
-          const objectUrl = URL.createObjectURL(file);
-          setPreviewImages(prev => [...prev, objectUrl]);
-
-          toast.error(`Failed to upload ${file.name}: ${uploadError.message}`);
+          toast.success('Image uploaded successfully');
+        } else {
+          throw new Error('No image URL returned from server');
         }
+      } else {
+        // For create mode, just store the File object to be sent with form submission
+        clearInterval(interval);
+        setUploadProgress(100);
+
+        // Store the file object in formData
+        setFormData(prev => ({
+          ...prev,
+          image: file
+        }));
+
+        toast.success('Image ready for upload');
       }
     } catch (error) {
       console.error("File upload error:", error);
-      setError(error.message || 'Failed to upload files');
+      setError(error.message || 'Failed to upload file');
+      toast.error(`Upload failed: ${error.message}`);
     } finally {
       setIsUploading(false);
       setUploadProgress(0);
     }
   };
 
-  const removeImage = (index) => {
-    setPreviewImages(prev => prev.filter((_, i) => i !== index));
+  const removeImage = () => {
+    // Clean up preview URL if it exists
+    if (previewImages.length > 0) {
+      URL.revokeObjectURL(previewImages[0]);
+    }
+
+    setPreviewImages([]);
     setFormData(prev => ({
       ...prev,
-      images: prev.images.filter((_, i) => i !== index)
+      image: ''
     }));
   };
 
@@ -394,7 +385,7 @@ const CreateEditEvent = () => {
         price: parseFloat(formData.price) || 0,
         currency: formData.currency,
         registrationDeadline: formData.registrationDeadline || null,
-        images: formData.images,
+        image: formData.image,
         tags: formData.tags,
         featured: formData.featured || false,
         status: formData.isPublished ? 'active' : 'draft',
@@ -814,65 +805,65 @@ const CreateEditEvent = () => {
                   className="w-full p-3 bg-gray-800/60 border border-gray-700/50 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-cyan-500/50"
                 />
               </div>
-
-              <div className="flex items-center h-full">
-                <label className="flex items-center cursor-pointer">
-                  <input
-                    type="checkbox"
-                    name="isPaid"
-                    checked={formData.isPaid}
-                    onChange={handleChange}
-                    className="sr-only"
-                  />
-                  <div className={`relative w-10 h-5 rounded-full transition-colors ${formData.isPaid ? 'bg-cyan-500' : 'bg-gray-700'}`}>
-                    <div className={`absolute left-0.5 top-0.5 bg-white w-4 h-4 rounded-full transition-transform ${formData.isPaid ? 'transform translate-x-5' : ''}`}></div>
-                  </div>
-                  <span className="ml-2 text-sm text-gray-300">This is a paid event</span>
-                </label>
-              </div>
-
-              {formData.isPaid && (
-                <>
-                  <div>
-                    <label htmlFor="price" className="block text-sm font-medium text-gray-300 mb-1">
-                      Price <span className="text-red-500">*</span>
-                    </label>
-                    <input
-                      type="number"
-                      id="price"
-                      name="price"
-                      min="0"
-                      step="0.01"
-                      value={formData.price}
-                      onChange={handleChange}
-                      required={formData.isPaid}
-                      className="w-full p-3 bg-gray-800/60 border border-gray-700/50 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-cyan-500/50"
-                    />
-                  </div>
-
-                  <div>
-                    <label htmlFor="currency" className="block text-sm font-medium text-gray-300 mb-1">
-                      Currency <span className="text-red-500">*</span>
-                    </label>
-                    <select
-                      id="currency"
-                      name="currency"
-                      value={formData.currency}
-                      onChange={handleChange}
-                      required={formData.isPaid}
-                      className="w-full p-3 bg-gray-800/60 border border-gray-700/50 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-cyan-500/50"
-                    >
-                      <option value="USD">USD - US Dollar</option>
-                      <option value="EUR">EUR - Euro</option>
-                      <option value="GBP">GBP - British Pound</option>
-                      <option value="CAD">CAD - Canadian Dollar</option>
-                      <option value="AUD">AUD - Australian Dollar</option>
-                      <option value="INR">INR - Indian Rupee</option>
-                    </select>
-                  </div>
-                </>
-              )}
             </div>
+
+            <div className="mt-4 flex items-center h-full">
+              <label className="flex items-center cursor-pointer">
+                <input
+                  type="checkbox"
+                  name="isPaid"
+                  checked={formData.isPaid}
+                  onChange={handleChange}
+                  className="sr-only"
+                />
+                <div className={`relative w-10 h-5 rounded-full transition-colors ${formData.isPaid ? 'bg-cyan-500' : 'bg-gray-700'}`}>
+                  <div className={`absolute left-0.5 top-0.5 bg-white w-4 h-4 rounded-full transition-transform ${formData.isPaid ? 'transform translate-x-5' : ''}`}></div>
+                </div>
+                <span className="ml-2 text-sm text-gray-300">This is a paid event</span>
+              </label>
+            </div>
+
+            {formData.isPaid && (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-4">
+                <div>
+                  <label htmlFor="price" className="block text-sm font-medium text-gray-300 mb-1">
+                    Price <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="number"
+                    id="price"
+                    name="price"
+                    min="0"
+                    step="0.01"
+                    value={formData.price}
+                    onChange={handleChange}
+                    required={formData.isPaid}
+                    className="w-full p-3 bg-gray-800/60 border border-gray-700/50 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-cyan-500/50"
+                  />
+                </div>
+
+                <div>
+                  <label htmlFor="currency" className="block text-sm font-medium text-gray-300 mb-1">
+                    Currency <span className="text-red-500">*</span>
+                  </label>
+                  <select
+                    id="currency"
+                    name="currency"
+                    value={formData.currency}
+                    onChange={handleChange}
+                    required={formData.isPaid}
+                    className="w-full p-3 bg-gray-800/60 border border-gray-700/50 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-cyan-500/50"
+                  >
+                    <option value="USD">USD - US Dollar</option>
+                    <option value="EUR">EUR - Euro</option>
+                    <option value="GBP">GBP - British Pound</option>
+                    <option value="CAD">CAD - Canadian Dollar</option>
+                    <option value="AUD">AUD - Australian Dollar</option>
+                    <option value="INR">INR - Indian Rupee</option>
+                  </select>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Timeline Section */}
@@ -889,7 +880,7 @@ const CreateEditEvent = () => {
                 </div>
               ))}
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-2">
               <input
                 type="text"
                 name="time"
@@ -930,7 +921,7 @@ const CreateEditEvent = () => {
                 </div>
               ))}
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-2">
               <input
                 type="text"
                 name="place"
@@ -979,7 +970,7 @@ const CreateEditEvent = () => {
                 </div>
               ))}
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-2">
               <input
                 type="text"
                 name="name"
@@ -1032,7 +1023,7 @@ const CreateEditEvent = () => {
                 </div>
               ))}
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-2">
               <input
                 type="text"
                 name="question"
@@ -1063,24 +1054,23 @@ const CreateEditEvent = () => {
           <div className="mb-8">
             <h2 className="text-xl font-semibold mb-4 flex items-center">
               <Image className="mr-2 text-cyan-500" size={20} />
-              Event Images
+              Event Image
             </h2>
 
             <div className="border-2 border-dashed border-gray-700 rounded-lg p-6 bg-gray-800/30 hover:bg-gray-800/50 transition-colors">
               <div className="flex flex-col items-center justify-center">
                 <Upload className="h-12 w-12 text-cyan-500 mb-4" />
-                <p className="text-gray-300 mb-4">Drag & drop images here or click to browse</p>
+                <p className="text-gray-300 mb-4">Drag & drop image here or click to browse</p>
                 <input
                   type="file"
-                  id="eventImages"
+                  id="eventImage"
                   accept="image/*"
-                  multiple
                   onChange={handleFileUpload}
                   className="hidden"
                   disabled={isUploading}
                 />
                 <label
-                  htmlFor="eventImages"
+                  htmlFor="eventImage"
                   className={`
                     px-6 py-3 bg-cyan-500 hover:bg-cyan-600 text-black font-medium rounded-lg cursor-pointer
                     flex items-center transition-colors ${isUploading ? 'opacity-50 cursor-not-allowed' : ''}
@@ -1097,44 +1087,33 @@ const CreateEditEvent = () => {
                   ) : (
                     <>
                       <Upload className="h-5 w-5 mr-2" />
-                      Choose Images
+                      Choose Image
                     </>
                   )}
                 </label>
                 <p className="text-gray-500 text-sm mt-3">
-                  Supported formats: JPG, PNG, GIF. Max size: 5MB per file.
+                  Supported formats: JPG, PNG, GIF. Max size: 5MB.
                 </p>
               </div>
             </div>
 
-            {/* Image Preview Grid */}
+            {/* Image Preview */}
             {previewImages.length > 0 && (
               <div className="mt-6">
-                <h3 className="text-md font-medium text-gray-300 mb-3">Selected Images</h3>
-                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
-                  {previewImages.map((image, index) => (
-                    <div key={index} className="relative group">
-                      <div className="aspect-square rounded-lg overflow-hidden bg-gray-800 border border-gray-700">
-                        <img
-                          src={image}
-                          alt={`Event preview ${index + 1}`}
-                          className="w-full h-full object-cover"
-                        />
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => removeImage(index)}
-                        className="absolute top-2 right-2 bg-red-600 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity"
-                      >
-                        <X size={14} />
-                      </button>
-                      {index === 0 && (
-                        <span className="absolute top-2 left-2 bg-cyan-500 text-black text-xs px-2 py-1 rounded-md">
-                          Cover
-                        </span>
-                      )}
-                    </div>
-                  ))}
+                <h3 className="text-md font-medium text-gray-300 mb-3">Event Cover Image</h3>
+                <div className="relative group w-full max-w-md mx-auto">
+                  <img
+                    src={previewImages[0]}
+                    alt="Event cover"
+                    className="w-full h-auto object-cover rounded-lg"
+                  />
+                  <button
+                    type="button"
+                    onClick={removeImage}
+                    className="absolute top-2 right-2 bg-red-600 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity"
+                  >
+                    <X size={14} />
+                  </button>
                 </div>
               </div>
             )}

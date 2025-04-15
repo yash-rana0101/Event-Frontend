@@ -8,7 +8,7 @@ import { motion } from "framer-motion";
 import { toast } from "react-toastify";
 
 export default function EventDetail() {
-  const { eventId } = useParams();
+  const { eventId } = useParams(); // Ensure eventId is retrieved from route params
   const navigate = useNavigate();
   const [isRegistered, setIsRegistered] = useState(false);
   const [activeTab, setActiveTab] = useState("overview");
@@ -27,30 +27,16 @@ export default function EventDetail() {
   const fetchEventDetails = async () => {
     try {
       setLoading(true);
-      const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000/api/v1';
-      
-      // Make sure eventId is actually available
+      setError(null);
+
       if (!eventId) {
-        throw new Error('Event ID is missing');
+        throw new Error("Event ID is missing.");
       }
-      
-      console.log(`Fetching event with ID: ${eventId} from ${apiUrl}/events/${eventId}`);
-      
-      
-      // Make the request to get event details
+
+      const apiUrl = import.meta.env.VITE_API_URL || "http://localhost:3000/api/v1";
       const response = await axios.get(`${apiUrl}/events/${eventId}`);
-      
-      // Log response for debugging
-      console.log("Event data received:", response.data);
-      
-      if (!response.data) {
-        throw new Error('No data received from server');
-      }
-      
-      // Check if we got an event object or if we need to access it via a property
-      const eventData = response.data.event || response.data;
-      setEvent(eventData);
-      
+      setEvent(response.data);
+
       // Also fetch similar events (just getting a few published events for now)
       try {
         const similarResponse = await axios.get(`${apiUrl}/events/published?limit=3`);
@@ -98,13 +84,8 @@ export default function EventDetail() {
 
   // Call fetchEventDetails when component mounts or eventId changes
   useEffect(() => {
-    if (eventId) {
-      fetchEventDetails();
-    } else {
-      setError("No event ID provided");
-      setLoading(false);
-    }
-  }, [eventId, user, userToken]);
+    fetchEventDetails();
+  }, [eventId]);
 
   const handleRegister = async () => {
     // If not logged in, redirect to login page

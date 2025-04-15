@@ -6,12 +6,37 @@ const eventService = {
   // Create a new event
   createEvent: async (eventData) => {
     const config = {
-      headers: getApiHeaders(),
+      headers: {
+        "Content-Type": "multipart/form-data",
+        ...getApiHeaders(true),
+      },
     };
+
+    // Convert data to FormData if needed
+    let formData;
+    if (!(eventData instanceof FormData)) {
+      formData = new FormData();
+
+      // Add all fields to formData
+      for (const key in eventData) {
+        if (key === "image" && eventData[key] instanceof File) {
+          formData.append("image", eventData[key]);
+        } else {
+          formData.append(
+            key,
+            typeof eventData[key] === "object"
+              ? JSON.stringify(eventData[key])
+              : eventData[key]
+          );
+        }
+      }
+    } else {
+      formData = eventData;
+    }
 
     const response = await axios.post(
       `${getApiBaseUrl()}/events`,
-      eventData,
+      formData,
       config
     );
 
@@ -49,6 +74,11 @@ const eventService = {
 
   // Update event
   updateEvent: async (eventId, eventData) => {
+    // Handle image conversion to array if it's a string
+    if (eventData.images && typeof eventData.images === "string") {
+      eventData.images = [eventData.images];
+    }
+
     const config = {
       headers: getApiHeaders(),
     };

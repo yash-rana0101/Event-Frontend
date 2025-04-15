@@ -52,23 +52,23 @@ export default function EditEvent() {
   const fetchEventData = async () => {
     setLoading(true);
     setError(null);
-    
+
     try {
       const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000/api/v1';
-      
+
       console.log(`Fetching event data from: ${apiUrl}/events/${eventId}`);
-      
+
       // Get token for authorization
       let rawToken = organizerToken || localStorage.getItem('organizer_token');
       const token = safelyParseToken(rawToken);
 
       // Attempt to fetch with authorization header (in case it's a private event)
       const headers = token ? { Authorization: `Bearer ${token}` } : {};
-      
+
       try {
         const response = await axios.get(`${apiUrl}/events/${eventId}`, { headers });
         const eventData = response.data;
-        
+
         // Format the data for our component
         setEvent({
           id: eventData._id || eventId,
@@ -92,17 +92,17 @@ export default function EditEvent() {
           featured: eventData.featured || false,
           sessions: eventData.timeline || eventData.sessions || []
         });
-        
+
         // If the event was successfully loaded, set error to null
         setError(null);
       } catch (firstError) {
         console.error("Error fetching from first endpoint:", firstError.message);
-        
+
         // If first attempt fails, try alternate endpoint
         console.log("Trying alternate endpoint...");
         const response = await axios.get(`${apiUrl}/events/${eventId}`, { headers });
         const eventData = response.data;
-        
+
         // Format the data for our component 
         setEvent({
           id: eventData._id || eventId,
@@ -126,7 +126,7 @@ export default function EditEvent() {
           featured: eventData.featured || false,
           sessions: eventData.timeline || eventData.sessions || []
         });
-        
+
         setError(null);
       }
     } catch (err) {
@@ -177,91 +177,67 @@ export default function EditEvent() {
     }));
   };
 
-    const saveChanges = async () => {
-    setSaving(true);
-    setError(null);
-    
+  const handleUpdate = async (eventData) => {
     try {
       const apiUrl = import.meta.env.VITE_API_URL;
       const token = organizerToken || userToken;
-      
+
       if (!token) {
         throw new Error("Authentication required");
       }
 
-      // Parse the token from the store
       const parsedToken = safelyParseToken(token);
-      
-      // Prepare data for API
-      const eventData = {
-        title: event.title,
-        description: event.description,
-        category: event.category,
-        location: {
-          address: event.location
-        },
-        // Convert sessions data to timeline format expected by API
-        timeline: event.sessions.map(session => ({
-          time: session.time,
-          event: session.name || session.event,
-          speaker: session.speaker
-        })),
-        featured: event.featured
-      };
-      
-      console.log(`Updating event with ID: ${event.id}`);
-      console.log("Data to send:", eventData);
-      
-      // Make a single request to update the event
-      const response = await axios.put(
-        `${apiUrl}/events/${event.id}`,
-        eventData,
-        {
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${parsedToken}`
-          }
+
+      // Ensure proper data structure for complex objects
+      const eventPayload = {
+        ...eventData,
+        timeline: Array.isArray(eventData.timeline) ? eventData.timeline : [],
+        prizes: Array.isArray(eventData.prizes) ? eventData.prizes : [],
+        sponsors: Array.isArray(eventData.sponsors) ? eventData.sponsors : [],
+        faqs: Array.isArray(eventData.faqs) ? eventData.faqs : [],
+        socialShare: {
+          likes: eventData.socialShare?.likes || 0,
+          comments: eventData.socialShare?.comments || 0,
+          shares: eventData.socialShare?.shares || 0
         }
-      );
-      
-      // If we've reached here, the request succeeded
+      };
+
+      // Send as JSON
+      const response = await axios({
+        method: 'PUT',
+        url: `${apiUrl}/events/${eventId}`,
+        data: eventPayload,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${parsedToken}`
+        }
+      });
+
       console.log("Update response:", response?.data);
       setSuccess(true);
       setIsEditMode(false);
       toast.success("Event updated successfully!");
-      
-      // Reload the data to show updated info
+
       setTimeout(() => {
         fetchEventData();
         setSuccess(false);
       }, 2000);
-    } catch (err) {
-      console.error("Error updating event:", err);
-      
-      // More detailed error logging
-      if (err.response) {
-        console.error("Response status:", err.response.status);
-        console.error("Response data:", err.response.data);
-      }
-      
-      // Add debugging info to the error message
-      let errorMessage = err.response?.data?.message || "Failed to update event";
-      
-      // Provide specific guidance based on error
-      if (err.response?.status === 404) {
-        errorMessage = "Event not found or you don't have permission to update it. The event might have been deleted.";
+    } catch (error) {
+      console.error("Error updating event:", error);
+      let errorMessage = error.response?.data?.message || "Failed to update event";
+
+      if (error.response?.status === 404) {
+        errorMessage = "Event not found or you don't have permission to update it.";
         toast.error(errorMessage);
-        // Option to navigate back after a failure
         setTimeout(() => {
-          // navigate('/organizer/dashboard');
+          navigate('/organizer/dashboard');
         }, 5000);
-      } else if (err.response?.status === 403) {
+      } else if (error.response?.status === 403) {
         errorMessage = "You don't have permission to edit this event.";
         toast.error(errorMessage);
-      } else if (err.response?.status === 401) {
+      } else if (error.response?.status === 401) {
         errorMessage = "Your session has expired. Please log in again.";
         toast.error(errorMessage);
-        // Clear token and redirect to login
         localStorage.removeItem('organizer_token');
         setTimeout(() => {
           navigate('/organizer/login');
@@ -269,83 +245,56 @@ export default function EditEvent() {
       } else {
         toast.error(`Error: ${errorMessage}`);
       }
-      
+
       setError(errorMessage);
     } finally {
       setSaving(false);
     }
   };
 
-    // Check if the event API has the correct event ID structure
-    useEffect(() => {
-      // This function can help debug if there's an ID mismatch between what we use in the UI vs. the API
-      const verifyEventId = async () => {
-        try {
-          if (!eventId) return;
-          
-          // Try to fetch events and look for the current one
-          const apiUrl = import.meta.env.VITE_API_URL;
-          const response = await axios.get(`${apiUrl}/events`);
-          
-          const events = response.data.events || response.data;
-          if (Array.isArray(events)) {
-            console.log("Available events:", events.map(e => ({ id: e._id, title: e.title })));
-            
-            // Check if our event ID exists in the list
-            const eventExists = events.some(e => e._id === eventId);
-            console.log(`Current event ID ${eventId} exists in API response: ${eventExists}`);
-          }
-        } catch (error) {
-          console.error("Error checking events:", error);
-        }
-      };
-      
-      verifyEventId();
-    }, [eventId]);
+  const confirmDelete = async () => {
+    try {
+      setIsDeleteModalOpen(false);
 
-    const confirmDelete = async () => {
-      try {
-        setIsDeleteModalOpen(false);
+      const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000/api/v1';
+      const token = organizerToken || userToken;
 
-        const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000/api/v1';
-        const token = organizerToken || userToken;
-
-        if (!token) {
-          throw new Error("Authentication required");
-        }
-
-        const parsedToken = safelyParseToken(token);
-
-        // Delete the event
-        await axios.delete(
-          `${apiUrl}/events/${event.id}`,
-          {
-            headers: {
-              'Authorization': `Bearer ${parsedToken}`
-            }
-          }
-        );
-
-        toast.success("Event deleted successfully");
-
-        // Navigate back to events list
-        navigate('/organizer/dashboard');
-      } catch (err) {
-        console.error("Error deleting event:", err);
-        toast.error(err.response?.data?.message || "Failed to delete event");
+      if (!token) {
+        throw new Error("Authentication required");
       }
-    };
 
-    if (loading) {
-      return (
-        <div className="min-h-screen text-gray-100 flex items-center justify-center">
-          <div className="flex flex-col items-center">
-            <Loader size={32} className="text-cyan-400 animate-spin mb-4" />
-            <h3 className="text-xl">Loading event details...</h3>
-          </div>
-        </div>
+      const parsedToken = safelyParseToken(token);
+
+      // Delete the event
+      await axios.delete(
+        `${apiUrl}/events/${event.id}`,
+        {
+          headers: {
+            'Authorization': `Bearer ${parsedToken}`
+          }
+        }
       );
+
+      toast.success("Event deleted successfully");
+
+      // Navigate back to events list
+      navigate('/organizer/dashboard');
+    } catch (err) {
+      console.error("Error deleting event:", err);
+      toast.error(err.response?.data?.message || "Failed to delete event");
     }
+  };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen text-gray-100 flex items-center justify-center">
+        <div className="flex flex-col items-center">
+          <Loader size={32} className="text-cyan-400 animate-spin mb-4" />
+          <h3 className="text-xl">Loading event details...</h3>
+        </div>
+      </div>
+    );
+  }
 
   if (error && !event.id) {
     return (
@@ -411,7 +360,7 @@ export default function EditEvent() {
             {isEditMode && (
               <>
                 <button
-                  onClick={saveChanges}
+                  onClick={() => handleUpdate(event)}
                   disabled={saving}
                   className="flex items-center px-4 py-2 bg-green-600 hover:bg-green-700 rounded-md transition-colors cursor-pointer"
                 >

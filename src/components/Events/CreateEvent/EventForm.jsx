@@ -12,8 +12,9 @@ import EventPrizes from './EventPrizes';
 import EventSponsors from './EventSponsors';
 import EventFAQs from './EventFAQs';
 
-const EventForm = ({ onSubmit, submitting }) => {
+const EventForm = ({ onSubmit, submitting: initialSubmitting }) => {
   const navigate = useNavigate();
+  const [submitting, setSubmitting] = useState(initialSubmitting || false);
 
   const [formData, setFormData] = useState({
     title: '',
@@ -57,6 +58,7 @@ const EventForm = ({ onSubmit, submitting }) => {
 
   const [currentStep, setCurrentStep] = useState(1);
   const [errors, setErrors] = useState({});
+  const [imagePreviews, setImagePreviews] = useState([]);
 
   // Update form data when child components change values
   const updateFormData = (data) => {
@@ -133,17 +135,50 @@ const EventForm = ({ onSubmit, submitting }) => {
 
   const handleFormSuccess = (eventId) => {
     // Redirect to the new event detail page
-    navigate(`/event/${eventId}`);
+    // navigate(`/event/${eventId}`);
   };
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    const isValid = validateStep(currentStep);
 
-    if (isValid) {
-      onSubmit(formData).then((eventId) => {
-        handleFormSuccess(eventId);
-      });
+    // Prepare the form data - ensure arrays are proper arrays and not strings
+    const formattedData = {
+      ...formData,
+      // Make sure these are actual arrays/objects, not stringified versions
+      timeline: Array.isArray(formData.timeline) ? formData.timeline : [],
+      prizes: Array.isArray(formData.prizes) ? formData.prizes : [],
+      sponsors: Array.isArray(formData.sponsors) ? formData.sponsors : [],
+      faqs: Array.isArray(formData.faqs) ? formData.faqs : [],
+      socialShare: {
+        likes: 0,
+        comments: 0,
+        shares: 0
+      }
+    };
+
+    setSubmitting(true);
+
+    // Pass the properly formatted data to the parent component
+    onSubmit(formattedData).then((eventId) => {
+      handleFormSuccess(eventId);
+    });
+  };
+
+  const handleImagesChange = (e) => {
+    const files = Array.from(e.target.files);
+
+    if (files.length > 0) {
+      // Create preview URLs for displaying images
+      const newPreviewUrls = files.map(file => URL.createObjectURL(file));
+
+      // Update preview URLs
+      setImagePreviews(prev => [...prev, ...newPreviewUrls]);
+
+      // Store the actual File objects in formData
+      setFormData(prev => ({
+        ...prev,
+        images: [...prev.images, ...files]
+      }));
     }
   };
 
@@ -156,7 +191,7 @@ const EventForm = ({ onSubmit, submitting }) => {
     { step: 6, component: <EventPrizes formData={formData} updateFormData={updateFormData} errors={errors} /> },
     { step: 7, component: <EventSponsors formData={formData} updateFormData={updateFormData} errors={errors} /> },
     { step: 8, component: <EventFAQs formData={formData} updateFormData={updateFormData} errors={errors} /> },
-    { step: 9, component: <EventImagesUpload formData={formData} updateFormData={updateFormData} errors={errors} /> }
+    { step: 9, component: <EventImagesUpload formData={formData} updateFormData={updateFormData} errors={errors} handleImagesChange={handleImagesChange} imagePreviews={imagePreviews} /> }
   ];
 
   // Progress percentage

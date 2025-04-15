@@ -7,6 +7,7 @@ import axios from 'axios';
 import { useSelector } from 'react-redux';
 import { toast } from 'react-toastify';
 import { fixPersistenceIssues, safelyParseToken } from '../../utils/persistFix';
+import eventService from '../../services/eventService';
 
 export default function CreateEvent() {
   const navigate = useNavigate();
@@ -52,89 +53,78 @@ export default function CreateEvent() {
       // Fix persistence issues first
       fixPersistenceIssues();
 
-      // Get token and parse it if it's a JSON string
+      // Get token - simplified token handling
       let rawToken = organizerToken || localStorage.getItem('organizer_token');
       const token = safelyParseToken(rawToken);
-
-      console.log('Submit - Raw token type:', typeof rawToken);
-      console.log('Submit - Parsed token:', typeof token, token ? token.substring(0, 15) + '...' : 'none');
 
       if (!token) {
         throw new Error('Authentication required. Please log in again.');
       }
 
-      // Handle possibly stringified user object
-      let organizer = user;
+      // Simplified organizer ID extraction
       let organizerId = null;
-      
-      if (typeof user === 'string') {
-        try {
-          organizer = JSON.parse(user);
-        } catch (e) {
-          console.error("Failed to parse user data:", e);
-        }
+
+      // Extract ID from user object if available
+      if (user) {
+        const userObj = typeof user === 'string' ? JSON.parse(user) : user;
+        organizerId = userObj._id || userObj.id ||
+          (userObj._doc && (userObj._doc._id || userObj._doc.id));
       }
 
-      // Attempt to extract organizer ID from various possible structures
-      if (organizer) {
-        if (typeof organizer === 'object') {
-          organizerId = 
-            organizer._id || 
-            organizer.id || 
-            (organizer._doc && (organizer._doc._id || organizer._doc.id));
-        }
-      }
-
-      // Check localStorage as fallback (for testing purposes)
+      // Fallback to localStorage if needed
       if (!organizerId) {
-        try {
-          const localOrganizer = JSON.parse(localStorage.getItem('organizer_user'));
-          if (localOrganizer) {
-            organizerId = localOrganizer._id || localOrganizer.id;
-          }
-        } catch (e) {
-          // Ignore parsing errors
-        }
+        const localOrganizer = JSON.parse(localStorage.getItem('organizer_user') || '{}');
+        organizerId = localOrganizer._id || localOrganizer.id;
       }
 
-      // Process images - convert any blob URLs to actual files
-      let processedImages = [...eventData.images].map(img => {
-        if (typeof img === 'string' && img.startsWith('blob:')) {
-          // For now, we'll use a placeholder
-          return "https://via.placeholder.com/800x600?text=Image+Pending";
+      if (!organizerId) {
+        throw new Error('Organizer ID not found. Please log in again.');
+      }
+
+      // Make a defensive copy of eventData to avoid mutation issues
+      const eventDataCopy = { ...eventData };
+
+      // Ensure the event data has all required properties properly initialized
+      const eventPayload = {
+        ...eventDataCopy,
+        organizer: organizerId,
+        // Initialize any potentially undefined properties with default values
+        images: Array.isArray(eventDataCopy.images) ? eventDataCopy.images : [],
+        tags: Array.isArray(eventDataCopy.tags) ? eventDataCopy.tags : [],
+        timeline: Array.isArray(eventDataCopy.timeline) ? eventDataCopy.timeline : [],
+        prizes: Array.isArray(eventDataCopy.prizes) ? eventDataCopy.prizes : [],
+        sponsors: Array.isArray(eventDataCopy.sponsors) ? eventDataCopy.sponsors : [],
+        faqs: Array.isArray(eventDataCopy.faqs) ? eventDataCopy.faqs : [],
+        // Ensure socialShare is a proper object
+        socialShare: {
+          likes: 0,
+          comments: 0,
+          shares: 0
         }
-        return img;
-      });      
-      // Format event data for submission
-      const formattedData = {
-        ...eventData,
-        images: processedImages,
-        organizer: organizerId
       };
 
-      // Make sure we're using absolute URL path and correct API endpoint
+      // Clean up images array to remove any invalid items
+      eventPayload.images = eventPayload.images
+        .filter(img => img && (typeof img === 'string' || img instanceof File || Object.keys(img).length > 0))
+        .map(img => {
+          if (typeof img === 'string' && img.startsWith('blob:')) {
+            return "https://via.placeholder.com/800x600?text=Image+Pending";
+          }
+          return img;
+        });
+
+      console.log("Sending event data:", JSON.stringify(eventPayload));
+
       const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000/api/v1';
-      const baseUrl = apiUrl.endsWith('/api/v1') ? apiUrl : `${apiUrl}/api/v1`;
-
-      console.log(`Sending request to: ${baseUrl}/events`);
-      console.log('Using token:', token.substring(0, 15) + '...');
-      
-      // Log the headers we're sending
-      const headers = {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`
-      };
-      console.log('Request headers:', JSON.stringify(headers));
-
-      // Send the request with proper headers
-      const response = await axios.post(
-        `${baseUrl}/events`,
-        formattedData,
-        {
-          headers: headers,
-          withCredentials: false // Include credentials for CORS requests
+      const response = await axios({
+        method: 'POST',
+        url: `${apiUrl}/events`,
+        data: eventPayload,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
         }
-      );
+      });
 
       console.log("Event created:", response.data);
       toast.success('Event created successfully!');
@@ -146,39 +136,24 @@ export default function CreateEvent() {
 
     } catch (error) {
       console.error("Failed to create event:", error);
-      
-      // Enhanced error logging
-      if (error.response) {
-        console.error("Error response status:", error.response.status);
-        console.error("Error response data:", error.response.data);
-        console.error("Error response headers:", error.response.headers);
-      }
 
+      // More detailed error handling
       let errorMessage = 'Failed to create event. Please try again.';
 
       if (error.response) {
-        switch (error.response.status) {
-          case 401:
-            errorMessage = 'Authentication failed. Your session may have expired - please log in again.';
-            // Add debug info
-            if (error.response.data?.message) {
-              errorMessage += ` (${error.response.data.message})`;
-            }
-            localStorage.removeItem('organizer_token');
-            setTimeout(() => navigate('/organizer/login'), 3000);
-            break;
+        console.error('Error response:', error.response.data);
+        errorMessage = error.response.data?.message ||
+          error.response.data?.error ||
+          'Server error. Please check your data and try again.';
+      } else if (error.request) {
+        errorMessage = 'No response from server. Please check your connection.';
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
 
-          case 403:
-            errorMessage = 'You do not have permission to create events.';
-            break;
-
-          case 400:
-            errorMessage = error.response.data?.message || 'Invalid event data provided.';
-            break;
-
-          default:
-            errorMessage = error.response.data?.message || 'Server error. Please try again later.';
-        }
+      if (errorMessage.includes('Authentication failed')) {
+        localStorage.removeItem('organizer_token');
+        setTimeout(() => navigate('/organizer/login'), 3000);
       }
 
       setError(errorMessage);
@@ -240,16 +215,6 @@ export default function CreateEvent() {
                     Fill in the details below to create your new event. All fields marked with an asterisk (*) are required.
                   </motion.p>
                 </div>
-
-                {error && (
-                  <motion.div
-                    className="mb-6 p-4 bg-red-900/30 border border-red-500 rounded-lg text-red-400 text-center"
-                    initial={{ opacity: 0, y: -10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                  >
-                    {error}
-                  </motion.div>
-                )}
 
                 <EventForm
                   onSubmit={handleSubmit}

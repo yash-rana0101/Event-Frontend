@@ -1,7 +1,8 @@
+/* eslint-disable no-unused-vars */
 import { useRef, useState, useEffect } from "react";
 // eslint-disable-next-line no-unused-vars
 import { motion, useInView, AnimatePresence, useAnimation } from "framer-motion";
-import logo2 from "../../assets/logo2.png";
+// import logo2 from "../../assets/logo2.png";
 import googleIcon from "../../assets/google_icon.png";
 import githubIcon from "../../assets/github_icon.png";
 import xIcon from "../../assets/x_icon.png";

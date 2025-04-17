@@ -13,6 +13,7 @@
     "@reduxjs/toolkit": "^2.6.0",
     "@tailwindcss/vite": "^4.0.9",
     "axios": "^1.8.1",
+    "chart.js": "^4.4.8",
     "dayjs": "^1.11.13",
     "framer-motion": "^12.4.10",
     "lucide-react": "^0.477.0",

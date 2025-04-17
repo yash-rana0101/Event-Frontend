@@ -1,237 +1,468 @@
-/* eslint-disable no-unused-vars */
-import React, { useState, useEffect } from 'react';
-import { Line } from 'react-chartjs-2';
-import {
-  Chart as ChartJS,
-  LineElement,
-  CategoryScale,
-  LinearScale,
-  PointElement,
-  Tooltip,
-  Legend
-} from 'chart.js';
-import dayjs from 'dayjs';
-import { useLoader } from '../../context/LoaderContext';
+import { useState } from 'react';
+import { Calendar, Bell, BookOpen, Star, Heart, MessageCircle, HelpCircle, Phone, Users, Ticket, ChevronRight } from 'lucide-react';
 
-ChartJS.register(LineElement, CategoryScale, LinearScale, PointElement, Tooltip, Legend);
-
-const UserDashboard = () => {
-  const [darkMode, setDarkMode] = useState(true);
-  const [eventData, setEventData] = useState({ upcoming: 0, past: 0, tickets: 0, bookings: [] });
-  const [currentDate, setCurrentDate] = useState(dayjs());
-  const [selectedDate, setSelectedDate] = useState(null);
-  const [sortOption, setSortOption] = useState('date-newest');
+export default function UserDashboard() {
   const [activeTab, setActiveTab] = useState('overview');
-  const { setIsLoading } = useLoader();
-  const [loading, setLoading] = useState(true);
+  
+  // Sample data
+  const upcomingEvents = [
+    { id: 1, title: "Tech Conference 2025", date: "May 5, 2025", location: "Convention Center", image: "/api/placeholder/300/200" },
+    { id: 2, title: "Music Festival", date: "May 20, 2025", location: "Central Park", image: "/api/placeholder/300/200" },
+    { id: 3, title: "Art Exhibition", date: "June 12, 2025", location: "Art Gallery", image: "/api/placeholder/300/200" }
+  ];
+  
+  const savedEvents = [
+    { id: 4, title: "Business Summit", date: "July 8, 2025", location: "Downtown Conference Hall", image: "/api/placeholder/300/200" },
+    { id: 5, title: "Comedy Night", date: "June 28, 2025", location: "City Theater", image: "/api/placeholder/300/200" }
+  ];
+  
+  const notifications = [
+    { id: 1, message: "Reminder: Tech Conference starts in 3 days", time: "2 hours ago" },
+    { id: 2, message: "New event: Photography Workshop added", time: "Yesterday" },
+    { id: 3, message: "Your ticket for Music Festival is confirmed", time: "2 days ago" }
+  ];
+  
+  const recommendations = [
+    { id: 6, title: "Food Festival", date: "August 15, 2025", location: "City Square", image: "/api/placeholder/300/200" },
+    { id: 7, title: "Science Exhibition", date: "July 22, 2025", location: "Science Museum", image: "/api/placeholder/300/200" }
+  ];
 
-  useEffect(() => {
-    setIsLoading(loading);
-    return () => setIsLoading(false);
-  }, [loading, setIsLoading]);
-
-  useEffect(() => {
-    setTimeout(() => {
-      setEventData({
-        upcoming: 3,
-        past: 19,
-        tickets: 12,
-        bookings: [
-          { name: 'Music Festival', date: 'April 24, 2024' },
-          { name: 'Tech Conference', date: 'May 5, 2024' },
-          { name: 'Art Expo', date: 'May 15, 2024' }
-        ]
-      });
-      setLoading(false);
-    }, 1000);
-  }, []);
-
-  const chartData = {
-    labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May'],
-    datasets: [{
-      label: 'Attendance',
-      data: [120, 190, 300, 250, 400],
-      borderColor: '#00b5d8',
-      tension: 0.4,
-      fill: false,
-      pointBackgroundColor: '#00b5d8'
-    }]
-  };
-
-  const generateCalendarDays = (date) => {
-    const startOfMonth = date.startOf('month');
-    const endOfMonth = date.endOf('month');
-    const startDay = startOfMonth.day();
-    const totalDays = endOfMonth.date();
-
-    const days = [];
-    for (let i = 0; i < startDay; i++) days.push(null);
-    for (let i = 1; i <= totalDays; i++) days.push(i);
-    return days;
-  };
-
-  const handlePrevMonth = () => setCurrentDate(prev => prev.subtract(1, 'month'));
-  const handleNextMonth = () => setCurrentDate(prev => prev.add(1, 'month'));
-
-  const days = generateCalendarDays(currentDate);
-  const today = dayjs();
-
-  const sortedBookings = [...eventData.bookings].sort((a, b) => {
-    if (sortOption === 'date-newest') return new Date(b.date) - new Date(a.date);
-    if (sortOption === 'date-oldest') return new Date(a.date) - new Date(b.date);
-    if (sortOption === 'name-asc') return a.name.localeCompare(b.name);
-    if (sortOption === 'name-desc') return b.name.localeCompare(a.name);
-    return 0;
-  });
-
-  const textColor = darkMode ? 'text-white' : 'text-black';
-  const bgColor = darkMode ? 'bg-black' : 'bg-gray-50';
-  const cardColor = darkMode ? 'bg-gray-800/60' : 'bg-gray-50';
-  const accentColor = 'text-cyan-500';
-
+  // Calendar data
+  const calendarDays = Array.from({ length: 31 }, (_, i) => ({
+    day: i + 1,
+    status: Math.random() > 0.3 ? 'present' : 'absent'
+  }));
+  
   return (
-    <div className={`flex ${bgColor} ${textColor} min-h-screen pt-20`}>
-      <div className="md:hidden fixed top-4 left-4 z-50">
-        <button className="bg-cyan-500 text-white px-3 py-2 rounded-lg shadow-md">☰ Menu</button>
+    <div className="min-h-screen bg-black flex">
+      {/* Left Sidebar Navigation */}
+      <div className="w-64 bg-black text-cyan-500 p-4 shadow-lg fixed h-full">
+        <div className="mb-8 flex justify-center">
+          <div className="bg-cyan-500 text-black rounded-full w-16 h-16 flex items-center justify-center font-bold text-2xl">
+            JD
+          </div>
+        </div>
+        <h2 className="text-xl font-bold text-center mb-4">John Doe</h2>
+        <p className="text-center text-cyan-500 mb-6">Event Enthusiast</p>
+        <nav>
+          <ul className="space-y-2">
+            <NavItem icon={<BookOpen size={18} />} label="Overview" active={activeTab === 'overview'} onClick={() => setActiveTab('overview')} />
+            <NavItem icon={<Calendar size={18} />} label="Calendar" active={activeTab === 'calendar'} onClick={() => setActiveTab('calendar')} />
+            <NavItem icon={<Ticket size={18} />} label="My Events" active={activeTab === 'events'} onClick={() => setActiveTab('events')} />
+            <NavItem icon={<Star size={18} />} label="Recommendations" active={activeTab === 'recommendations'} onClick={() => setActiveTab('recommendations')} />
+            <NavItem icon={<Heart size={18} />} label="Saved Events" active={activeTab === 'saved'} onClick={() => setActiveTab('saved')} />
+            <NavItem icon={<Bell size={18} />} label="Notifications" active={activeTab === 'notifications'} onClick={() => setActiveTab('notifications')} badge={3} />
+            <NavItem icon={<MessageCircle size={18} />} label="Feedback & Reviews" active={activeTab === 'feedback'} onClick={() => setActiveTab('feedback')} />
+            <NavItem icon={<HelpCircle size={18} />} label="FAQs & Help" active={activeTab === 'help'} onClick={() => setActiveTab('help')} />
+            <NavItem icon={<Phone size={18} />} label="Contact Organizer" active={activeTab === 'contact'} onClick={() => setActiveTab('contact')} />
+          </ul>
+        </nav>
       </div>
 
-      <aside className={`hidden md:flex w-64 ${cardColor} px-6 py-10 md:py-12 flex-col justify-between rounded-r-2xl fixed top-20 left-0 h-[calc(100vh-6rem)] z-40`}>
-        <div>
-          <nav className="space-y-6">
-            <button
-              className={`w-full flex items-center py-3 px-4 rounded-xl transition-all duration-300 text-gray-400 hover:bg-gray-800/50 hover:text-white ${activeTab === 'overview' ? 'bg-gradient-to-r from-cyan-500/20 to-transparent text-cyan-500' : ''}`}
-              onClick={() => setActiveTab('overview')}
-            >
-              <span className="ml-4">📊</span>
-              <span className="ml-4">Overview</span>
-            </button>
-            <button
-              className={`w-full flex items-center py-3 px-4 rounded-xl transition-all duration-300 text-gray-400 hover:bg-gray-800/50 hover:text-white ${activeTab === 'attendees' ? 'bg-gradient-to-r from-cyan-500/20 to-transparent text-cyan-500' : ''}`}
-              onClick={() => setActiveTab('attendees')}
-            >
-              <span className="ml-4">👥</span>
-              <span className="ml-4">Attendees</span>
-            </button>
-            <button
-              className={`w-full flex items-center py-3 px-4 rounded-xl transition-all duration-300 text-gray-400 hover:bg-gray-800/50 hover:text-white ${activeTab === 'events' ? 'bg-gradient-to-r from-cyan-500/20 to-transparent text-cyan-500' : ''}`}
-              onClick={() => setActiveTab('events')}
-            >
-              <span className="ml-4">📅</span>
-              <span className="ml-4">Events</span>
-            </button>
-            <button
-              className={`w-full flex items-center py-3 px-4 rounded-xl transition-all duration-300 text-gray-400 hover:bg-gray-800/50 hover:text-white ${activeTab === 'settings' ? 'bg-gradient-to-r from-cyan-500/20 to-transparent text-cyan-500' : ''}`}
-              onClick={() => setActiveTab('settings')}
-            >
-              <span className="ml-4">⚙</span>
-              <span className="ml-4">Settings</span>
-            </button>
-          </nav>
-        </div>
-        <div className="pt-6 mt-6 border-t border-gray-700">
-          <div className="flex items-center space-x-3">
-            <div className="bg-cyan-500 text-white rounded-full w-10 h-10 flex items-center justify-center font-bold">EP</div>
-            <div>
-              <div className="text-sm font-semibold">Event Pro</div>
-              <div className="text-xs text-gray-400">Premium Plan</div>
+      {/* Main Content */}
+      <div className="flex-1 p-4 md:p-6 overflow-y-auto bg-black text-cyan-500" style={{ marginLeft: '16rem' }}>
+        <div className="max-w-6xl mx-auto">
+          {/* User Profile Banner for Mobile */}
+          <div className="md:hidden bg-cyan-500 rounded-lg p-4 mb-6 shadow-lg">
+            <div className="flex items-center">
+              <div className="bg-black text-cyan-500 rounded-full w-12 h-12 flex items-center justify-center font-bold text-xl mr-4">
+                JD
+              </div>
+              <div>
+                <h1 className="text-xl font-bold text-black">John Doe</h1>
+                <p className="text-black">Event Enthusiast</p>
+              </div>
             </div>
           </div>
-        </div>
-      </aside>
-
-      <main className={`flex-1 overflow-y-auto p-4 sm:p-6 md:p-10 ml-0 md:ml-64 space-y-6`}>
-        <div className="flex justify-between items-center">
-          <h1 className="text-2xl md:text-3xl font-bold">Dashboard</h1>
-          <div className="flex items-center">
-            <label className="inline-flex items-center cursor-pointer">
-              <span className="mr-2">☀</span>
-              <input type="checkbox" className="hidden" checked={darkMode} onChange={() => setDarkMode(!darkMode)} />
-              <span className="w-11 h-6 bg-gray-200 dark:bg-gray-700 rounded-full flex items-center">
-                <span className={`w-4 h-4 bg-white rounded-full transform transition-transform ${darkMode ? 'translate-x-5' : ''}`}></span>
-              </span>
-              <span className="ml-2">🌙</span>
-            </label>
+          
+          {/* Action Buttons */}
+          <div className="flex flex-wrap gap-3 mb-6">
+            <button className="bg-cyan-600 hover:bg-cyan-700 text-white px-4 py-2 rounded-md transition flex items-center gap-2">
+              <Ticket size={16} />
+              <span>Book Ticket</span>
+            </button>
+            <button className="bg-cyan-500 hover:bg-cyan-600 text-white px-4 py-2 rounded-md transition flex items-center gap-2">
+              <Users size={16} />
+              <span>Participate</span>
+            </button>
           </div>
-        </div>
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6 mb-6">
-          <div className={`${cardColor} px-5 py-2.5 rounded-xl`}>
-            <div className="text-lg mb-2">Upcoming Events</div>
-            <div className="text-white text-2xl font-bold">{eventData.upcoming}</div>
-          </div>
-          <div className={`${cardColor} px-5 py-2.5 rounded-xl`}>
-            <div className="text-lg mb-2">Past Events</div>
-            <div className="text-white text-2xl font-bold">{eventData.past}</div>
-          </div>
-          <div className={`${cardColor} px-5 py-2.5 rounded-xl`}>
-            <div className="text-lg mb-2">Booked Tickets</div>
-            <div className="text-white text-2xl font-bold">{eventData.tickets}</div>
-          </div>
-        </div>
-
-        <div className={`${cardColor} px-5 py-2.5 rounded-xl mb-6`}>
-          <div className="flex justify-between items-center mb-3">
-            <button className="bg-cyan-500 text-white px-4 py-2 rounded-md" onClick={handlePrevMonth}>&lt; Prev</button>
-            <div className="text-lg font-semibold">{currentDate.format('MMMM YYYY')}</div>
-            <button className="bg-cyan-500 text-white px-4 py-2 rounded-md" onClick={handleNextMonth}>Next &gt;</button>
-          </div>
-
-          <div className="grid grid-cols-7 gap-1">
-            {days.map((day, idx) => (
-              <div
-                key={idx}
-                onClick={() => setSelectedDate(day)}
-                className="group flex justify-center items-center w-10 h-10 cursor-pointer relative"
-              >
-                <div
-                  className={`
-                    absolute w-10 h-10 rounded-full
-                    ${day === today.date() && day !== 14 && currentDate.isSame(today, 'month') ? 'bg-cyan-500' : ''}
-                    group-hover:bg-cyan-500
-                    ${day === selectedDate ? 'ring-2 ring-cyan-400' : ''}
-                  `}
-                ></div>
-                <span className={`z-10 ${day === today.date() && day !== 14 && currentDate.isSame(today, 'month') ? 'text-white' : ''}`}>
-                  {day}
-                </span>
+          
+          {activeTab === 'overview' ? (
+            <div className="space-y-8">
+              {/* Calendar Section */}
+              <OverviewSection title="Calendar" icon={<Calendar size={20} />}>
+                <div className="bg-black rounded-lg p-4 shadow-md">
+                  <div className="grid grid-cols-7 gap-2 mb-4">
+                    {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map(day => (
+                      <div key={day} className="text-center font-medium text-cyan-500">{day}</div>
+                    ))}
+                  </div>
+                  <div className="grid grid-cols-7 gap-2">
+                    {calendarDays.slice(0, 14).map((day, index) => (
+                      <div 
+                        key={index} 
+                        className={`p-2 text-center rounded-md ${
+                          day.status === 'present' 
+                            ? 'bg-cyan-500 text-black border border-cyan-500' 
+                            : 'bg-black text-cyan-500'
+                        }`}
+                      >
+                        {day.day}
+                      </div>
+                    ))}
+                  </div>
+                  <div className="mt-4 flex justify-between items-center">
+                    <div className="flex items-center gap-4">
+                      <div className="flex items-center">
+                        <div className="w-3 h-3 bg-cyan-500 border border-black rounded mr-1"></div>
+                        <span className="text-xs text-cyan-500">Present</span>
+                      </div>
+                      <div className="flex items-center">
+                        <div className="w-3 h-3 bg-black rounded mr-1"></div>
+                        <span className="text-xs text-cyan-500">Absent</span>
+                      </div>
+                    </div>
+                    <button 
+                      className="text-xs text-cyan-500 hover:text-black flex items-center"
+                      onClick={() => setActiveTab('calendar')}
+                    >
+                      View Full Calendar <ChevronRight size={14} />
+                    </button>
+                  </div>
+                </div>
+              </OverviewSection>
+              
+              {/* My Events Section */}
+              <OverviewSection title="My Events" icon={<Ticket size={20} />}>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {upcomingEvents.slice(0, 3).map(event => (
+                    <EventCard key={event.id} event={event} />
+                  ))}
+                </div>
+                <div className="mt-4 text-right">
+                  <button 
+                    className="text-sm text-cyan-500 hover:text-black flex items-center ml-auto"
+                    onClick={() => setActiveTab('events')}
+                  >
+                    View All Events <ChevronRight size={14} />
+                  </button>
+                </div>
+              </OverviewSection>
+              
+              {/* Recommendations Section */}
+              <OverviewSection title="Recommendations" icon={<Star size={20} />}>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {recommendations.map(event => (
+                    <EventCard key={event.id} event={event} />
+                  ))}
+                </div>
+                <div className="mt-4 text-right">
+                  <button 
+                    className="text-sm text-cyan-500 hover:text-black flex items-center ml-auto"
+                    onClick={() => setActiveTab('recommendations')}
+                  >
+                    View All Recommendations <ChevronRight size={14} />
+                  </button>
+                </div>
+              </OverviewSection>
+              
+              {/* Saved Events Section */}
+              <OverviewSection title="Saved Events" icon={<Heart size={20} />}>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {savedEvents.map(event => (
+                    <EventCard key={event.id} event={event} />
+                  ))}
+                </div>
+                <div className="mt-4 text-right">
+                  <button 
+                    className="text-sm text-cyan-500 hover:text-black flex items-center ml-auto"
+                    onClick={() => setActiveTab('saved')}
+                  >
+                    View All Saved Events <ChevronRight size={14} />
+                  </button>
+                </div>
+              </OverviewSection>
+              
+              {/* Notifications Section */}
+              <OverviewSection title="Notifications & Reminders" icon={<Bell size={20} />}>
+                <div className="space-y-3">
+                  {notifications.map(note => (
+                    <div key={note.id} className="p-3 border-l-4 border-cyan-500 bg-black rounded">
+                      <p className="text-cyan-500">{note.message}</p>
+                      <p className="text-xs text-cyan-500 mt-1">{note.time}</p>
+                    </div>
+                  ))}
+                </div>
+                <div className="mt-4 text-right">
+                  <button 
+                    className="text-sm text-cyan-500 hover:text-black flex items-center ml-auto"
+                    onClick={() => setActiveTab('notifications')}
+                  >
+                    View All Notifications <ChevronRight size={14} />
+                  </button>
+                </div>
+              </OverviewSection>
+              
+              {/* Feedback Section */}
+              <OverviewSection title="Feedback & Reviews" icon={<MessageCircle size={20} />}>
+                <div className="bg-black p-4 rounded-lg">
+                  <p className="font-medium text-cyan-500 mb-3">Share your experience</p>
+                  <div className="flex gap-2 mb-4 justify-center">
+                    {[1, 2, 3, 4, 5].map(star => (
+                      <Star key={star} size={24} className="text-cyan-500 cursor-pointer" />
+                    ))}
+                  </div>
+                  <button 
+                    className="w-full bg-cyan-500 text-black px-4 py-2 rounded hover:bg-black transition"
+                    onClick={() => setActiveTab('feedback')}
+                  >
+                    Write a Review
+                  </button>
+                </div>
+              </OverviewSection>
+              
+              {/* FAQs Section */}
+              <OverviewSection title="FAQs & Help" icon={<HelpCircle size={20} />}>
+                <div className="p-4 bg-black rounded-lg">
+                  <h3 className="font-medium text-cyan-500">How do I book tickets?</h3>
+                  <p className="text-cyan-500 mt-2 text-sm">You can book tickets by navigating to the event page and clicking the "Book Ticket" button.</p>
+                </div>
+                <div className="mt-4 text-right">
+                  <button 
+                    className="text-sm text-cyan-500 hover:text-black flex items-center ml-auto"
+                    onClick={() => setActiveTab('help')}
+                  >
+                    View All FAQs <ChevronRight size={14} />
+                  </button>
+                </div>
+              </OverviewSection>
+              
+              {/* Contact Section */}
+              <OverviewSection title="Contact Organizer" icon={<Phone size={20} />}>
+                <div className="flex flex-col sm:flex-row gap-4">
+                  <select className="p-2 border border-cyan-300 rounded flex-1">
+                    <option>Select an event organizer</option>
+                    {upcomingEvents.map(event => (
+                      <option key={event.id}>{event.title} - Organizer</option>
+                    ))}
+                  </select>
+                  <button 
+                    className="bg-cyan-600 text-white px-4 py-2 rounded hover:bg-cyan-700 transition"
+                    onClick={() => setActiveTab('contact')}
+                  >
+                    Contact
+                  </button>
+                </div>
+              </OverviewSection>
+            </div>
+          ) : activeTab === 'calendar' ? (
+            <div className="bg-black rounded-lg p-6 shadow-md">
+              <h2 className="text-xl font-bold mb-4 text-cyan-500">Your Calendar</h2>
+              <div className="grid grid-cols-7 gap-2 mb-4">
+                {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
+                  <div key={day} className="text-center font-medium text-cyan-500">{day}</div>
+                ))}
               </div>
-            ))}
-          </div>
+              <div className="grid grid-cols-7 gap-2">
+                {calendarDays.map((day, index) => (
+                  <div 
+                    key={index} 
+                    className={`p-2 text-center rounded-md cursor-pointer ${
+                      day.status === 'present' 
+                        ? 'bg-cyan-500 text-black border border-cyan-500' 
+                        : 'bg-black text-cyan-500'
+                    }`}
+                  >
+                    {day.day}
+                  </div>
+                ))}
+              </div>
+              <div className="mt-6 flex items-center justify-center gap-6">
+                <div className="flex items-center">
+                  <div className="w-4 h-4 bg-cyan-500 border border-black rounded mr-2"></div>
+                  <span className="text-sm text-cyan-500">Present</span>
+                </div>
+                <div className="flex items-center">
+                  <div className="w-4 h-4 bg-black rounded mr-2"></div>
+                  <span className="text-sm text-cyan-500">Absent</span>
+                </div>
+              </div>
+            </div>
+          ) : activeTab === 'events' ? (
+            <div className="bg-black rounded-lg p-6 shadow-md">
+              <h2 className="text-xl font-bold mb-4 text-cyan-500">My Events</h2>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {upcomingEvents.map(event => (
+                  <EventCard key={event.id} event={event} />
+                ))}
+              </div>
+            </div>
+          ) : activeTab === 'recommendations' ? (
+            <div className="bg-black rounded-lg p-6 shadow-md">
+              <h2 className="text-xl font-bold mb-4 text-cyan-500">Recommended For You</h2>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {recommendations.map(event => (
+                  <EventCard key={event.id} event={event} />
+                ))}
+              </div>
+            </div>
+          ) : activeTab === 'saved' ? (
+            <div className="bg-black rounded-lg p-6 shadow-md">
+              <h2 className="text-xl font-bold mb-4 text-cyan-500">Saved Events</h2>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {savedEvents.map(event => (
+                  <EventCard key={event.id} event={event} />
+                ))}
+              </div>
+            </div>
+          ) : activeTab === 'notifications' ? (
+            <div className="bg-black rounded-lg p-6 shadow-md">
+              <h2 className="text-xl font-bold mb-4 text-cyan-500">Notifications & Reminders</h2>
+              <div className="space-y-4">
+                {notifications.map(note => (
+                  <div key={note.id} className="p-4 border-l-4 border-cyan-500 bg-black rounded">
+                    <p className="text-cyan-500">{note.message}</p>
+                    <p className="text-xs text-cyan-500 mt-1">{note.time}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : activeTab === 'feedback' ? (
+            <div className="bg-black rounded-lg p-6 shadow-md">
+              <h2 className="text-xl font-bold mb-4 text-cyan-500">Feedback & Reviews</h2>
+              <div className="p-4 bg-black rounded-lg mb-4">
+                <p className="font-medium text-cyan-500 mb-2">Share your experience</p>
+                <div className="space-y-4">
+                  <select className="w-full p-2 border border-cyan-300 rounded">
+                    <option>Select an event to review</option>
+                    {[...upcomingEvents, ...savedEvents].map(event => (
+                      <option key={event.id}>{event.title}</option>
+                    ))}
+                  </select>
+                  <div className="flex gap-2 justify-center">
+                    {[1, 2, 3, 4, 5].map(star => (
+                      <Star key={star} size={24} className="text-cyan-500 cursor-pointer" />
+                    ))}
+                  </div>
+                  <textarea className="w-full p-2 border border-cyan-300 rounded" rows="4" placeholder="Share your thoughts about this event..."></textarea>
+                  <button className="bg-cyan-500 text-black px-4 py-2 rounded hover:bg-black transition">Submit Review</button>
+                </div>
+              </div>
+            </div>
+          ) : activeTab === 'help' ? (
+            <div className="bg-black rounded-lg p-6 shadow-md">
+              <h2 className="text-xl font-bold mb-4 text-cyan-500">FAQs & Help Desk</h2>
+              <div className="space-y-4">
+                <div className="p-4 bg-black rounded-lg">
+                  <h3 className="font-medium text-cyan-500">How do I book tickets?</h3>
+                  <p className="text-cyan-500 mt-2">You can book tickets by navigating to the event page and clicking the "Book Ticket" button. Follow the instructions to complete your purchase.</p>
+                </div>
+                <div className="p-4 bg-black rounded-lg">
+                  <h3 className="font-medium text-cyan-500">Can I cancel my ticket?</h3>
+                  <p className="text-cyan-500 mt-2">Yes, you can cancel your ticket up to 48 hours before the event. A refund will be processed according to our refund policy.</p>
+                </div>
+                <div className="p-4 bg-black rounded-lg">
+                  <h3 className="font-medium text-cyan-500">How do I contact the organizer?</h3>
+                  <p className="text-cyan-500 mt-2">You can contact the organizer by clicking on the "Contact Organizer" button on the event page or by visiting the "Contact" section.</p>
+                </div>
+                <button className="bg-cyan-500 text-black px-4 py-2 rounded hover:bg-black transition">Contact Support</button>
+              </div>
+            </div>
+          ) : activeTab === 'contact' ? (
+            <div className="bg-black rounded-lg p-6 shadow-md">
+              <h2 className="text-xl font-bold mb-4 text-cyan-500">Contact Organizer</h2>
+              <div className="space-y-4">
+                <select className="w-full p-2 border border-cyan-300 rounded">
+                  <option>Select an event organizer</option>
+                  {upcomingEvents.map(event => (
+                    <option key={event.id}>{event.title} - Organizer</option>
+                  ))}
+                </select>
+                <input type="text" placeholder="Subject" className="w-full p-2 border border-cyan-300 rounded" />
+                <textarea className="w-full p-2 border border-cyan-300 rounded" rows="4" placeholder="Your message to the organizer..."></textarea>
+                <button className="bg-cyan-500 text-black px-4 py-2 rounded hover:bg-black transition">Send Message</button>
+              </div>
+            </div>
+          ) : null}
         </div>
-
-        <div className={`${cardColor} px-5 py-2.5 rounded-xl mb-6`}>
-          <div className="text-lg font-semibold mb-4">Event Attendance</div>
-          <div className="h-72">
-            <Line data={chartData} options={{ responsive: true, maintainAspectRatio: false }} />
-          </div>
-        </div>
-
-        <div className={`${cardColor} px-5 py-2.5 rounded-xl`}>
-          <div className="mb-4 flex flex-col md:flex-row items-start md:items-center justify-between gap-3">
-            <div className="text-lg font-semibold">Your Bookings</div>
-            <select
-              value={sortOption}
-              onChange={(e) => setSortOption(e.target.value)}
-              className="bg-gray-700 text-white px-3 py-2 rounded-md focus:outline-none"
-            >
-              <option value="date-newest">Sort by Date (Newest)</option>
-              <option value="date-oldest">Sort by Date (Oldest)</option>
-              <option value="name-asc">Sort by Name (A–Z)</option>
-              <option value="name-desc">Sort by Name (Z–A)</option>
-            </select>
-          </div>
-          <ul className="divide-y divide-gray-700">
-            {sortedBookings.map((booking, index) => (
-              <li key={index} className="py-2 flex justify-between text-sm">
-                <span>{booking.name}</span>
-                <span className="text-white">{booking.date}</span>
-              </li>
-            ))}
-          </ul>
-        </div>
-      </main>
+      </div>
     </div>
   );
-};
+}
 
-export default UserDashboard;
+// Helper Components
+function NavItem({ icon, label, active, onClick, badge }) {
+  return (
+    <li 
+      className={`flex items-center p-3 rounded-md cursor-pointer transition ${
+        active ? 'bg-cyan-600 text-white' : 'text-cyan-200 hover:bg-cyan-700'
+      }`}
+      onClick={onClick}
+    >
+      <div className="mr-3">
+        {icon}
+      </div>
+      <span className={active ? 'font-medium' : ''}>{label}</span>
+      {badge && (
+        <span className="ml-auto bg-cyan-300 text-cyan-800 text-xs rounded-full w-5 h-5 flex items-center justify-center">
+          {badge}
+        </span>
+      )}
+    </li>
+  );
+}
+
+function MobileNavItem({ icon, active, onClick, badge }) {
+  return (
+    <button 
+      className={`p-2 ${active ? 'text-white' : 'text-cyan-200'}`}
+      onClick={onClick}
+    >
+      <div className="relative">
+        {icon}
+        {badge && (
+          <span className="absolute -top-1 -right-1 bg-cyan-300 text-cyan-800 text-xs rounded-full w-4 h-4 flex items-center justify-center">
+            {badge}
+          </span>
+        )}
+      </div>
+    </button>
+  );
+}
+
+function OverviewSection({ title, icon, children }) {
+  return (
+    <div className="bg-black rounded-lg shadow-md overflow-hidden">
+      <div className="bg-cyan-500 text-black p-3 flex items-center">
+        <div className="mr-2">
+          {icon}
+        </div>
+        <h2 className="font-bold">{title}</h2>
+      </div>
+      <div className="p-4">
+        {children}
+      </div>
+    </div>
+  );
+}
+
+function EventCard({ event }) {
+  return (
+    <div className="bg-black border border-cyan-500 p-3 rounded-lg shadow-sm hover:shadow-md transition overflow-hidden">
+      <img src={event.image} alt={event.title} className="w-full h-32 object-cover rounded-md mb-3" />
+      <h3 className="font-bold text-cyan-500 mb-1">{event.title}</h3>
+      <div className="flex items-center text-cyan-500 text-xs mb-3">
+        <Calendar size={12} className="mr-1" />
+        {event.date}
+        <span className="mx-1">•</span>
+        <span>{event.location}</span>
+      </div>
+      <div className="flex gap-2">
+        <button className="flex-1 bg-cyan-500 text-black px-2 py-1 rounded text-xs hover:bg-black transition">Book Ticket</button>
+        <button className="bg-black text-cyan-500 px-2 py-1 rounded text-xs hover:bg-cyan-500 transition">
+          <Heart size={14} />
+        </button>
+      </div>
+    </div>
+  );
+}

@@ -34,6 +34,7 @@ import EventAttendees from '../pages/Organizer/EventAttendees';
 import UserDashboard from '../pages/User/UserDashboard';
 import About from '../pages/Home/About';
 import EditOrgProfile from '../pages/Organizer/EditOrgProfile';
+import UserProfile from '../pages/User/UserProfile';
 
 
 function AppRoutes() {
@@ -70,7 +71,7 @@ function AppRoutes() {
         </Guard>
       }>
         <Route path="dashboard" element={<UserDashboard/>} />
-        <Route path="profile" element={<div>User Profile</div>} />
+        <Route path="profile" element={<UserProfile/>} />
       </Route>
       
       {/* Organizer Protected Routes */}

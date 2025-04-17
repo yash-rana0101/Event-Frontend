@@ -1,8 +1,10 @@
 /* eslint-disable no-unused-vars */
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import { Ticket, Users } from 'lucide-react';
+import axios from 'axios';
+import { toast } from 'react-toastify';
 
 // Import components
 import Sidebar from '../../components/User/Dashboard/Sidebar';
@@ -16,39 +18,105 @@ import HelpSection from '../../components/User/Dashboard/HelpSection';
 import ContactSection from '../../components/User/Dashboard/ContactSection';
 import OverviewSection from '../../components/User/Dashboard/OverviewSection';
 import EventCard from '../../components/User/Dashboard/EventCard';
+import Skeleton from '../../components/UI/Skeleton';
 
 export default function UserDashboard() {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState('overview');
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
-  // Sample data
-  const upcomingEvents = [
-    { id: 1, title: "Tech Conference 2025", date: "May 5, 2025", location: "Convention Center", image: "/api/placeholder/300/200" },
-    { id: 2, title: "Music Festival", date: "May 20, 2025", location: "Central Park", image: "/api/placeholder/300/200" },
-    { id: 3, title: "Art Exhibition", date: "June 12, 2025", location: "Art Gallery", image: "/api/placeholder/300/200" }
-  ];
+  // Data states
+  const [profile, setProfile] = useState(null);
+  const [dashboardData, setDashboardData] = useState({
+    upcomingEvents: [],
+    savedEvents: [],
+    notifications: [],
+    recommendations: [],
+    calendarDays: [],
+    stats: {
+      eventsAttended: 0,
+      upcomingEvents: 0,
+      savedEvents: 0,
+      eventPhotos: 0
+    }
+  });
 
-  const savedEvents = [
-    { id: 4, title: "Business Summit", date: "July 8, 2025", location: "Downtown Conference Hall", image: "/api/placeholder/300/200" },
-    { id: 5, title: "Comedy Night", date: "June 28, 2025", location: "City Theater", image: "/api/placeholder/300/200" }
-  ];
+  // Fetch user profile and dashboard data
+  useEffect(() => {
+    const fetchUserDashboard = async () => {
+      try {
+        setLoading(true);
+        setError(null);
 
-  const notifications = [
-    { id: 1, message: "Reminder: Tech Conference starts in 3 days", time: "2 hours ago" },
-    { id: 2, message: "New event: Photography Workshop added", time: "Yesterday" },
-    { id: 3, message: "Your ticket for Music Festival is confirmed", time: "2 days ago" }
-  ];
+        // Check if the user is authenticated
+        const token = localStorage.getItem('token');
+        if (!token) {
+          navigate('/login');
+          return;
+        }
 
-  const recommendations = [
-    { id: 6, title: "Food Festival", date: "August 15, 2025", location: "City Square", image: "/api/placeholder/300/200" },
-    { id: 7, title: "Science Exhibition", date: "July 22, 2025", location: "Science Museum", image: "/api/placeholder/300/200" }
-  ];
+        // Fetch user profile first
+        const profileResponse = await axios.get(`${import.meta.env.VITE_API_URL}/profiles/me`, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
 
-  // Calendar data
-  const calendarDays = Array.from({ length: 31 }, (_, i) => ({
-    day: i + 1,
-    status: Math.random() > 0.3 ? 'present' : 'absent'
-  }));
+        setProfile(profileResponse.data.data);
+
+        // Fetch dashboard data
+        const dashboardResponse = await axios.get(`${import.meta.env.VITE_API_URL}/profiles/me/dashboard`, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+
+        setDashboardData(dashboardResponse.data.data);
+      } catch (err) {
+        console.error('Error fetching dashboard data:', err);
+
+        // If profile doesn't exist, redirect to create profile
+        if (err.response && err.response.status === 404) {
+          navigate('/user/create-profile');
+          return;
+        }
+
+        setError('Failed to load dashboard data. Please try again later.');
+        toast.error('Failed to load dashboard data');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchUserDashboard();
+  }, [navigate]);
+
+  if (loading) {
+    return <Skeleton type='profile' columns={8}/>;
+  }
+
+  if (error) {
+    return (
+      <div className="min-h-screen bg-black flex items-center justify-center">
+        <div className="text-white text-center p-6 max-w-md">
+          <h1 className="text-2xl font-bold mb-4">Something went wrong</h1>
+          <p className="mb-6">{error}</p>
+          <button
+            onClick={() => window.location.reload()}
+            className="px-6 py-3 rounded-xl bg-gradient-to-r bg-cyan-400 text-black font-medium"
+          >
+            Try Again
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // Fix the destructuring issue by ensuring dashboardData is not undefined
+  const {
+    upcomingEvents = [],
+    savedEvents = [],
+    notifications = [],
+    recommendations = [],
+    calendarDays = []
+  } = dashboardData || {};
 
   return (
     <div className="min-h-screen bg-black flex">
@@ -73,11 +141,11 @@ export default function UserDashboard() {
           <div className="md:hidden bg-gradient-to-r from-cyan-500 to-cyan-600 rounded-lg p-4 mb-6 shadow-lg">
             <div className="flex items-center">
               <div className="bg-black text-cyan-500 rounded-full w-12 h-12 flex items-center justify-center font-bold text-xl mr-4">
-                JD
+                {profile?.name.charAt(0) || 'U'}
               </div>
               <div>
-                <h1 className="text-xl font-bold text-black">John Doe</h1>
-                <p className="text-black">Event Enthusiast</p>
+                <h1 className="text-xl font-bold text-black">{profile?.name || 'User'}</h1>
+                <p className="text-black">{profile?.badges?.[0]?.name || 'Member'}</p>
               </div>
             </div>
           </div>
@@ -88,6 +156,7 @@ export default function UserDashboard() {
               className="px-6 py-3 rounded-xl bg-gradient-to-r bg-cyan-400 text-black font-medium transition-colors cursor-pointer flex items-center space-x-2 hover:bg-black hover:text-cyan-400 hover:border hover:border-cyan-400"
               whileHover={{ y: -2 }}
               whileTap={{ scale: 0.98 }}
+              onClick={() => navigate('/events')}
             >
               <Ticket size={16} />
               <span>Book Ticket</span>
@@ -107,7 +176,7 @@ export default function UserDashboard() {
               {/* My Events Section */}
               <OverviewSection title="My Events" icon="ticket">
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {upcomingEvents.slice(0, 3).map(event => (
+                  {upcomingEvents && upcomingEvents.slice(0, 3).map(event => (
                     <EventCard key={event.id} event={event} />
                   ))}
                 </div>
@@ -123,21 +192,21 @@ export default function UserDashboard() {
 
               {/* Recommendations Section */}
               <RecommendationsSection
-                recommendations={recommendations}
+                recommendations={recommendations || []}
                 setActiveTab={setActiveTab}
                 overview={true}
               />
 
               {/* Saved Events Section */}
               <SavedEventsSection
-                savedEvents={savedEvents}
+                savedEvents={savedEvents || []}
                 setActiveTab={setActiveTab}
                 overview={true}
               />
 
               {/* Notifications Section */}
               <NotificationsSection
-                notifications={notifications}
+                notifications={notifications || []}
                 setActiveTab={setActiveTab}
                 overview={true}
               />
@@ -149,24 +218,24 @@ export default function UserDashboard() {
               <HelpSection setActiveTab={setActiveTab} overview={true} />
 
               {/* Contact Section */}
-              <ContactSection events={upcomingEvents} setActiveTab={setActiveTab} overview={true} />
+              <ContactSection events={upcomingEvents || []} setActiveTab={setActiveTab} overview={true} />
             </div>
           ) : activeTab === 'calendar' ? (
-            <CalendarView calendarDays={calendarDays} />
+            <CalendarView calendarDays={calendarDays || []} />
           ) : activeTab === 'events' ? (
-            <EventsSection events={upcomingEvents} />
+            <EventsSection events={upcomingEvents || []} />
           ) : activeTab === 'recommendations' ? (
-            <RecommendationsSection recommendations={recommendations} />
+            <RecommendationsSection recommendations={recommendations || []} />
           ) : activeTab === 'saved' ? (
-            <SavedEventsSection savedEvents={savedEvents} />
+            <SavedEventsSection savedEvents={savedEvents || []} />
           ) : activeTab === 'notifications' ? (
-            <NotificationsSection notifications={notifications} />
+            <NotificationsSection notifications={notifications || []} />
           ) : activeTab === 'feedback' ? (
-            <FeedbackSection events={[...upcomingEvents, ...savedEvents]} />
+            <FeedbackSection events={[...(upcomingEvents || []), ...(savedEvents || [])]} />
           ) : activeTab === 'help' ? (
             <HelpSection />
           ) : activeTab === 'contact' ? (
-            <ContactSection events={upcomingEvents} />
+            <ContactSection events={upcomingEvents || []} />
           ) : null}
         </motion.div>
       </div>

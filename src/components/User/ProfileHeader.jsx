@@ -1,17 +1,10 @@
 import React, { useState } from 'react';
-import { Edit, Share2, Settings, MapPin, Calendar, Ticket, MessageCircle, Camera, X, Check } from 'lucide-react';
+import { Edit, Share2, Settings, MapPin, Calendar, Ticket, MessageCircle, Camera } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 
-const ProfileHeader = ({
-  user,
-  isEditing,
-  setIsEditing,
-  editedName,
-  setEditedName,
-  editedLocation,
-  setEditedLocation,
-  handleSave
-}) => {
+const ProfileHeader = ({ user }) => {
   const [showProfileOptions, setShowProfileOptions] = useState(false);
+  const navigate = useNavigate();
 
   return (
     <div className="relative bg-black text-white rounded-xl overflow-hidden">
@@ -30,21 +23,12 @@ const ProfileHeader = ({
 
           {showProfileOptions && (
             <div className="absolute top-10 right-0 bg-black/90 backdrop-blur-md border border-gray-800 p-3 rounded-xl shadow-xl flex flex-col gap-2 md:hidden">
-              {isEditing ? (
-                <button
-                  onClick={handleSave}
-                  className="flex items-center gap-1 text-sm px-4 py-2 bg-cyan-500 text-black rounded-lg hover:bg-cyan-400"
-                >
-                  <Check size={14} /> Save
-                </button>
-              ) : (
-                <button
-                  onClick={() => setIsEditing(true)}
-                  className="flex items-center gap-1 text-sm px-4 py-2 bg-black text-cyan-500 border border-cyan-500 rounded-lg hover:bg-cyan-500 hover:text-black"
-                >
-                  <Edit size={14} /> Edit
-                </button>
-              )}
+              <button
+                onClick={() => navigate("/user/profile/edit")}
+                className="flex items-center gap-1 text-sm px-4 py-2 bg-black text-cyan-500 border border-cyan-500 rounded-lg hover:bg-cyan-500 hover:text-black"
+              >
+                <Edit size={14} /> Edit
+              </button>
               <button className="flex items-center gap-1 text-sm px-4 py-2 bg-black text-cyan-500 border border-cyan-500 rounded-lg hover:bg-cyan-500 hover:text-black">
                 <Share2 size={14} /> Share
               </button>
@@ -53,21 +37,12 @@ const ProfileHeader = ({
         </div>
 
         <div className="hidden md:flex absolute top-6 right-6 gap-3">
-          {isEditing ? (
-            <button
-              onClick={handleSave}
-              className="flex items-center gap-1 px-4 py-2 bg-cyan-500 text-black rounded-lg hover:bg-cyan-400 transition font-medium"
-            >
-              <Check size={16} /> Save Changes
-            </button>
-          ) : (
-            <button
-              onClick={() => setIsEditing(true)}
-              className="flex items-center gap-1 px-4 py-2 bg-black/70 backdrop-blur-sm text-cyan-500 border border-cyan-500 rounded-lg hover:bg-cyan-500 hover:text-black transition font-medium"
-            >
-              <Edit size={16} /> Edit Profile
-            </button>
-          )}
+          <button
+            onClick={() => navigate("/user/profile/edit")}
+            className="flex items-center gap-1 px-4 py-2 bg-black/70 backdrop-blur-sm text-cyan-500 border border-cyan-500 rounded-lg hover:bg-cyan-500 hover:text-black transition font-medium"
+          >
+            <Edit size={16} /> Edit Profile
+          </button>
           <button className="flex items-center gap-1 px-4 py-2 bg-cyan-500 text-black rounded-lg hover:bg-cyan-400 transition font-medium">
             <Share2 size={16} /> Share
           </button>
@@ -93,37 +68,11 @@ const ProfileHeader = ({
 
           {/* User info with modern styling */}
           <div className="text-center md:text-left flex-1">
-            {isEditing ? (
-              <div className="space-y-3">
-                <div className="relative">
-                  <input
-                    type="text"
-                    value={editedName}
-                    onChange={(e) => setEditedName(e.target.value)}
-                    className="text-2xl font-bold bg-black/50 text-white border-b-2 border-cyan-500 px-2 py-1 w-full focus:outline-none focus:border-cyan-300"
-                    placeholder="Your name"
-                  />
-                </div>
-                <div className="relative flex items-center">
-                  <MapPin size={16} className="absolute left-2 text-cyan-500" />
-                  <input
-                    type="text"
-                    value={editedLocation}
-                    onChange={(e) => setEditedLocation(e.target.value)}
-                    className="pl-8 bg-black/50 text-white border-b-2 border-cyan-500 px-2 py-1 w-full focus:outline-none focus:border-cyan-300"
-                    placeholder="Your location"
-                  />
-                </div>
-              </div>
-            ) : (
-              <>
-                <h1 className="text-2xl md:text-3xl font-bold bg-gradient-to-r from-cyan-500 to-white bg-clip-text text-transparent">{user.name}</h1>
-                <div className="flex items-center justify-center md:justify-start mt-1 text-gray-300">
-                  <MapPin size={16} className="mr-1 text-cyan-500" />
-                  <span>{user.location}</span>
-                </div>
-              </>
-            )}
+            <h1 className="text-2xl md:text-3xl font-bold bg-gradient-to-r from-cyan-500 to-white bg-clip-text text-transparent">{user.name}</h1>
+            <div className="flex items-center justify-center md:justify-start mt-1 text-gray-300">
+              <MapPin size={16} className="mr-1 text-cyan-500" />
+              <span>{user.location}</span>
+            </div>
 
             {/* User stats with hover effects */}
             <div className="flex flex-wrap gap-2 mt-4 justify-center md:justify-start">

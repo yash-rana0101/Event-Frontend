@@ -35,6 +35,8 @@ import UserDashboard from '../pages/User/UserDashboard';
 import About from '../pages/Home/About';
 import EditOrgProfile from '../pages/Organizer/EditOrgProfile';
 import UserProfile from '../pages/User/UserProfile';
+import EditUserProfile from '../pages/User/EditUserProfile';
+import CreateUserProfile from '../pages/User/CreateUserProfile';
 
 
 function AppRoutes() {
@@ -72,6 +74,8 @@ function AppRoutes() {
       }>
         <Route path="dashboard" element={<UserDashboard/>} />
         <Route path="profile" element={<UserProfile/>} />
+        <Route path="profile/edit" element={<EditUserProfile/>} />
+        <Route path="profile/create" element={<CreateUserProfile/>} />
       </Route>
       
       {/* Organizer Protected Routes */}

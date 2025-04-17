@@ -2,6 +2,7 @@
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
+import { AlertCircle } from 'lucide-react';
 import EventBasicInfo from './EventBasicInfo';
 import EventDateTime from './EventDateTime';
 import EventLocation from './EventLocation';
@@ -15,6 +16,9 @@ import EventFAQs from './EventFAQs';
 const EventForm = ({ onSubmit, submitting: initialSubmitting }) => {
   const navigate = useNavigate();
   const [submitting, setSubmitting] = useState(initialSubmitting || false);
+
+  // Add error state
+  const [submitError, setSubmitError] = useState(null);
 
   const [formData, setFormData] = useState({
     title: '',
@@ -135,16 +139,19 @@ const EventForm = ({ onSubmit, submitting: initialSubmitting }) => {
 
   const handleFormSuccess = (eventId) => {
     // Redirect to the new event detail page
-    // navigate(`/event/${eventId}`);
+    navigate(`/event/${eventId}`);
   };
 
-  const handleSubmit = (e) => {
+  // Updated handleSubmit with better error handling and retry support
+  const handleSubmit = async (e) => {
     e.preventDefault();
 
-    // Prepare the form data - ensure arrays are proper arrays and not strings
+    // Clear any previous errors
+    setSubmitError(null);
+
+    // Prepare the form data
     const formattedData = {
       ...formData,
-      // Make sure these are actual arrays/objects, not stringified versions
       timeline: Array.isArray(formData.timeline) ? formData.timeline : [],
       prizes: Array.isArray(formData.prizes) ? formData.prizes : [],
       sponsors: Array.isArray(formData.sponsors) ? formData.sponsors : [],
@@ -158,10 +165,30 @@ const EventForm = ({ onSubmit, submitting: initialSubmitting }) => {
 
     setSubmitting(true);
 
-    // Pass the properly formatted data to the parent component
-    onSubmit(formattedData).then((eventId) => {
+    try {
+      // Pass the properly formatted data to the parent component
+      const eventId = await onSubmit(formattedData);
       handleFormSuccess(eventId);
-    });
+      // Successful submission will be handled by the parent component
+    } catch (error) {
+      console.error("Event creation failed:", error);
+
+      // Set error state with details
+      setSubmitError({
+        message: error.response?.data?.message || error.message || "Failed to create event",
+        details: error.response?.data?.details || "Please check your form data and try again",
+        status: error.response?.status,
+        error: error
+      });
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  // Function to retry submission after an error
+  const handleRetry = () => {
+    setSubmitError(null);
+    handleSubmit(new Event('submit')); // Create synthetic event object
   };
 
   const handleImagesChange = (e) => {
@@ -197,6 +224,43 @@ const EventForm = ({ onSubmit, submitting: initialSubmitting }) => {
   // Progress percentage
   const progress = (currentStep / formSteps.length) * 100;
 
+  // Error display component
+  const ErrorDisplay = ({ error, onRetry }) => (
+    <div className="bg-red-900/20 border border-red-500/30 text-red-400 rounded-xl p-6 mb-6">
+      <div className="flex items-start">
+        <AlertCircle className="w-6 h-6 mr-3 mt-1" />
+        <div className="flex-1">
+          <h3 className="font-bold text-lg mb-2">Failed to Create Event</h3>
+          <p className="mb-2">{error.message}</p>
+          {error.details && (
+            <p className="text-sm opacity-80 mb-4">{error.details}</p>
+          )}
+
+          <div className="flex space-x-4 mt-4">
+            <button
+              type="button"
+              onClick={onRetry}
+              className="px-4 py-2 bg-red-500/20 hover:bg-red-500/30 text-red-400 rounded-lg transition-colors flex items-center"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+              </svg>
+              Retry Submission
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setCurrentStep(1)} // Go back to first step
+              className="px-4 py-2 bg-gray-800/50 hover:bg-gray-800 text-white rounded-lg transition-colors"
+            >
+              Edit Form
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+
   return (
     <div className="max-w-4xl mx-auto">
       {/* Progress bar */}
@@ -222,6 +286,17 @@ const EventForm = ({ onSubmit, submitting: initialSubmitting }) => {
         </div>
       </div>
 
+      {/* Display error message if submission failed */}
+      {submitError && (
+        <motion.div
+          initial={{ opacity: 0, y: -10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.3 }}
+        >
+          <ErrorDisplay error={submitError} onRetry={handleRetry} />
+        </motion.div>
+      )}
+
       <form onSubmit={handleSubmit}>
         {/* Form content - show only current step */}
         <motion.div
@@ -241,6 +316,7 @@ const EventForm = ({ onSubmit, submitting: initialSubmitting }) => {
               onClick={prevStep}
               className={`px-6 py-3 rounded-xl border border-gray-700 text-gray-300 hover:bg-gray-800 transition-colors ${currentStep === 1 ? 'invisible' : ''
                 }`}
+              disabled={submitting}
             >
               Previous
             </button>
@@ -250,6 +326,7 @@ const EventForm = ({ onSubmit, submitting: initialSubmitting }) => {
                 type="button"
                 onClick={nextStep}
                 className="px-6 py-3 rounded-xl bg-gradient-to-r bg-cyan-400 text-black font-medium transition-colors cursor-pointer flex items-center space-x-2 hover:bg-black hover:text-cyan-400 hover:border hover:border-cyan-400"
+                disabled={submitting}
               >
                 Next
               </button>
@@ -257,11 +334,11 @@ const EventForm = ({ onSubmit, submitting: initialSubmitting }) => {
               <button
                 type="submit"
                 disabled={submitting}
-                className="px-6 py-3 rounded-xl bg-gradient-to-r bg-cyan-400 text-black font-medium transition-colors cursor-pointer flex items-center space-x-2 hover:bg-black hover:text-cyan-400 hover:border hover:border-cyan-400"
+                className="px-6 py-3 rounded-xl bg-gradient-to-r bg-cyan-400 text-black font-medium transition-colors cursor-pointer flex items-center space-x-2 hover:bg-black hover:text-cyan-400 hover:border hover:border-cyan-400 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {submitting ? (
                   <>
-                    <div className="w-5 h-5 border-2 border-black border-t-transparent rounded-full animate-spin"></div>
+                    <div className="w-5 h-5 border-2 border-black border-t-transparent rounded-full animate-spin mr-2"></div>
                     <span>Creating...</span>
                   </>
                 ) : (

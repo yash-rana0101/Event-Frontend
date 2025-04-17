@@ -1,11 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { Eye, Edit2, Trash2, Search, Filter, ChevronLeft, ChevronRight, Calendar, MapPin, Users, Clock } from 'lucide-react';
-import { FaArrowLeft } from "react-icons/fa";
+import { FaArrowLeft, FaPlus } from "react-icons/fa";
 import { useNavigate, Link } from "react-router-dom";
 import axios from "axios";
 import { toast } from "react-toastify";
 import { useSelector } from "react-redux";
 import { fixPersistenceIssues, safelyParseToken } from "../../utils/persistFix";
+import { useLoader } from '../../context/LoaderContext';
+import DeletePopUp from '../../components/UI/DeletePopUp'; // Import the DeletePopUp component
+import Skeleton from '../../components/UI/Skeleton';
 
 const EventListPage = () => {
   const [events, setEvents] = useState([]);
@@ -17,6 +20,12 @@ const EventListPage = () => {
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [statusFilter, setStatusFilter] = useState('All');
+  const { setIsLoading } = useLoader();
+
+  useEffect(() => {
+    setIsLoading(loading && events.length === 0);
+    return () => setIsLoading(false);
+  }, [loading, events.length, setIsLoading]);
 
   // Get auth token from Redux store
   const organizerToken = useSelector(state => state.organizer?.token);
@@ -40,7 +49,7 @@ const EventListPage = () => {
         throw new Error('Authentication required. Please log in again.');
       }
 
-        console.log("organizerData", organizerData); 
+      console.log("organizerData", organizerData);
       // Get organizer ID
       let organizerId;
       if (typeof organizerData === 'string') {
@@ -199,15 +208,10 @@ const EventListPage = () => {
     return event.date || "Date not specified";
   };
 
-  // Loading state UI
+  // Remove the loading UI
   if (loading && events.length === 0) {
     return (
-      <div className="min-h-screen bg-black p-4 md:p-8 text-white flex items-center justify-center">
-        <div className="flex flex-col items-center">
-          <div className="w-12 h-12 border-4 border-t-cyan-500 border-r-transparent border-b-transparent border-l-transparent rounded-full animate-spin"></div>
-          <p className="mt-4">Loading events...</p>
-        </div>
-      </div>
+        <Skeleton type='list' count={8} columns={{ default: 1, md: 1, lg: 1 }} />
     );
   }
 
@@ -244,7 +248,7 @@ const EventListPage = () => {
         <div className="flex items-start space-x-4">
           <div className="flex items-start justify-start">
             <button
-              onClick={() => navigate('/organizer/dashboard')}
+              onClick={() => navigate(-1)}
               className="p-2 rounded-full border border-cyan-500 text-cyan-500 hover:bg-cyan-900/30 transition-colors hover:cursor-pointer"
             >
               <FaArrowLeft size={20} />
@@ -296,8 +300,11 @@ const EventListPage = () => {
                   <option value="Cancelled">Cancelled</option>
                 </select>
               </div>
-              <Link to="/organizer/event/create" className="px-6 py-2 rounded-xl bg-gradient-to-r bg-cyan-400 text-black font-medium transition-colors cursor-pointer flex items-center space-x-2 hover:bg-black hover:text-cyan-400 hover:border hover:border-cyan-400">
-                + New Event
+              <Link to="/organizer/create" className="px-6 py-2 rounded-xl bg-gradient-to-r bg-cyan-400 text-black font-medium transition-colors cursor-pointer flex items-center space-x-2 hover:bg-black hover:text-cyan-400 hover:border hover:border-cyan-400">
+                <span>
+                  <FaPlus />
+                </span>
+                &nbsp; New Event
               </Link>
             </div>
           </div>
@@ -335,10 +342,10 @@ const EventListPage = () => {
                   <tbody className="divide-y divide-gray-800">
                     {currentEvents.map((event) => (
                       <tr key={event.id} className="hover:bg-gray-800/40">
-                        <td className="px-6 py-4 whitespace-nowrap">
+                        <td className="px-6 py-6 whitespace-nowrap">
                           <div className="text-sm font-medium text-white">{event.title}</div>
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
+                        <td className="px-4 py-4 ">
                           <div className="flex items-center">
                             <Calendar className="h-4 w-4 text-cyan-500 mr-2" />
                             <div className="text-sm text-gray-300">{formatEventDate(event)}</div>
@@ -457,8 +464,8 @@ const EventListPage = () => {
                 <>
                   <p className="text-gray-400 mb-4">No events found. Try adjusting your search criteria or create a new event.</p>
                   <Link
-                    to="/organizer/event/create"
-                    className="inline-flex items-center px-6 py-3 bg-cyan-500 hover:bg-cyan-600 text-black font-medium rounded-lg"
+                    to="/organizer/create"
+                    className="inline-flex items-center px-6 py-3 rounded-xl bg-gradient-to-r bg-cyan-400 text-black font-medium transition-colors cursor-pointer  space-x-2 hover:bg-black hover:text-cyan-400 hover:border hover:border-cyan-400"
                   >
                     Create Your First Event
                   </Link>
@@ -543,36 +550,12 @@ const EventListPage = () => {
         </div>
       </div>
 
-      {/* Delete Confirmation Modal - updated for dark theme */}
-      {isDeleteModalOpen && (
-        <div className="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center p-4 z-50">
-          <div className="bg-gray-900 rounded-lg shadow-xl max-w-md w-full border border-gray-800">
-            <div className="p-6">
-              <div className="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-red-900/30 mb-4">
-                <Trash2 className="h-6 w-6 text-red-400" />
-              </div>
-              <h3 className="text-lg font-medium text-white text-center mb-2">Delete Event</h3>
-              <p className="text-gray-400 text-center mb-6">
-                Are you sure you want to delete this event? This action cannot be undone.
-              </p>
-              <div className="flex justify-center space-x-3">
-                <button
-                  onClick={() => setIsDeleteModalOpen(false)}
-                  className="px-4 py-2 border border-gray-600 rounded-md text-sm font-medium text-gray-300 hover:bg-gray-700"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={handleDelete}
-                  className="px-4 py-2 bg-red-600 border border-transparent rounded-md text-sm font-medium text-white hover:bg-red-700"
-                >
-                  Delete
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Replace the Delete Confirmation Modal with DeletePopUp component */}
+      <DeletePopUp
+        isOpen={isDeleteModalOpen}
+        onClose={() => setIsDeleteModalOpen(false)}
+        deleteProject={handleDelete}
+      />
     </div>
   );
 };

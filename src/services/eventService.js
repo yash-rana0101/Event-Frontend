@@ -1,5 +1,6 @@
 import axios from "axios";
 import { getApiBaseUrl, getApiHeaders } from "../utils/apiUtils";
+import { safelyParseToken } from "../utils/persistFix";
 
 // Service for event-related API calls
 const eventService = {
@@ -135,6 +136,67 @@ const eventService = {
 
     return response.data;
   },
+};
+
+// Update your client-side code to properly format the image data before sending to the API
+export const createEvent = async (eventData, token) => {
+  try {
+    const cleanToken = safelyParseToken(token);
+
+    if (!cleanToken) {
+      throw new Error("Invalid authentication token");
+    }
+
+    // Format image data properly
+    const formattedData = { ...eventData };
+
+    // If image is an empty object, set to empty string
+    if (
+      formattedData.image &&
+      typeof formattedData.image === "object" &&
+      Object.keys(formattedData.image).length === 0
+    ) {
+      formattedData.image = "";
+    }
+
+    // Ensure images is an array of strings
+    if (formattedData.images) {
+      if (!Array.isArray(formattedData.images)) {
+        formattedData.images = formattedData.image ? [formattedData.image] : [];
+      }
+
+      // Filter out any non-string or empty values
+      formattedData.images = formattedData.images.filter(
+        (img) => typeof img === "string" && img.trim() !== ""
+      );
+    }
+
+    // If we have a main image but no images array, initialize it
+    if (
+      formattedData.image &&
+      typeof formattedData.image === "string" &&
+      (!formattedData.images || formattedData.images.length === 0)
+    ) {
+      formattedData.images = [formattedData.image];
+    }
+
+    const apiUrl = import.meta.env.VITE_API_URL || "/api/v1";
+
+    const response = await axios.post(`${apiUrl}/events`, formattedData, {
+      headers: {
+        Authorization: `Bearer ${cleanToken}`,
+        "Content-Type": "application/json",
+      },
+    });
+
+    return response.data;
+  } catch (error) {
+    console.error(
+      "Error creating event:",
+      error.response?.data || error.message
+    );
+    throw error;
+  }
 };
 
 export default eventService;

@@ -204,10 +204,10 @@ export default function EventCarousel({ carouselEvents = [] }) {
                 </div>
                 
                 <div className="flex flex-wrap gap-3">
-                  <Link to={`/event/${currentEvent.id}`} className="bg-cyan-400 text-black font-medium px-4 py-2 rounded-lg hover:bg-cyan-500 transition-colors duration-300 inline-flex items-center text-sm">
+                  <Link to={`/event/${currentEvent.id}`} className="px-4 py-2 rounded-xl bg-gradient-to-r bg-cyan-400 text-black font-medium transition-colors cursor-pointer flex items-center space-x-2 hover:bg-black hover:text-cyan-400 hover:border hover:border-cyan-400">
                     View Details
                   </Link>
-                  <Link to={`/event/${currentEvent.id}`} className="bg-transparent border border-cyan-400 text-cyan-400 font-medium px-4 py-2 rounded-lg hover:bg-cyan-400/10 transition-colors duration-300 inline-flex items-center text-sm">
+                  <Link to={`/event/${currentEvent.id}`} className="bg-transparent border border-cyan-400 text-cyan-300 hover:text-white font-medium px-4 py-2 rounded-lg hover:bg-cyan-400/10 transition-colors duration-300 inline-flex items-center text-sm">
                     Register Now
                   </Link>
                 </div>

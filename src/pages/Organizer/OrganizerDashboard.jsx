@@ -4,158 +4,273 @@ import axios from 'axios';
 import {
   Calendar, BarChart3, Users, Clock, MapPin, Settings, Bell, Search, Plus,
   CheckCircle, X, Menu, ChevronRight, Sliders, CheckSquare, Activity,
-  Sparkles, ChevronDown, MoreHorizontal, ArrowRight
+  Sparkles, ChevronDown, MoreHorizontal, ArrowRight, AlertCircle
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate, Link } from 'react-router-dom';
+import { useLoader } from '../../context/LoaderContext';
+import { useSelector } from 'react-redux';
+import { safelyParseToken } from '../../utils/persistFix';
+import { toast } from 'react-toastify';
 
 const OrganizerDashboard = () => {
   const [activeTab, setActiveTab] = useState('overview');
   const [loading, setLoading] = useState(true);
   const [isStatsExpanded, setIsStatsExpanded] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
+  // Event data states
   const [events, setEvents] = useState([]);
   const [eventsLoading, setEventsLoading] = useState(true);
+  const [upcomingEvents, setUpcomingEvents] = useState([]);
+  const [pastEvents, setPastEvents] = useState([]);
+  const [eventStats, setEventStats] = useState({
+    totalEvents: 0,
+    totalAttendees: 0,
+    completionRate: 0,
+    cancellations: 0,
+  });
+  const [error, setError] = useState(null);
+
   const navigate = useNavigate();
+  const { setIsLoading } = useLoader();
 
-  // Sample data
-  const upcomingEvents = [
-    { id: 1, name: "Tech Conference 2025", date: "March 15, 2025", attendees: 450, status: "confirmed", location: "Grand Convention Center" },
-    { id: 2, name: "Product Launch", date: "March 22, 2025", attendees: 200, status: "pending", location: "Innovation Hub" },
-    { id: 3, name: "Networking Mixer", date: "April 5, 2025", attendees: 120, status: "confirmed", location: "Sky Lounge" }
-  ];
+  // Get auth token from Redux store
+  const organizerData = useSelector(state => state.organizer);
+  const token = organizerData?.token;
+  const user = organizerData?.user;
 
-  const statistics = [
-    { label: "Total Events", value: 24, icon: Calendar, change: "+12%", color: "from-cyan-500 to-blue-600" },
-    { label: "Total Attendees", value: 3845, icon: Users, change: "+24%", color: "from-cyan-400 to-teal-500" },
-    { label: "Completion Rate", value: "94%", icon: CheckCircle, change: "+2%", color: "from-emerald-400 to-cyan-500" },
-    { label: "Cancellations", value: 3, icon: X, change: "-50%", color: "from-cyan-500 to-indigo-600" }
-  ];
+  // Get organizer ID from user object
+  const getOrganizerId = () => {
+    if (!user) return null;
 
-  const tasks = [
-    { id: 1, title: "Confirm catering for Tech Conference", due: "Mar 10", priority: "high" },
-    { id: 2, title: "Send reminder emails for Product Launch", due: "Mar 18", priority: "medium" },
-    { id: 3, title: "Book A/V equipment for Networking Mixer", due: "Mar 25", priority: "medium" }
-  ];
-
-  // Simulated revenue data for the chart
-  const revenueData = [
-    { month: 'Jan', value: 65 },
-    { month: 'Feb', value: 40 },
-    { month: 'Mar', value: 85 },
-    { month: 'Apr', value: 50 },
-    { month: 'May', value: 75 },
-    { month: 'Jun', value: 30 },
-    { month: 'Jul', value: 60 },
-    { month: 'Aug', value: 45 },
-    { month: 'Sep', value: 90 },
-    { month: 'Oct', value: 55 },
-    { month: 'Nov', value: 70 },
-    { month: 'Dec', value: 40 }
-  ];
-
-  // Revenue chart view type
-  const [chartView, setChartView] = useState('monthly');
-
-  useEffect(() => {
-    // Simulate loading
-    const timer = setTimeout(() => {
-      setLoading(false);
-    }, 1000);
-
-    return () => clearTimeout(timer);
-  }, []);
-
-  useEffect(() => {
-    if (activeTab === 'events') {
-      setEventsLoading(true);
-
-      // Parse user and token from localStorage
-      const user = JSON.parse(localStorage.getItem('user'));
-      const token = localStorage.getItem('token')?.replace(/"/g, ''); // Remove quotes from token
-
-      if (user && token) {
-        axios
-          .get(`${import.meta.env.VITE_API_URL}/api/events/organizer/${user.id}`, {
-            headers: {
-              Authorization: `Bearer ${token}`,
-            },
-          })
-          .then((response) => {
-            setEvents(Array.isArray(response.data) ? response.data : []);
-            setEventsLoading(false);
-          })
-          .catch((error) => {
-            console.error('Error fetching events:', error);
-            setEvents([]); // Reset events to an empty array on error
-            setEventsLoading(false);
-          });
-      } else {
-        console.error('User or token is missing or invalid');
-        setEvents([]); // Reset events to an empty array
-        setEventsLoading(false);
+    if (typeof user === 'string') {
+      try {
+        const parsed = JSON.parse(user);
+        return parsed?._id || parsed?.id || parsed?._doc?._id;
+      } catch (e) {
+        console.error('Error parsing organizer data:', e);
+        return null;
       }
     }
-  }, [activeTab]);
 
-  const getStatusColor = (status) => {
-    return status === 'confirmed' ? 'bg-cyan-500' : 'bg-yellow-500';
+    return user?._id || user?.id || user?._doc?._id;
   };
 
-  const getPriorityColor = (priority) => {
-    switch (priority) {
-      case 'high': return 'bg-red-500';
-      case 'medium': return 'bg-yellow-500';
-      case 'low': return 'bg-green-500';
-      default: return 'bg-gray-500';
+  useEffect(() => {
+    setIsLoading(loading || eventsLoading);
+    return () => setIsLoading(false);
+  }, [loading, eventsLoading, setIsLoading]);
+
+  const fetchEvents = async () => {
+    setEventsLoading(true);
+    setError(null);
+
+    try {
+      // Get the clean token
+      const parsedToken = safelyParseToken(token);
+      const organizerId = getOrganizerId();
+
+      if (!parsedToken || !organizerId) {
+        throw new Error('Authentication required. Please log in again.');
+      }
+
+      const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000/api/v1';
+      const config = {
+        headers: {
+          Authorization: `Bearer ${parsedToken}`
+        }
+      };
+
+      // Try different endpoint formats - the error shows we need to fix the URL
+      let response = null;
+      let allEvents = [];
+      let endpointUsed = '';
+
+      // Try several possible endpoint structures that might be used by your API
+      const possibleEndpoints = [
+        `/organizer/events/organizer/${organizerId}`,  // Format used in OrganizerProfile
+      ];
+
+      let lastError = null;
+
+      // Try each endpoint until one works
+      for (const endpoint of possibleEndpoints) {
+        try {
+          console.log(`Trying endpoint: ${apiUrl}${endpoint}`);
+          response = await axios.get(`${apiUrl}${endpoint}`, config);
+
+          if (response.data) {
+            allEvents = Array.isArray(response.data) ? response.data :
+              (response.data.events || response.data.data || []);
+            endpointUsed = endpoint;
+            console.log(`Successfully fetched data from: ${apiUrl}${endpoint}`);
+            break;
+          }
+        } catch (err) {
+          console.warn(`Endpoint ${apiUrl}${endpoint} failed:`, err.message);
+          lastError = err;
+          // Continue trying other endpoints
+        }
+      }
+
+      // If all endpoints failed
+      if (!response && lastError) {
+        // Log the comprehensive debug information
+        console.error('All endpoints failed. Details:', {
+          organizerId,
+          possibleEndpoints: possibleEndpoints.map(ep => `${apiUrl}${ep}`),
+          lastError
+        });
+
+        // Try a fallback - get all events and filter by organizer
+        try {
+          const allEventsResponse = await axios.get(`${apiUrl}/events`, config);
+          if (allEventsResponse.data) {
+            // Filter events by organizer ID
+            let events = Array.isArray(allEventsResponse.data) ?
+              allEventsResponse.data :
+              (allEventsResponse.data.events || allEventsResponse.data.data || []);
+
+            allEvents = events.filter(event =>
+              event.organizer === organizerId ||
+              event.organizer?._id === organizerId);
+
+            console.log(`Fallback: filtered ${allEvents.length} events for organizer from all events`);
+          }
+        } catch (fallbackErr) {
+          throw lastError; // If fallback also fails, throw the original error
+        }
+      }
+
+      // Process events
+      setEvents(allEvents);
+
+      // Sort events into upcoming and past
+      const now = new Date();
+      const upcoming = allEvents.filter(event => {
+        const eventDate = new Date(event.date || event.startDate);
+        return eventDate > now;
+      }).slice(0, 3); // Show only 3 upcoming events
+
+      const past = allEvents.filter(event => {
+        const eventDate = new Date(event.date || event.startDate);
+        return eventDate <= now;
+      }).slice(0, 3); // Show only 3 past events
+
+      setUpcomingEvents(upcoming);
+      setPastEvents(past);
+
+      // Calculate basic stats
+      setEventStats({
+        totalEvents: allEvents.length,
+        totalAttendees: allEvents.reduce((sum, event) => sum + (event.attendeesCount || 0), 0),
+        completionRate: Math.round((past.length / Math.max(allEvents.length, 1)) * 100) + '%',
+        cancellations: allEvents.filter(event => event.status === 'cancelled').length
+      });
+    } catch (err) {
+      console.error("Error fetching events:", err);
+
+      // Provide more specific error message for 404
+      if (err.response?.status === 404) {
+        setError("Could not find events API endpoint. The server returned a 404 error.");
+      } else {
+        setError(err.response?.data?.message || err.message || "Failed to load events");
+      }
+
+      // Show a descriptive toast with debugging hint
+      toast.error(`Could not load events: ${err.response?.status === 404 ?
+        "API endpoint not found (404)" :
+        "Server error"}`);
+    } finally {
+      setEventsLoading(false);
+      setLoading(false);
     }
   };
 
-  // Loading animation
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-screen ">
-        <motion.div
-          className="relative flex flex-col items-center"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ duration: 0.5 }}
+  // Fetch all data on component mount
+  useEffect(() => {
+    fetchEvents();
+  }, []);
+
+  const getStatusColor = (status) => {
+    switch (status?.toLowerCase()) {
+      case 'active':
+      case 'confirmed':
+        return 'bg-cyan-500 text-black';
+      case 'pending':
+        return 'bg-yellow-500 text-black';
+      case 'cancelled':
+        return 'bg-red-500 text-white';
+      case 'completed':
+        return 'bg-green-500 text-black';
+      default:
+        return 'bg-gray-500 text-white';
+    }
+  };
+
+  const formatEventDate = (event) => {
+    if (event.startDate && event.endDate) {
+      const start = new Date(event.startDate);
+      const end = new Date(event.endDate);
+
+      if (start.toDateString() === end.toDateString()) {
+        return new Date(event.startDate).toLocaleDateString();
+      } else {
+        return `${new Date(event.startDate).toLocaleDateString()} - ${new Date(event.endDate).toLocaleDateString()}`;
+      }
+    }
+    return event.date || new Date(event.startDate || event.createdAt).toLocaleDateString();
+  };
+
+  // Generate statistics array based on real data
+  const statistics = [
+    {
+      label: "Total Events",
+      value: eventStats.totalEvents,
+      icon: Calendar,
+      change: "+12%",
+      color: "from-cyan-500 to-blue-600"
+    },
+    {
+      label: "Total Attendees",
+      value: eventStats.totalAttendees,
+      icon: Users,
+      change: "+24%",
+      color: "from-cyan-400 to-teal-500"
+    },
+    {
+      label: "Completion Rate",
+      value: eventStats.completionRate,
+      icon: CheckCircle,
+      change: "+2%",
+      color: "from-emerald-400 to-cyan-500"
+    },
+    {
+      label: "Cancellations",
+      value: eventStats.cancellations,
+      icon: X,
+      change: "-50%",
+      color: "from-cyan-500 to-indigo-600"
+    }
+  ];
+
+  // Error display component
+  const ErrorDisplay = ({ message }) => (
+    <div className="bg-red-900/20 border border-red-500/30 text-red-400 rounded-xl p-4 flex items-start">
+      <AlertCircle className="w-5 h-5 mr-2 mt-0.5 flex-shrink-0" />
+      <div>
+        <p className="font-medium">Error loading data</p>
+        <p className="text-sm">{message}</p>
+        <button
+          onClick={fetchEvents}
+          className="mt-2 text-sm bg-red-500/20 hover:bg-red-500/30 text-red-400 px-3 py-1 rounded-lg transition-colors"
         >
-          <motion.div
-            className="w-20 h-20 rounded-full border-4 border-t-cyan-500 border-r-transparent border-b-transparent border-l-transparent"
-            animate={{ rotate: 360 }}
-            transition={{
-              duration: 1,
-              repeat: Infinity,
-              ease: "linear"
-            }}
-          />
-          <motion.div
-            className="mt-2 flex space-x-1"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ delay: 1, duration: 0.5 }}
-          >
-            <motion.div
-              className="w-2 h-2 rounded-full bg-cyan-500"
-              animate={{ y: [0, -6, 0] }}
-              transition={{ duration: 0.8, repeat: Infinity, delay: 0 }}
-            />
-            <motion.div
-              className="w-2 h-2 rounded-full bg-cyan-500"
-              animate={{ y: [0, -6, 0] }}
-              transition={{ duration: 0.8, repeat: Infinity, delay: 0.2 }}
-            />
-            <motion.div
-              className="w-2 h-2 rounded-full bg-cyan-500"
-              animate={{ y: [0, -6, 0] }}
-              transition={{ duration: 0.8, repeat: Infinity, delay: 0.4 }}
-            />
-          </motion.div>
-        </motion.div>
+          Retry
+        </button>
       </div>
-    );
-  }
+    </div>
+  );
 
   return (
     <div className="min-h-screen bg-black text-stone-400">
@@ -210,9 +325,10 @@ const OrganizerDashboard = () => {
                        flex items-center space-x-2 hover:bg-gray-700/80 transition-all duration-300 border border-gray-700/30 hover:cursor-pointer"
             whileHover={{ scale: 1.05, y: -2 }}
             whileTap={{ scale: 0.98 }}
+            onClick={() => navigate('/organizer/profile')}
           >
-            <Sliders className="h-4 w-4" />
-            <span>Filters</span>
+            <Users className="h-4 w-4" />
+            <span>My Profile</span>
           </motion.button>
 
           <motion.button
@@ -220,11 +336,23 @@ const OrganizerDashboard = () => {
                        flex items-center space-x-2 hover:bg-gray-700/80 transition-all duration-300 border border-gray-700/30 hover:cursor-pointer"
             whileHover={{ scale: 1.05, y: -2 }}
             whileTap={{ scale: 0.98 }}
+            onClick={() => navigate('/organizer/events/list')}
           >
-            <Users className="h-4 w-4" />
-            <span>Team</span>
+            <Calendar className="h-4 w-4" />
+            <span>All Events</span>
           </motion.button>
         </motion.div>
+
+        {/* Display error if there is one */}
+        {error && (
+          <motion.div
+            className="mb-8"
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+          >
+            <ErrorDisplay message={error} />
+          </motion.div>
+        )}
 
         {/* Statistics Cards */}
         <div className="mb-10">
@@ -319,64 +447,13 @@ const OrganizerDashboard = () => {
                 <div className="mt-4 h-2 w-full bg-gray-800/60 rounded-full overflow-hidden relative z-10">
                   <motion.div
                     className={`h-full bg-gradient-to-r ${stat.color} rounded-full`}
-                    style={{ width: stat.value }}
+                    style={{ width: typeof stat.value === 'string' ? (parseInt(stat.value) || 50) + '%' : `${Math.min(100, (stat.value / 100) * 100)}%` }}
                   />
                 </div>
               </motion.div>
             ))}
           </motion.div>
         </div>
-
-        {/* Revenue Chart */}
-        <motion.div
-          className="bg-gray-900/40 backdrop-blur-sm rounded-2xl p-6"
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5, delay: 0.4 }}
-        >
-          <div className="flex items-center justify-between mb-6">
-            <h2 className="font-bold text-xl md:text-2xl bg-gradient-to-r from-white to-gray-300 bg-clip-text text-transparent">
-              Revenue Overview
-            </h2>
-            <div className="flex items-center space-x-2">
-              <button
-                onClick={() => setChartView('monthly')}
-                className={`text-sm font-medium ${chartView === 'monthly' ? 'text-cyan-500' : 'text-gray-400'} hover:text-cyan-500 transition-colors`}
-              >
-                Monthly
-              </button>
-              <button
-                onClick={() => setChartView('yearly')}
-                className={`text-sm font-medium ${chartView === 'yearly' ? 'text-cyan-500' : 'text-gray-400'} hover:text-cyan-500 transition-colors`}
-              >
-                Yearly
-              </button>
-            </div>
-          </div>
-
-          <div className="relative h-48 md:h-64">
-            <div className="absolute inset-0 flex items-end">
-              <div className="w-full h-1 bg-gray-800/60 rounded-full overflow-hidden">
-                <motion.div
-                  className="h-full bg-gradient-to-r from-cyan-500 to-blue-600 rounded-full"
-                  style={{ width: 'calc(100% / 12)' }}
-                  initial={{ width: 0 }}
-                  animate={{ width: 'calc(100% / 12 * 5)' }}
-                  transition={{ duration: 1.5 }}
-                />
-              </div>
-            </div>
-
-            <div className="flex justify-between mt-2">
-              {revenueData.map((data, index) => (
-                <div key={index} className="flex items-center space-x-2">
-                  <div className="w-2 h-2 rounded-full bg-cyan-500"></div>
-                  <span className="text-xs">{data.month}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-        </motion.div>
 
         {/* Upcoming Events */}
         <motion.div
@@ -387,112 +464,179 @@ const OrganizerDashboard = () => {
         >
           <div className="flex items-center justify-between my-6">
             <h2 className="font-bold text-xl md:text-2xl bg-gradient-to-r from-white to-gray-300 bg-clip-text text-transparent">
-              All events
+              Upcoming Events
             </h2>
-            <button className="px-3 py-2 rounded-xl bg-gradient-to-r bg-cyan-400 text-black font-medium transition-colors cursor-pointer flex  space-x-2 hover:bg-black hover:text-cyan-400 hover:border hover:border-cyan-400"
+            <button className="px-3 py-2 rounded-xl bg-gradient-to-r bg-cyan-400 text-black font-medium transition-colors cursor-pointer flex space-x-2 hover:bg-black hover:text-cyan-400 hover:border hover:border-cyan-400"
               onClick={() => navigate('/organizer/events/list')}
-            >View all</button>
+            >
+              View all
+            </button>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-            {upcomingEvents.map((event) => (
-              <motion.div
-                key={event.id}
-                className="bg-gray-900/40 backdrop-blur-sm rounded-2xl p-5 border border-gray-800/30 
-                          hover:shadow-xl hover:shadow-cyan-500/5 group relative overflow-hidden"
-                whileHover={{ y: -5 }}
-              >
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h3 className="text-lg font-bold">{event.name}</h3>
-                    <p className="text-gray-400 text-sm mt-1">
-                      {event.date} - {event.location}
-                    </p>
+          {eventsLoading ? (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+              {[1, 2, 3].map(i => (
+                <div key={i} className="bg-gray-900/40 backdrop-blur-sm rounded-2xl p-5 border border-gray-800/30 animate-pulse">
+                  <div className="h-6 bg-gray-800 rounded w-3/4 mb-4"></div>
+                  <div className="h-4 bg-gray-800 rounded w-1/2 mb-2"></div>
+                  <div className="h-4 bg-gray-800 rounded w-5/6"></div>
+                </div>
+              ))}
+            </div>
+          ) : upcomingEvents.length > 0 ? (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+              {upcomingEvents.map((event) => (
+                <motion.div
+                  key={event._id}
+                  className="bg-gray-900/40 backdrop-blur-sm rounded-2xl p-5 border border-gray-800/30 
+                           hover:shadow-xl hover:shadow-cyan-500/5 group relative overflow-hidden cursor-pointer"
+                  whileHover={{ y: -5 }}
+                  onClick={() => navigate(`/event/${event._id}`)}
+                >
+                  <div className="flex items-center justify-between">
+                    <div className="flex-grow">
+                      <h3 className="text-lg font-bold text-white">{event.title}</h3>
+                      <p className="text-gray-400 text-sm mt-1">
+                        {formatEventDate(event)}
+                      </p>
+                      <p className="text-gray-400 text-sm mt-1">
+                        {event.location?.address || event.venue || "No location specified"}
+                      </p>
+                    </div>
+                    <span className={`text-xs font-medium px-2 py-1 rounded-full ${getStatusColor(event.status)}`}>
+                      {event.status || 'active'}
+                    </span>
                   </div>
-                  <span className={`text-sm font-medium px-2 py-1 rounded-full ${getStatusColor(event.status)}`}>
-                    {event.status}
-                  </span>
-                </div>
-                <div className="flex items-center mt-4">
-                  <Users className="h-4 w-4 text-gray-400" />
-                  <span className="text-gray-400 text-sm ml-1">{event.attendees} Attendees</span>
-                </div>
-              </motion.div>
-            ))}
-          </div>
+                  <div className="flex items-center mt-4 justify-between">
+                    <div className="flex items-center">
+                      <Users className="h-4 w-4 text-gray-400" />
+                      <span className="text-gray-400 text-sm ml-1">{event.attendeesCount || 0} Attendees</span>
+                    </div>
+                    <ArrowRight className="h-4 w-4 text-gray-400 group-hover:text-cyan-500 transition-colors" />
+                  </div>
+                </motion.div>
+              ))}
+            </div>
+          ) : (
+            <div className="bg-gray-900/30 border border-gray-800/30 rounded-xl p-8 text-center">
+              <Calendar className="mx-auto h-12 w-12 text-gray-600 mb-3" />
+              <h3 className="text-xl font-medium text-gray-400 mb-2">No Upcoming Events</h3>
+              <p className="text-gray-500 mb-6">You don't have any upcoming events scheduled.</p>
+              <button
+                onClick={() => navigate('/organizer/create')}
+                className="px-6 py-3 bg-cyan-500 text-black font-medium rounded-xl hover:bg-cyan-600 transition-colors"
+              >
+                Create Your First Event
+              </button>
+            </div>
+          )}
         </motion.div>
 
-        {/* Tasks */}
+        {/* Past Events Section */}
+        {pastEvents.length > 0 && (
+          <motion.div
+            className="mb-10"
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5, delay: 0.6 }}
+          >
+            <div className="flex items-center justify-between my-6">
+              <h2 className="font-bold text-xl md:text-2xl bg-gradient-to-r from-white to-gray-300 bg-clip-text text-transparent">
+                Past Events
+              </h2>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              {pastEvents.map((event) => (
+                <motion.div
+                  key={event._id}
+                  className="bg-gray-900/30 rounded-xl p-4 border border-gray-800/30 hover:bg-gray-900/50 transition-colors cursor-pointer"
+                  whileHover={{ scale: 1.02 }}
+                  onClick={() => navigate(`/event/${event._id}`)}
+                >
+                  <div className="flex justify-between">
+                    <div>
+                      <h4 className="font-medium text-gray-300">{event.title}</h4>
+                      <div className="flex flex-wrap gap-x-4 text-xs text-gray-400 mt-1">
+                        <div className="flex items-center">
+                          <Calendar size={12} className="mr-1" />
+                          {formatEventDate(event)}
+                        </div>
+                        <div className="flex items-center">
+                          <Users size={12} className="mr-1" />
+                          {event.attendeesCount || 0}
+                        </div>
+                      </div>
+                    </div>
+                    <div className="w-8 h-8 rounded-full bg-black/50 flex items-center justify-center">
+                      <ArrowRight size={12} className="text-gray-500 group-hover:text-cyan-500" />
+                    </div>
+                  </div>
+                </motion.div>
+              ))}
+            </div>
+          </motion.div>
+        )}
+
+        {/* Event Reports Section */}
         <motion.div
           className="mb-10"
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5, delay: 0.6 }}
+          transition={{ duration: 0.5, delay: 0.7 }}
         >
-          <div className="flex items-baseline justify-between mb-6">
+          <div className="flex items-center justify-between my-6">
             <h2 className="font-bold text-xl md:text-2xl bg-gradient-to-r from-white to-gray-300 bg-clip-text text-transparent">
-              Tasks
+              Reports & Analytics
             </h2>
-            <button className="px-3 py-2 rounded-xl bg-gradient-to-r bg-cyan-400 text-black font-medium transition-colors cursor-pointer flex  space-x-2 hover:bg-black hover:text-cyan-400 hover:border hover:border-cyan-400">View all</button>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-            {tasks.map((task) => (
+          <div className="bg-gray-900/30 border border-gray-800/30 rounded-xl p-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               <motion.div
-                key={task.id}
-                className="bg-gray-900/40 backdrop-blur-sm rounded-2xl p-5 border border-gray-800/30 
-                          hover:shadow-xl hover:shadow-cyan-500/5 group relative overflow-hidden"
+                className="bg-gray-800/50 rounded-lg p-5 border border-gray-700/30 hover:border-cyan-500/30 transition-colors cursor-pointer"
                 whileHover={{ y: -5 }}
+                onClick={() => navigate('/organizer/reports/attendance')}
               >
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h3 className="text-lg font-bold">{task.title}</h3>
-                    <p className="text-gray-400 text-sm mt-1">
-                      Due: {task.due}
-                    </p>
+                <div className="flex items-center mb-4">
+                  <div className="w-10 h-10 rounded-lg bg-cyan-500/20 flex items-center justify-center mr-3">
+                    <Users className="h-5 w-5 text-cyan-500" />
                   </div>
-                  <span className={`text-sm font-medium px-2 py-1 rounded-full ${getPriorityColor(task.priority)}`}>
-                    {task.priority}
-                  </span>
+                  <h3 className="font-medium text-lg">Attendance Reports</h3>
                 </div>
+                <p className="text-gray-400 text-sm">View detailed attendance information for your events</p>
               </motion.div>
-            ))}
+
+              <motion.div
+                className="bg-gray-800/50 rounded-lg p-5 border border-gray-700/30 hover:border-cyan-500/30 transition-colors cursor-pointer"
+                whileHover={{ y: -5 }}
+                onClick={() => navigate('/organizer/reports/revenue')}
+              >
+                <div className="flex items-center mb-4">
+                  <div className="w-10 h-10 rounded-lg bg-green-500/20 flex items-center justify-center mr-3">
+                    <BarChart3 className="h-5 w-5 text-green-500" />
+                  </div>
+                  <h3 className="font-medium text-lg">Revenue Analytics</h3>
+                </div>
+                <p className="text-gray-400 text-sm">Track financial performance of your events</p>
+              </motion.div>
+
+              <motion.div
+                className="bg-gray-800/50 rounded-lg p-5 border border-gray-700/30 hover:border-cyan-500/30 transition-colors cursor-pointer"
+                whileHover={{ y: -5 }}
+                onClick={() => navigate('/organizer/reports/popularity')}
+              >
+                <div className="flex items-center mb-4">
+                  <div className="w-10 h-10 rounded-lg bg-purple-500/20 flex items-center justify-center mr-3">
+                    <Activity className="h-5 w-5 text-purple-500" />
+                  </div>
+                  <h3 className="font-medium text-lg">Event Popularity</h3>
+                </div>
+                <p className="text-gray-400 text-sm">Analyze which of your events are most popular</p>
+              </motion.div>
+            </div>
           </div>
         </motion.div>
-
-        {/* Events Tab */}
-        {activeTab === 'events' && (
-          <div>
-            {eventsLoading ? (
-              <div className="text-center text-gray-400">Loading events...</div>
-            ) : events.length > 0 ? (
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-                {events.map((event) => (
-                  <div
-                    key={event._id}
-                    className="bg-gray-900/40 backdrop-blur-sm rounded-2xl p-5 border border-gray-800/30 
-                              hover:shadow-xl hover:shadow-cyan-500/5 group relative overflow-hidden"
-                  >
-                    <Link 
-                      to={`/event/${event._id}`} 
-                      className="text-lg font-bold text-cyan-500 hover:text-cyan-400 transition-colors"
-                    >
-                      {event.title}
-                    </Link>
-                    <p className="text-gray-400 text-sm mt-1">{event.date}</p>
-                    <p className="text-gray-400 text-sm mt-1">{event.location?.address || 'No location provided'}</p>
-                    <div className="flex items-center mt-4">
-                      <Users className="h-4 w-4 text-gray-400" />
-                      <span className="text-gray-400 text-sm ml-1">{event.attendeesCount || 0} Attendees</span>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className="text-center text-gray-400">No events found.</div>
-            )}
-          </div>
-        )}
       </div>
     </div>
   );

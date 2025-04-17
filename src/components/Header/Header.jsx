@@ -195,7 +195,6 @@ export default function Header() {
     };
 
     setDebugAuthInfo(debug);
-    console.log("Auth Debug Info:", debug);
 
     if (organizerToken && !currentOrganizer) {
       console.log("Organizer token exists but user is null - fetching organizer data");
@@ -284,28 +283,7 @@ export default function Header() {
                 <div className="absolute inset-0 bg-[#00D8FF]/0 group-hover:bg-[#00D8FF]/10 rounded-lg transition-all duration-300" />
               </NavLink>
 
-              {currentUser && (
-                <NavLink
-                  to="/freelancer"
-                  end
-                  className={({ isActive }) =>
-                    `group relative px-4 py-2 rounded-lg transition-all duration-300 ${isActive
-                      ? "text-[#00D8FF]"
-                      : "text-gray-400 hover:text-white"
-                    }`
-                  }
-                >
-                  <div className="flex items-center space-x-3">
-                    <SiFreelancer size={26} />
-                    <span className="relative">
-                      Freelance
-                      <span className="absolute -bottom-1 left-0 w-0 h-[2px] bg-[#00D8FF] group-hover:w-full transition-all duration-300" />
-                    </span>
-                  </div>
-                  <div className="absolute inset-0 bg-[#00D8FF]/0 group-hover:bg-[#00D8FF]/10 rounded-lg transition-all duration-300" />
-                </NavLink>
-              )}
-
+              
               {nav
                 .filter((item) => !item.guestOnly)
                 .map((item) => (

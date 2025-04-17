@@ -3,14 +3,18 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 import axios from 'axios';
-import { 
-  Calendar, Mail, MapPin, Phone, Award, Users, Star, ArrowRight, 
-  Clock, ExternalLink, Globe, Zap, Twitter, Linkedin, Instagram, 
+import {
+  Calendar, Mail, MapPin, Phone, Award, Users, Star, ArrowRight,
+  Clock, ExternalLink, Globe, Zap, Twitter, Linkedin, Instagram,
   Facebook, AlertTriangle, User, Building
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { safelyParseToken } from '../../utils/persistFix';
 import { toast } from 'react-toastify';
+import { useLoader } from '../../context/LoaderContext';
+import Error from '../common/Error';
+import { FaPhone } from 'react-icons/fa6';
+import Skeleton from '../../components/UI/Skeleton';
 
 const OrganizerProfile = () => {
   const { organizerId } = useParams();
@@ -23,8 +27,9 @@ const OrganizerProfile = () => {
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [events, setEvents] = useState([]);
   const [eventsLoading, setEventsLoading] = useState(true);
+  const [upcomingEvents, setUpcomingEvents] = useState([]);
+  const [pastEvents, setPastEvents] = useState([]);
 
   // Get organizer from Redux store
   const organizerData = useSelector(state => state.organizer);
@@ -33,7 +38,7 @@ const OrganizerProfile = () => {
   // Extract user ID from possibly nested JSON structure
   const getUserId = () => {
     if (!loggedInUser) return null;
-    
+
     if (typeof loggedInUser === 'string') {
       try {
         const parsed = JSON.parse(loggedInUser);
@@ -42,12 +47,38 @@ const OrganizerProfile = () => {
         return null;
       }
     }
-    
+
     return loggedInUser._id || loggedInUser.id || loggedInUser?._doc?._id;
   };
 
   const loggedInUserId = getUserId();
   const isOwnProfile = organizerId === loggedInUserId;
+
+  const { setIsLoading } = useLoader();
+
+  useEffect(() => {
+    setIsLoading(loading);
+    return () => setIsLoading(false);
+  }, [loading, setIsLoading]);
+
+  // Add this function to filter events by date
+  const filterEventsByDate = (events) => {
+    const currentDate = new Date();
+
+    // Filter past events (dates that have passed)
+    const past = events.filter(event => {
+      const eventDate = new Date(event.date || event.startDate || event.endDate);
+      return eventDate < currentDate;
+    });
+
+    // Filter upcoming events (dates in the future)
+    const upcoming = events.filter(event => {
+      const eventDate = new Date(event.date || event.startDate || event.endDate);
+      return eventDate >= currentDate;
+    });
+
+    return { past, upcoming };
+  };
 
   useEffect(() => {
     const fetchOrganizerProfile = async () => {
@@ -64,7 +95,7 @@ const OrganizerProfile = () => {
         }
 
         // Get API URL from environment or use fallback
-        const apiUrl = import.meta.env.VITE_API_URL || '/api/v1';
+        const apiUrl = import.meta.env.VITE_API_URL;
 
         const token = organizerData?.token || localStorage.getItem('organizer_token');
         const cleanToken = safelyParseToken(token);
@@ -97,15 +128,19 @@ const OrganizerProfile = () => {
 
         // Fetch events for this organizer
         try {
-          const eventsResponse = await axios.get(`${apiUrl}/events/organizer/${idToFetch}`, config);
+          const eventsResponse = await axios.get(`${apiUrl}/organizer/events/organizer/${idToFetch}`, config);
           if (eventsResponse.data && Array.isArray(eventsResponse.data)) {
-            setEvents(eventsResponse.data);
+            const { past, upcoming } = filterEventsByDate(eventsResponse.data);
+            setUpcomingEvents(upcoming);
+            setPastEvents(past);
           } else {
-            setEvents([]);
+            setUpcomingEvents([]);
+            setPastEvents([]);
           }
         } catch (eventsErr) {
           console.error("Error fetching events:", eventsErr);
-          setEvents([]);
+          setUpcomingEvents([]);
+          setPastEvents([]);
         } finally {
           setEventsLoading(false);
         }
@@ -136,19 +171,6 @@ const OrganizerProfile = () => {
     return phoneNumber.replace(/(\d{3})(\d{3})(\d{4})/, '($1) $2-$3');
   };
 
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-black text-white flex items-center justify-center">
-        <motion.div
-          className="w-16 h-16 border-4 border-cyan-500 border-t-transparent rounded-full"
-          animate={{ rotate: 360 }}
-          transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
-        />
-        <span className="ml-4 text-xl font-medium">Loading profile...</span>
-      </div>
-    );
-  }
-
   if (error) {
     return (
       <div className="min-h-screen bg-black text-white p-8">
@@ -158,8 +180,8 @@ const OrganizerProfile = () => {
             <div>
               <h2 className="text-xl font-bold text-red-400 mb-2">Error Loading Profile</h2>
               <p className="text-gray-300">{error}</p>
-              <button 
-                onClick={() => navigate(-1)} 
+              <button
+                onClick={() => navigate(-1)}
                 className="mt-6 px-4 py-2 bg-gray-800 hover:bg-gray-700 rounded-lg transition-colors"
               >
                 Go Back
@@ -171,21 +193,15 @@ const OrganizerProfile = () => {
     );
   }
 
+  if (loading) {
+      return (
+        <Skeleton type='profile' count={12} columns={{ default: 1, md: 1, lg: 1 }}/>
+      );
+    }
+
   if (!profile) {
     return (
-      <div className="min-h-screen bg-black text-white p-8">
-        <div className="max-w-3xl mx-auto bg-gray-900/50 border border-gray-800 rounded-xl p-8 text-center">
-          <User className="mx-auto text-gray-500 mb-4" size={48} />
-          <h2 className="text-xl font-bold text-gray-400 mb-2">Profile Not Found</h2>
-          <p className="text-gray-500">The organizer profile you're looking for doesn't exist or is private.</p>
-          <button 
-            onClick={() => navigate(-1)} 
-            className="mt-6 px-4 py-2 bg-gray-800 hover:bg-gray-700 rounded-lg transition-colors"
-          >
-            Go Back
-          </button>
-        </div>
-      </div>
+      <Error />
     );
   }
 
@@ -197,26 +213,15 @@ const OrganizerProfile = () => {
   const phone = profile.phone || '';
   const bio = profile.bio || 'No bio provided';
 
-  // Process events
-  const upcomingEvents = events.filter(event => {
-    const eventDate = new Date(event.date || event.startDate);
-    return eventDate > new Date();
-  });
-  
-  const pastEvents = events.filter(event => {
-    const eventDate = new Date(event.date || event.startDate);
-    return eventDate <= new Date();
-  });
-
   // Extract profile data with fallbacks
   const expertise = profile.expertise || [];
   const certifications = profile.certifications || [];
   const socials = profile.socials || [];
   const testimonials = profile.testimonials || [];
-  
+
   // Add default stats if not available
   const stats = profile.stats || {
-    eventsHosted: events.length || 0,
+    eventsHosted: upcomingEvents.length + pastEvents.length || 0,
     totalAttendees: "0",
     clientSatisfaction: "N/A",
     awards: 0
@@ -225,12 +230,12 @@ const OrganizerProfile = () => {
   // Function to get icon for social media
   const getSocialIcon = (url) => {
     if (!url) return <Globe size={16} />;
-    
+
     if (url.includes('twitter') || url.includes('x.com')) return <Twitter size={16} />;
     if (url.includes('linkedin')) return <Linkedin size={16} />;
     if (url.includes('instagram')) return <Instagram size={16} />;
     if (url.includes('facebook')) return <Facebook size={16} />;
-    
+
     return <Globe size={16} />;
   };
 
@@ -313,7 +318,7 @@ const OrganizerProfile = () => {
 
               {/* Contact Button */}
               {!isOwnProfile && (
-                <button 
+                <button
                   onClick={() => {
                     if (email) {
                       window.location.href = `mailto:${email}`;
@@ -321,7 +326,7 @@ const OrganizerProfile = () => {
                       toast.info("Contact information not available");
                     }
                   }}
-                  className="md:self-center bg-cyan-500 text-black px-6 py-3 rounded-full font-bold flex items-center transform transition-transform hover:scale-105 hover:shadow-cyan-900 hover:shadow-lg"
+                  className="md:self-center bg-cyan-500 text-black px-6 py-3 rounded-full font-bold flex items-center transform transition-transform hover:scale-105 hover:shadow-cyan-900 hover:shadow-lg hover:text-cyan-500 hover:bg-black hover:border hover:border-cyan-500 cursor-pointer"
                 >
                   <Mail className="w-5 h-5 mr-2" />
                   Contact
@@ -330,9 +335,9 @@ const OrganizerProfile = () => {
 
               {/* Edit Profile Button (for own profile) */}
               {isOwnProfile && (
-                <button 
-                  onClick={() => navigate('/organizer/details')}
-                  className="md:self-center bg-cyan-500 text-black px-6 py-3 rounded-full font-bold flex items-center transform transition-transform hover:scale-105 hover:shadow-cyan-900 hover:shadow-lg"
+                <button
+                  onClick={() => navigate('/organizer/profile/edit')}
+                  className="md:self-center bg-cyan-500 text-black hover:text-cyan-500 hover:bg-black hover:border hover:border-cyan-500 px-6 py-3 rounded-full font-bold flex items-center transform transition-transform hover:scale-105 hover:shadow-cyan-900 hover:shadow-lg cursor-pointer"
                 >
                   <ArrowRight className="w-5 h-5 mr-2" />
                   Edit Profile
@@ -424,7 +429,7 @@ const OrganizerProfile = () => {
                   <div className="flex flex-col space-y-4">
                     {socials.length > 0 ? socials.map((social, index) => {
                       if (!social) return null;
-                      
+
                       // Extract domain name for display
                       let displayName = social;
                       try {
@@ -434,7 +439,7 @@ const OrganizerProfile = () => {
                         // If parsing fails, use original value
                         displayName = social;
                       }
-                      
+
                       return (
                         <a href={social.startsWith('http') ? social : `https://${social}`} key={index} target="_blank" rel="noopener noreferrer" className="flex items-center justify-between group">
                           <div className="flex items-center">
@@ -570,7 +575,7 @@ const OrganizerProfile = () => {
                                   </>
                                 )}
 
-                                <button 
+                                <button
                                   onClick={() => navigate(`/event/${event._id}`)}
                                   className="mt-6 px-6 py-3 rounded-xl bg-gradient-to-r bg-cyan-400 text-black font-medium transition-colors cursor-pointer flex items-center space-x-2 hover:bg-black hover:text-cyan-400 hover:border hover:border-cyan-400"
                                 >
@@ -597,29 +602,81 @@ const OrganizerProfile = () => {
                     </h3>
 
                     {pastEvents.length > 0 ? (
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="space-y-6">
                         {pastEvents.map(event => (
                           <div
                             key={event._id}
-                            className="bg-gray-900/50 rounded-xl p-4 hover:bg-gray-900 transition-colors"
-                            onClick={() => navigate(`/event/${event._id}`)}
+                            className={`relative bg-gray-900 rounded-2xl overflow-hidden transition-all duration-300 ${expandedEvent === event._id ? 'transform scale-102 shadow-lg shadow-cyan-900/20' : 'hover:transform hover:scale-101'}`}
                           >
-                            <div className="flex justify-between">
-                              <div>
-                                <h4 className="font-medium">{event.title}</h4>
-                                <div className="flex flex-wrap gap-x-4 text-xs text-gray-400 mt-1">
-                                  <div className="flex items-center">
-                                    <Calendar size={12} className="mr-1" />
-                                    {new Date(event.date || event.startDate).toLocaleDateString()}
+                            <div className="absolute top-0 right-0 w-24 h-24 bg-cyan-500 opacity-10 rounded-full transform translate-x-12 -translate-y-12"></div>
+
+                            <div
+                              className="p-6 cursor-pointer"
+                              onClick={() => handleEventClick(event._id)}
+                            >
+                              <div className="flex flex-col md:flex-row md:items-center justify-between">
+                                <div className="flex-grow">
+                                  <div className="flex items-center mb-2">
+                                    <span className="text-xs text-cyan-500 uppercase tracking-wider px-2 py-1 bg-cyan-900/30 rounded-full mr-2">
+                                      {event.category || "Event"}
+                                    </span>
+                                    <span className="text-xs text-gray-400 uppercase tracking-wider px-2 py-1 bg-gray-700/30 rounded-full">
+                                      completed
+                                    </span>
                                   </div>
-                                  <div className="flex items-center">
-                                    <Users size={12} className="mr-1" />
-                                    {event.attendeesCount || 0}
+
+                                  <h4 className="text-xl font-bold hover:text-cyan-500 transition-colors">{event.title}</h4>
+
+                                  <div className="flex flex-wrap gap-x-6 text-sm text-gray-400 mt-2">
+                                    <div className="flex items-center">
+                                      <Calendar size={14} className="mr-1" />
+                                      {new Date(event.date || event.startDate).toLocaleDateString()}
+                                    </div>
+                                    <div className="flex items-center">
+                                      <MapPin size={14} className="mr-1" />
+                                      {event.location?.address || event.venue || "No location specified"}
+                                    </div>
+                                    <div className="flex items-center">
+                                      <Users size={14} className="mr-1" />
+                                      {event.attendeesCount || 0} attendees
+                                    </div>
                                   </div>
                                 </div>
+
+                                <div className={`transition-transform duration-300 transform ${expandedEvent === event._id ? 'rotate-90' : ''}`}>
+                                  <ArrowRight size={20} className="text-cyan-500" />
+                                </div>
                               </div>
-                              <div className="w-8 h-8 rounded-full bg-black/50 flex items-center justify-center">
-                                <ArrowRight size={12} className="text-gray-500" />
+                            </div>
+
+                            <div
+                              className={`transition-all duration-300 ease-in-out overflow-hidden ${expandedEvent === event._id ? 'max-h-96 opacity-100' : 'max-h-0 opacity-0'}`}
+                            >
+                              <div className="px-6 pb-6 pt-2">
+                                <div className="h-px bg-gradient-to-r from-transparent via-gray-700 to-transparent mb-6"></div>
+
+                                <p className="text-gray-300 mb-4">{event.description || "No description available"}</p>
+
+                                {event.highlights && event.highlights.length > 0 && (
+                                  <>
+                                    <h5 className="text-sm uppercase text-cyan-500 mb-3">Event Highlights</h5>
+                                    <div className="flex flex-wrap gap-2">
+                                      {event.highlights.map((highlight, index) => (
+                                        <span key={index} className="px-3 py-1 bg-black/50 rounded-full text-sm text-gray-300">
+                                          {highlight}
+                                        </span>
+                                      ))}
+                                    </div>
+                                  </>
+                                )}
+
+                                <button
+                                  onClick={() => navigate(`/event/${event._id}`)}
+                                  className="mt-6 px-6 py-3 rounded-xl bg-gradient-to-r bg-gray-600 text-white font-medium transition-colors cursor-pointer flex items-center space-x-2 hover:bg-black hover:text-gray-400 hover:border hover:border-gray-400"
+                                >
+                                  View Event Details
+                                  <ArrowRight className="w-4 h-4 ml-2" />
+                                </button>
                               </div>
                             </div>
                           </div>
@@ -700,7 +757,7 @@ const OrganizerProfile = () => {
 
                     <div className="flex flex-col sm:flex-row gap-4">
                       {email ? (
-                        <a 
+                        <a
                           href={`mailto:${email}`}
                           className="bg-cyan-500 text-black px-6 py-3 rounded-xl font-bold flex items-center justify-center transform transition-transform hover:scale-105"
                         >
@@ -716,13 +773,13 @@ const OrganizerProfile = () => {
                           Get in Touch
                         </button>
                       )}
-                      
-                      <button 
-                        onClick={() => navigate(`/organizer/events/${organizerId || loggedInUserId}`)}
+
+                      <button
+                        onClick={() => navigate(`/organizer/events/list`)}
                         className="bg-transparent border border-cyan-500 text-cyan-500 px-6 py-3 rounded-xl font-bold flex items-center justify-center transform transition-transform hover:scale-105"
                       >
-                        <Calendar className="w-5 h-5 mr-2" />
-                        View All Events
+                        <FaPhone className="w-5 h-5 mr-2  " />
+                        Call to Action
                       </button>
                     </div>
                   </div>

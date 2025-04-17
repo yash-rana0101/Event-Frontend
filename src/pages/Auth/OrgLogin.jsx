@@ -179,10 +179,10 @@ const OrgLogin = () => {
                 <button
                   type="submit"
                   disabled={loading}
-                  className={`group relative w-full flex justify-center py-2 px-4 border border-transparent rounded-md text-white font-medium ${
+                  className={`group relative w-full flex justify-center py-2 px-4 border border-transparent rounded-md text-black font-medium cursor-pointer ${
                     loading
                       ? "bg-cyan-700 cursor-not-allowed"
-                      : "bg-cyan-600 hover:bg-cyan-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-cyan-500"
+                      : "bg-cyan-600 hover:bg-black hover:border hover:border-cyan-500 hover:text-cyan-500 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-cyan-500"
                   }`}
                 >
                   {loading ? (

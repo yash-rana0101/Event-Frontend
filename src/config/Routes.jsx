@@ -29,11 +29,11 @@ import OrganizerDashboard from '../pages/Organizer/OrganizerDashboard';
 import OrganizerDetails from '../pages/Organizer/OrganizerDetails';
 import OrganizerProfile from '../pages/Organizer/OrganizerProfile';
 import EventAttendees from '../pages/Organizer/EventAttendees';
-import CreateEditEvent from '../pages/Organizer/CreateEditEvent';
 
 // user Pages
 import UserDashboard from '../pages/User/UserDashboard';
 import About from '../pages/Home/About';
+import EditOrgProfile from '../pages/Organizer/EditOrgProfile';
 
 
 function AppRoutes() {
@@ -45,6 +45,7 @@ function AppRoutes() {
         <Route index element={<Home />} />
         <Route path="contact" element={<Contact />} />
         <Route path="about" element={<About />} />
+        <Route path="/organizer/profile/:organizerId" element={<OrganizerProfile />} />
         
         {/* Events */}
         <Route path="event" element={<Events />} />
@@ -80,12 +81,11 @@ function AppRoutes() {
       }>
         <Route path="dashboard" element={<OrganizerDashboard />} />
         <Route path="profile" element={<OrganizerProfile />} />
-        <Route path="profile/:organizerId" element={<OrganizerProfile />} />
+        <Route path="profile/edit" element={<EditOrgProfile />} />
         <Route path="details" element={<OrganizerDetails />} />
         <Route path="events/list" element={<EventListPage />} />
         <Route path="events/attendees/:eventId" element={<EventAttendees />} />
-        <Route path="event/create" element={<CreateEditEvent />} />
-        <Route path="event/edit/:eventId" element={<CreateEditEvent />} />
+        <Route path="event/edit/:eventId" element={<EditEvent />} />
         
         {/* Legacy path support */}
         <Route path="create" element={<CreateEvent />} />

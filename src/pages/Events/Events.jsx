@@ -4,7 +4,8 @@ import { motion } from "framer-motion";
 import axios from 'axios';
 import { toast } from 'react-toastify';
 import Evnetpage from "../../components/Events/Evnetpage";
-import { Loader2 } from 'lucide-react';
+import EventSkeleton from "../../components/UI/Skeleton";
+import {useLoader}  from "../../context/LoaderContext";
 
 export default function Events() {
   const [events, setEvents] = useState([]);
@@ -19,27 +20,30 @@ export default function Events() {
     sortBy: 'startDate',
     search: ''
   });
-  
+
+  const { setIsLoading } = useLoader();
+
   // Fetch events from API
   useEffect(() => {
     const fetchEvents = async () => {
       setLoading(true);
+      setIsLoading(true); // To show loader
       try {
         const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000/api/v1';
-        
+
         // Build query parameters for filtering and pagination
         const queryParams = new URLSearchParams({
           page: page,
           limit: 6,
           status: filters.status
         });
-        
+
         if (filters.category) queryParams.append('category', filters.category);
         if (filters.search) queryParams.append('search', filters.search);
         if (filters.sortBy) queryParams.append('sortBy', filters.sortBy);
-        
+
         console.log(`Fetching events from: ${apiUrl}/events?${queryParams.toString()}`);
-        
+
         const response = await axios.get(`${apiUrl}/events`, {
           params: {
             page: page,
@@ -50,9 +54,9 @@ export default function Events() {
             sortBy: filters.sortBy || 'startDate'
           }
         });
-        
+
         console.log("API Response:", response.data);
-        
+
         // Extract events from the response
         let fetchedEvents = [];
         if (Array.isArray(response.data)) {
@@ -65,18 +69,18 @@ export default function Events() {
           console.warn("Unexpected response format:", response.data);
           fetchedEvents = [];
         }
-        
+
         // Set pagination data
         if (response.data.totalPages) {
           setTotalPages(response.data.totalPages);
         }
-        
+
         if (fetchedEvents.length === 0) {
           console.warn("No events found in the response");
         } else {
           console.log(`Received ${fetchedEvents.length} events`);
         }
-        
+
         // Format events
         const formattedEvents = fetchedEvents.map(event => ({
           id: event._id,
@@ -89,15 +93,15 @@ export default function Events() {
           attendees: event.attendeesCount,
           organizer: event.organizerName,
         }));
-        
+
         setEvents(formattedEvents);
-        
+
         // Get the newest events for the carousel
         try {
           const newestResponse = await axios.get(`${apiUrl}/events/newest`, {
             params: { limit: 5 }
           });
-          
+
           let newestData = [];
           if (Array.isArray(newestResponse.data)) {
             newestData = newestResponse.data;
@@ -106,7 +110,7 @@ export default function Events() {
           } else if (newestResponse.data.data) {
             newestData = newestResponse.data.data;
           }
-          
+
           // Format newest events
           const formattedNewEvents = newestData.map(event => ({
             id: event._id,
@@ -116,13 +120,13 @@ export default function Events() {
             location: (event.location?.address || event.location?.city || 'No location specified'),
             category: event.category
           }));
-          
+
           setNewEvents(formattedNewEvents);
         } catch (err) {
           console.warn("Could not fetch newest events:", err.message);
           // Fallback: use the newest events from main events array if available
           if (formattedEvents.length > 0) {
-            const sortedByDate = [...formattedEvents].sort((a, b) => 
+            const sortedByDate = [...formattedEvents].sort((a, b) =>
               new Date(b.startDate || b.date) - new Date(a.startDate || a.date)
             );
             setNewEvents(sortedByDate.slice(0, 5));
@@ -136,12 +140,13 @@ export default function Events() {
         toast.error(`Could not fetch events from server: ${err.message}`);
       } finally {
         setLoading(false);
+        setIsLoading(false); // To hide loader
       }
     };
-    
+
     fetchEvents();
   }, [page, filters]);
-  
+
   // Handle filter changes
   const handleFilterChange = (filterName, value) => {
     setFilters(prev => ({
@@ -150,7 +155,7 @@ export default function Events() {
     }));
     setPage(1); // Reset to first page when filters change
   };
-  
+
   // Handle search input
   const handleSearch = (searchText) => {
     setFilters(prev => ({
@@ -159,7 +164,7 @@ export default function Events() {
     }));
     setPage(1); // Reset to first page when search changes
   };
-  
+
   // Handle page change
   const handlePageChange = (newPage) => {
     setPage(newPage);
@@ -168,11 +173,8 @@ export default function Events() {
 
   if (loading && page === 1) {
     return (
-      <div className="flex items-center justify-center min-h-screen bg-black">
-        <div className="text-center">
-          <Loader2 className="h-12 w-12 animate-spin text-cyan-400 mx-auto" />
-          <p className="mt-4 text-white text-lg">Loading events...</p>
-        </div>
+      <div className="min-h-screen bg-black pt-20">
+        <EventSkeleton />
       </div>
     );
   }
@@ -184,8 +186,8 @@ export default function Events() {
         animate={{ opacity: 1 }}
         transition={{ duration: 0.5 }}
       >
-        <Evnetpage 
-          events={events} 
+        <Evnetpage
+          events={events}
           newEvents={newEvents}
           loading={loading}
           error={error}

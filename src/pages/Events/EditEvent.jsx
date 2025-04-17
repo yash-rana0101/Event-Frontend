@@ -1,719 +1,1402 @@
-import { useState, useEffect } from 'react';
-import { Calendar, Clock, MapPin, Users, Edit, Trash2, Share2, ChevronLeft, Star, Music, Coffee, MessageSquare, Loader, AlertCircle, Check } from 'lucide-react';
-import { useNavigate, useParams } from 'react-router-dom';
-import { toast } from 'react-toastify';
-import axios from 'axios';
-import { useSelector } from 'react-redux';
-import { safelyParseToken } from '../../utils/persistFix';
+/* eslint-disable no-unused-vars */
+import { useState, useEffect } from "react";
+import { useParams, useNavigate } from "react-router-dom";
+import { Calendar, MapPin, Users, Clock, Tag, Image, DollarSign, Calendar as CalendarIcon, Clock as ClockIcon, Save, Trash2, Plus, X, Info, ChevronDown, ArrowLeft, Trophy, Briefcase, AlertCircle } from "lucide-react";
+import axios from "axios";
+import { useSelector } from "react-redux";
+import { motion } from "framer-motion";
+import { toast } from "react-toastify";
+import DatePicker from "react-datepicker";
+import "react-datepicker/dist/react-datepicker.css";
+import DeletePopUp from "../../components/UI/DeletePopUp";
+import { FaArrowLeft } from "react-icons/fa";
+import Error from "../common/Error";
+import EventSkeleton from "../../components/UI/Skeleton";
 
 export default function EditEvent() {
-  const { eventId } = useParams(); // Get eventId from URL params
-  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
-  const [isEditMode, setIsEditMode] = useState(false);
+  const { eventId } = useParams();
   const navigate = useNavigate();
+  const [activeTab, setActiveTab] = useState("basic");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [event, setEvent] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [imagePreview, setImagePreview] = useState(null);
+  const [showDeletePopup, setShowDeletePopup] = useState(false);
 
-  // States for data management
-  const [event, setEvent] = useState({
-    id: "",
+  // Form state
+  const [formData, setFormData] = useState({
     title: "",
-    date: "",
-    time: "",
-    location: "",
+    tagline: "",
     description: "",
-    attendees: 0,
-    ticketsSold: 0,
-    category: "",
-    image: "",
-    organizer: "",
+    startDate: new Date(),
+    endDate: new Date(),
+    registrationDeadline: new Date(),
+    location: {
+      address: "",
+      city: "",
+      state: "",
+      country: "",
+      zipCode: "",
+    },
+    capacity: 0,
+    isPaid: false,
+    price: 0,
+    currency: "USD",
+    tags: [],
+    timeline: [],
+    prizes: [],
+    faqs: [],
+    sponsors: [],
     featured: false,
-    sessions: []
   });
 
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState(null);
-  const [success, setSuccess] = useState(false);
-  const [newSession, setNewSession] = useState({ name: "", speaker: "", time: "" });
+  // New tag input
+  const [newTag, setNewTag] = useState("");
 
-  // Get auth token from Redux
-  const organizerToken = useSelector(state => state.organizer?.token);
+  // Timeline item state
+  const [newTimelineItem, setNewTimelineItem] = useState({
+    time: "",
+    event: ""
+  });
+
+  // Prize item state
+  const [newPrize, setNewPrize] = useState({
+    place: "",
+    amount: "",
+    description: ""
+  });
+
+  // FAQ item state
+  const [newFaq, setNewFaq] = useState({
+    question: "",
+    answer: ""
+  });
+
+  // Sponsor item state
+  const [newSponsor, setNewSponsor] = useState({
+    name: "",
+    logo: "",
+    tier: "silver"
+  });
+
+  // Get user token from Redux
   const userToken = useSelector(state => state.auth?.token);
+  const organizerToken = useSelector(state => state.organizer?.token);
+  const organizer = useSelector(state => state.organizer?.user);
 
-  // Fetch event data when component mounts
-  useEffect(() => {
-    if (eventId) {
-      fetchEventData();
-    } else {
-      setLoading(false);
-      setError("No event ID provided");
-    }
-  }, [eventId]);
+  // Use organizer token if auth token is null/undefined
+  const authToken = userToken === "null" || !userToken ? organizerToken?.replace(/"/g, "") : userToken;
 
-  const fetchEventData = async () => {
-    setLoading(true);
-    setError(null);
-
-    try {
-      const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000/api/v1';
-
-      console.log(`Fetching event data from: ${apiUrl}/events/${eventId}`);
-
-      // Get token for authorization
-      let rawToken = organizerToken || localStorage.getItem('organizer_token');
-      const token = safelyParseToken(rawToken);
-
-      // Attempt to fetch with authorization header (in case it's a private event)
-      const headers = token ? { Authorization: `Bearer ${token}` } : {};
-
-      try {
-        const response = await axios.get(`${apiUrl}/events/${eventId}`, { headers });
-        const eventData = response.data;
-
-        // Format the data for our component
-        setEvent({
-          id: eventData._id || eventId,
-          title: eventData.title || "Untitled Event",
-          date: eventData.date || new Date(eventData.startDate || Date.now()).toLocaleDateString('en-US', {
-            year: 'numeric',
-            month: 'long',
-            day: 'numeric',
-          }),
-          time: eventData.time || `${new Date(eventData.startDate || Date.now()).toLocaleTimeString([],
-            { hour: '2-digit', minute: '2-digit' })} - ${new Date(eventData.endDate || Date.now()).toLocaleTimeString([],
-              { hour: '2-digit', minute: '2-digit' })}`,
-          location: eventData.location?.address || eventData.location || "",
-          description: eventData.description || "",
-          attendees: eventData.capacity || 0,
-          ticketsSold: eventData.attendeesCount || 0,
-          category: eventData.category || "Technology",
-          image: eventData.images?.[0] || "/api/placeholder/800/400",
-          organizer: eventData.organizer?.name || eventData.organizerName || "Event Organizer",
-          organizerId: eventData.organizer?._id || eventData.organizer,
-          featured: eventData.featured || false,
-          sessions: eventData.timeline || eventData.sessions || []
-        });
-
-        // If the event was successfully loaded, set error to null
-        setError(null);
-      } catch (firstError) {
-        console.error("Error fetching from first endpoint:", firstError.message);
-
-        // If first attempt fails, try alternate endpoint
-        console.log("Trying alternate endpoint...");
-        const response = await axios.get(`${apiUrl}/events/${eventId}`, { headers });
-        const eventData = response.data;
-
-        // Format the data for our component 
-        setEvent({
-          id: eventData._id || eventId,
-          title: eventData.title || "Untitled Event",
-          date: eventData.date || new Date(eventData.startDate || Date.now()).toLocaleDateString('en-US', {
-            year: 'numeric',
-            month: 'long',
-            day: 'numeric',
-          }),
-          time: eventData.time || `${new Date(eventData.startDate || Date.now()).toLocaleTimeString([],
-            { hour: '2-digit', minute: '2-digit' })} - ${new Date(eventData.endDate || Date.now()).toLocaleTimeString([],
-              { hour: '2-digit', minute: '2-digit' })}`,
-          location: eventData.location?.address || eventData.location || "",
-          description: eventData.description || "",
-          attendees: eventData.capacity || 0,
-          ticketsSold: eventData.attendeesCount || 0,
-          category: eventData.category || "Technology",
-          image: eventData.images?.[0] || "/api/placeholder/800/400",
-          organizer: eventData.organizer?.name || eventData.organizerName || "Event Organizer",
-          organizerId: eventData.organizer?._id || eventData.organizer,
-          featured: eventData.featured || false,
-          sessions: eventData.timeline || eventData.sessions || []
-        });
-
-        setError(null);
+  // Animation variants
+  const containerVariants = {
+    hidden: { opacity: 0 },
+    visible: {
+      opacity: 1,
+      transition: {
+        staggerChildren: 0.1
       }
-    } catch (err) {
-      console.error("Failed to fetch event:", err);
-      setError(err.response?.data?.message || "Could not load event data. Please try again.");
-      toast.error("Error loading event data");
-    } finally {
-      setLoading(false);
     }
   };
 
-  const handleInputChange = (e) => {
-    const { name, value } = e.target;
-    setEvent({
-      ...event,
-      [name]: value
-    });
+  const itemVariants = {
+    hidden: { opacity: 0, y: 20 },
+    visible: {
+      opacity: 1,
+      y: 0,
+      transition: {
+        type: "spring",
+        stiffness: 100
+      }
+    }
   };
 
-  const toggleEditMode = () => {
-    setIsEditMode(!isEditMode);
-  };
+  // Handle form input changes
+  const handleChange = (e) => {
+    const { name, value, type, checked } = e.target;
 
-  const handleSessionChange = (e) => {
-    const { name, value } = e.target;
-    setNewSession(prev => ({
-      ...prev,
-      [name]: value
-    }));
-  };
-
-  const addSession = () => {
-    if (newSession.name && newSession.time) {
-      setEvent(prev => ({
+    if (name.includes('.')) {
+      const [parent, child] = name.split('.');
+      setFormData(prev => ({
         ...prev,
-        sessions: [...prev.sessions, newSession]
+        [parent]: {
+          ...prev[parent],
+          [child]: value
+        }
       }));
-      setNewSession({ name: "", speaker: "", time: "" });
+    } else if (type === "checkbox") {
+      setFormData(prev => ({
+        ...prev,
+        [name]: checked
+      }));
     } else {
-      toast.warning("Session name and time are required");
+      setFormData(prev => ({
+        ...prev,
+        [name]: value
+      }));
     }
   };
 
-  const removeSession = (index) => {
-    setEvent(prev => ({
+  // Handle date changes
+  const handleDateChange = (date, field) => {
+    setFormData(prev => ({
       ...prev,
-      sessions: prev.sessions.filter((_, i) => i !== index)
+      [field]: date
     }));
   };
 
-  const handleUpdate = async (eventData) => {
-    try {
-      const apiUrl = import.meta.env.VITE_API_URL;
-      const token = organizerToken || userToken;
-
-      if (!token) {
-        throw new Error("Authentication required");
-      }
-
-      const parsedToken = safelyParseToken(token);
-
-      // Ensure proper data structure for complex objects
-      const eventPayload = {
-        ...eventData,
-        timeline: Array.isArray(eventData.timeline) ? eventData.timeline : [],
-        prizes: Array.isArray(eventData.prizes) ? eventData.prizes : [],
-        sponsors: Array.isArray(eventData.sponsors) ? eventData.sponsors : [],
-        faqs: Array.isArray(eventData.faqs) ? eventData.faqs : [],
-        socialShare: {
-          likes: eventData.socialShare?.likes || 0,
-          comments: eventData.socialShare?.comments || 0,
-          shares: eventData.socialShare?.shares || 0
-        }
+  // Handle image upload
+  const handleImageUpload = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setImagePreview(reader.result);
       };
+      reader.readAsDataURL(file);
 
-      // Send as JSON
-      const response = await axios({
-        method: 'PUT',
-        url: `${apiUrl}/events/${eventId}`,
-        data: eventPayload,
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${parsedToken}`
-        }
-      });
-
-      console.log("Update response:", response?.data);
-      setSuccess(true);
-      setIsEditMode(false);
-      toast.success("Event updated successfully!");
-
-      setTimeout(() => {
-        fetchEventData();
-        setSuccess(false);
-      }, 2000);
-    } catch (error) {
-      console.error("Error updating event:", error);
-      let errorMessage = error.response?.data?.message || "Failed to update event";
-
-      if (error.response?.status === 404) {
-        errorMessage = "Event not found or you don't have permission to update it.";
-        toast.error(errorMessage);
-        setTimeout(() => {
-          navigate('/organizer/dashboard');
-        }, 5000);
-      } else if (error.response?.status === 403) {
-        errorMessage = "You don't have permission to edit this event.";
-        toast.error(errorMessage);
-      } else if (error.response?.status === 401) {
-        errorMessage = "Your session has expired. Please log in again.";
-        toast.error(errorMessage);
-        localStorage.removeItem('organizer_token');
-        setTimeout(() => {
-          navigate('/organizer/login');
-        }, 2000);
-      } else {
-        toast.error(`Error: ${errorMessage}`);
-      }
-
-      setError(errorMessage);
-    } finally {
-      setSaving(false);
+      // In a real implementation, you would upload the file to your server
+      // and update the formData with the URL.
     }
   };
 
-  const confirmDelete = async () => {
+  // Add tag
+  const addTag = () => {
+    if (newTag && !formData.tags.includes(newTag)) {
+      setFormData(prev => ({
+        ...prev,
+        tags: [...prev.tags, newTag]
+      }));
+      setNewTag("");
+    }
+  };
+
+  // Remove tag
+  const removeTag = (indexToRemove) => {
+    setFormData(prev => ({
+      ...prev,
+      tags: prev.tags.filter((_, index) => index !== indexToRemove)
+    }));
+  };
+
+  // Add timeline item
+  const addTimelineItem = () => {
+    if (newTimelineItem.time && newTimelineItem.event) {
+      setFormData(prev => ({
+        ...prev,
+        timeline: [...prev.timeline, { ...newTimelineItem }]
+      }));
+      setNewTimelineItem({ time: "", event: "" });
+    }
+  };
+
+  // Remove timeline item
+  const removeTimelineItem = (indexToRemove) => {
+    setFormData(prev => ({
+      ...prev,
+      timeline: prev.timeline.filter((_, index) => index !== indexToRemove)
+    }));
+  };
+
+  // Add prize
+  const addPrize = () => {
+    if (newPrize.place && newPrize.amount) {
+      setFormData(prev => ({
+        ...prev,
+        prizes: [...prev.prizes, { ...newPrize }]
+      }));
+      setNewPrize({ place: "", amount: "", description: "" });
+    }
+  };
+
+  // Remove prize
+  const removePrize = (indexToRemove) => {
+    setFormData(prev => ({
+      ...prev,
+      prizes: prev.prizes.filter((_, index) => index !== indexToRemove)
+    }));
+  };
+
+  // Add FAQ
+  const addFaq = () => {
+    if (newFaq.question && newFaq.answer) {
+      setFormData(prev => ({
+        ...prev,
+        faqs: [...prev.faqs, { ...newFaq }]
+      }));
+      setNewFaq({ question: "", answer: "" });
+    }
+  };
+
+  // Remove FAQ
+  const removeFaq = (indexToRemove) => {
+    setFormData(prev => ({
+      ...prev,
+      faqs: prev.faqs.filter((_, index) => index !== indexToRemove)
+    }));
+  };
+
+  // Add sponsor
+  const addSponsor = () => {
+    if (newSponsor.name && newSponsor.logo) {
+      setFormData(prev => ({
+        ...prev,
+        sponsors: [...prev.sponsors, { ...newSponsor }]
+      }));
+      setNewSponsor({ name: "", logo: "", tier: "silver" });
+    }
+  };
+
+  // Remove sponsor
+  const removeSponsor = (indexToRemove) => {
+    setFormData(prev => ({
+      ...prev,
+      sponsors: prev.sponsors.filter((_, index) => index !== indexToRemove)
+    }));
+  };
+
+  // Function to fetch event details
+  const fetchEventDetails = async () => {
     try {
-      setIsDeleteModalOpen(false);
+      setLoading(true);
+      setError(null);
 
-      const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000/api/v1';
-      const token = organizerToken || userToken;
-
-      if (!token) {
-        throw new Error("Authentication required");
+      if (!eventId) {
+        throw new Error("Event ID is missing.");
       }
 
-      const parsedToken = safelyParseToken(token);
+      if (!authToken) {
+        throw new Error("Authentication token is missing. Please login again.");
+      }
 
-      // Delete the event
-      await axios.delete(
-        `${apiUrl}/events/${event.id}`,
-        {
-          headers: {
-            'Authorization': `Bearer ${parsedToken}`
-          }
-        }
+      const apiUrl = import.meta.env.VITE_API_URL;
+
+      // Make sure to include the token in the request
+      const response = await axios.get(
+        `${apiUrl}/events/${eventId}`,
+        { headers: { Authorization: `Bearer ${authToken}` } }
       );
 
-      toast.success("Event deleted successfully");
+      const eventData = response.data;
+      setEvent(eventData);
 
-      // Navigate back to events list
-      navigate('/organizer/dashboard');
+      // Format the data for the form
+      setFormData({
+        title: eventData.title || "",
+        tagline: eventData.tagline || "",
+        description: eventData.description || "",
+        startDate: eventData.startDate ? new Date(eventData.startDate) : new Date(),
+        endDate: eventData.endDate ? new Date(eventData.endDate) : new Date(),
+        registrationDeadline: eventData.registrationDeadline ? new Date(eventData.registrationDeadline) : new Date(),
+        location: {
+          address: eventData.location?.address || "",
+          city: eventData.location?.city || "",
+          state: eventData.location?.state || "",
+          country: eventData.location?.country || "",
+          zipCode: eventData.location?.zipCode || "",
+        },
+        capacity: eventData.capacity || 0,
+        isPaid: eventData.isPaid || false,
+        price: eventData.price || 0,
+        currency: eventData.currency || "USD",
+        tags: eventData.tags || [],
+        timeline: eventData.timeline || [],
+        prizes: eventData.prizes || [],
+        faqs: eventData.faqs || [],
+        sponsors: eventData.sponsors || [],
+        featured: eventData.featured || false,
+      });
+
+      // Set image preview if available
+      if (eventData.images && eventData.images.length > 0) {
+        setImagePreview(eventData.images[0]);
+      }
+
     } catch (err) {
-      console.error("Error deleting event:", err);
-      toast.error(err.response?.data?.message || "Failed to delete event");
+      console.error("Error fetching event details:", err);
+      const errorMessage = err.response?.data?.message ||
+        err.response?.data?.error ||
+        err.message ||
+        "Failed to load event details";
+
+      // Handle unauthorized error specifically
+      if (err.response?.status === 401) {
+        setError("Your session has expired. Please login again.");
+        toast.error("Authentication failed. Please login again.");
+      } else {
+        setError(errorMessage);
+        toast.error(errorMessage);
+      }
+    } finally {
+      setLoading(false);
     }
   };
 
+  // Call fetchEventDetails when component mounts or eventId changes
+  useEffect(() => {
+    fetchEventDetails();
+  }, [eventId]);
+
+  // Handle form submission
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+
+    try {
+      setIsSubmitting(true);
+
+      if (!authToken) {
+        throw new Error("Authentication token is missing. Please login again.");
+      }
+
+      const apiUrl = import.meta.env.VITE_API_URL;
+
+      // Make the update request with the correct token
+      await axios.put(
+        `${apiUrl}/events/${eventId}`,
+        formData,
+        { headers: { Authorization: `Bearer ${authToken}` } }
+      );
+
+      toast.success("Event updated successfully!");
+      navigate(`/event/${eventId}`);
+
+    } catch (err) {
+      console.error("Error updating event:", err);
+      const errorMessage = err.response?.data?.message ||
+        err.response?.data?.error ||
+        err.message ||
+        "Failed to update event";
+
+      // Handle unauthorized error specifically
+      if (err.response?.status === 401) {
+        toast.error("Authentication failed. Please login again.");
+      } else {
+        toast.error(errorMessage);
+      }
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  // Handle event deletion
+  const handleDelete = () => {
+    setShowDeletePopup(true);
+  };
+
+  // Function to actually delete the event after confirmation
+  const deleteEvent = async () => {
+    try {
+      setIsDeleting(true);
+
+      if (!authToken) {
+        throw new Error("Authentication token is missing. Please login again.");
+      }
+
+      const apiUrl = import.meta.env.VITE_API_URL || "http://localhost:3000/api/v1";
+
+      await axios.delete(
+        `${apiUrl}/events/${eventId}`,
+        { headers: { Authorization: `Bearer ${authToken}` } }
+      );
+
+      toast.success("Event deleted successfully!");
+      navigate(-1);
+
+    } catch (err) {
+      console.error("Error deleting event:", err);
+      const errorMessage = err.response?.data?.message ||
+        err.response?.data?.error ||
+        err.message ||
+        "Failed to delete event";
+
+      // Handle unauthorized error specifically
+      if (err.response?.status === 401) {
+        toast.error("Authentication failed. Please login again.");
+      } else {
+        toast.error(errorMessage);
+      }
+    } finally {
+      setIsDeleting(false);
+      setShowDeletePopup(false);
+    }
+  };
+
+  // Show loading state
   if (loading) {
     return (
-      <div className="min-h-screen text-gray-100 flex items-center justify-center">
-        <div className="flex flex-col items-center">
-          <Loader size={32} className="text-cyan-400 animate-spin mb-4" />
-          <h3 className="text-xl">Loading event details...</h3>
-        </div>
-      </div>
+      <EventSkeleton type="list" />
     );
   }
 
-  if (error && !event.id) {
+  // Show error state
+  if (error) {
     return (
-      <div className="min-h-screen text-gray-100 p-4">
-        <div className="max-w-lg mx-auto bg-gray-800 rounded-xl p-6 mt-12 border border-red-500/30">
-          <div className="flex items-center mb-4">
-            <AlertCircle className="text-red-500 mr-3" size={24} />
-            <h2 className="text-xl font-semibold">Error Loading Event</h2>
-          </div>
-          <p className="text-gray-300 mb-6">{error}</p>
-          <div className="flex space-x-4">
-            <button
-              onClick={() => navigate('/organizer/dashboard')}
-              className="px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded-md transition-colors"
-            >
-              Back to Dashboard
-            </button>
-            <button
-              onClick={fetchEventData}
-              className="px-4 py-2 bg-cyan-600 hover:bg-cyan-500 rounded-md transition-colors"
-            >
-              Retry
-            </button>
-          </div>
-        </div>
-      </div>
+      <Error message={error} onRetry={fetchEventDetails} />
     );
   }
 
   return (
-    <div className="min-h-screen text-gray-100">
+    <div className="min-h-screen  text-white pb-16">
+      {/* Delete Popup */}
+      <DeletePopUp
+        isOpen={showDeletePopup}
+        onClose={() => setShowDeletePopup(false)}
+        deleteProject={deleteEvent}
+      />
+
       {/* Header */}
-      <header className="fixed top-0 left-0 w-full bg-black p-4 z-50 shadow-md shadow-cyan-900/20 border-b border-gray-800">
-        <div className="container mx-auto flex justify-between items-center">
-          <div className="flex items-center space-x-4">
+      <motion.div
+        initial={{ opacity: 0, y: -20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.5 }}
+        className=" border-b border-gray-700 py-6"
+      >
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex items-center justify-between">
+            <div className="flex items-start space-x-4">
+              <div className="flex items-start justify-start">
+                <button
+                  onClick={() => navigate(-1)}
+                  className="p-2 rounded-full border border-cyan-500 text-cyan-500 hover:bg-cyan-900/30 transition-colors hover:cursor-pointer"
+                >
+                  <FaArrowLeft size={20} />
+                </button>
+              </div>
+              <div>
+                <h1 className="text-2xl md:text-3xl font-bold text-white">Edit Event</h1>
+                <p className="text-gray-400 mt-1">Manage all your events in one place</p>
+              </div>
+            </div>
+            <div className="flex items-center space-x-3">
+              <button
+                onClick={handleDelete}
+                disabled={isDeleting}
+                className="inline-flex items-center px-4 py-2 bg-red-600/20 text-red-500 hover:bg-red-600/30 rounded-lg transition-colors disabled:opacity-50 cursor-pointer"
+              >
+                <Trash2 size={18} className="mr-2" />
+                {isDeleting ? "Deleting..." : "Delete Event"}
+              </button>
+              <button
+                type="button"
+                onClick={handleSubmit}
+                disabled={isSubmitting}
+                className="inline-flex items-center px-6 py-2 rounded-xl bg-gradient-to-r bg-cyan-400 text-black font-medium transition-colors cursor-pointer space-x-2 hover:bg-black hover:text-cyan-400 hover:border hover:border-cyan-400 disabled:opacity-50"
+              >
+                <Save size={18} className="mr-2" />
+                {isSubmitting ? "Saving..." : "Save Changes"}
+              </button>
+            </div>
+          </div>
+        </div>
+      </motion.div>
+
+      {/* Content */}
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <form onSubmit={handleSubmit}>
+          {/* Tabs */}
+          <div className="flex flex-wrap gap-2 mb-8 overflow-x-auto scrollbar-hide">
             <button
-              onClick={() => navigate(-1)}
-              className="p-2 rounded-full hover:bg-gray-800 transition-colors"
+              type="button"
+              onClick={() => setActiveTab("basic")}
+              className={`px-4 py-2 rounded-lg font-medium transition-all duration-300 ${activeTab === "basic"
+                ? "bg-cyan-400 text-gray-900"
+                : "bg-gray-800 text-gray-300 hover:bg-gray-700"
+                }`}
             >
-              <ChevronLeft size={24} className="text-cyan-400" />
+              Basic Info
             </button>
-            <h1 className="text-xl font-bold text-cyan-400">Event Manager</h1>
+            <button
+              type="button"
+              onClick={() => setActiveTab("details")}
+              className={`px-4 py-2 rounded-lg font-medium transition-all duration-300 ${activeTab === "details"
+                ? "bg-cyan-400 text-gray-900"
+                : "bg-gray-800 text-gray-300 hover:bg-gray-700"
+                }`}
+            >
+              Details
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveTab("timeline")}
+              className={`px-4 py-2 rounded-lg font-medium transition-all duration-300 ${activeTab === "timeline"
+                ? "bg-cyan-400 text-gray-900"
+                : "bg-gray-800 text-gray-300 hover:bg-gray-700"
+                }`}
+            >
+              Timeline
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveTab("prizes")}
+              className={`px-4 py-2 rounded-lg font-medium transition-all duration-300 ${activeTab === "prizes"
+                ? "bg-cyan-400 text-gray-900"
+                : "bg-gray-800 text-gray-300 hover:bg-gray-700"
+                }`}
+            >
+              Prizes
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveTab("sponsors")}
+              className={`px-4 py-2 rounded-lg font-medium transition-all duration-300 ${activeTab === "sponsors"
+                ? "bg-cyan-400 text-gray-900"
+                : "bg-gray-800 text-gray-300 hover:bg-gray-700"
+                }`}
+            >
+              Sponsors
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveTab("faqs")}
+              className={`px-4 py-2 rounded-lg font-medium transition-all duration-300 ${activeTab === "faqs"
+                ? "bg-cyan-400 text-gray-900"
+                : "bg-gray-800 text-gray-300 hover:bg-gray-700"
+                }`}
+            >
+              FAQs
+            </button>
           </div>
-          <div className="flex space-x-3">
-            {!isEditMode && (
-              <>
-                <button
-                  onClick={toggleEditMode}
-                  className="flex items-center px-4 py-2 rounded-xl bg-gradient-to-r bg-cyan-400 text-black font-medium transition-colors cursor-pointer space-x-2 hover:bg-black hover:text-cyan-400 hover:border hover:border-cyan-400"
-                >
-                  <Edit size={16} className="mr-2" />
-                  Edit
-                </button>
-                <button
-                  onClick={() => setIsDeleteModalOpen(true)}
-                  className="flex items-center px-4 py-2 bg-red-700 hover:bg-gray-600 rounded-md transition-colors cursor-pointer"
-                >
-                  <Trash2 size={16} className="mr-2" />
-                  Delete
-                </button>
-              </>
+
+          {/* Tab Content */}
+          <motion.div
+            key={activeTab}
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -20 }}
+            transition={{ duration: 0.3 }}
+          >
+            {/* Basic Info Tab */}
+            {activeTab === "basic" && (
+              <motion.div
+                variants={containerVariants}
+                initial="hidden"
+                animate="visible"
+                className="grid grid-cols-1 lg:grid-cols-3 gap-6"
+              >
+                {/* Event Cover Image */}
+                <motion.div variants={itemVariants} className="lg:col-span-1">
+                  <div className="bg-gray-800 rounded-xl p-6 border border-gray-700 h-full">
+                    <h2 className="text-xl font-semibold mb-4">Cover Image</h2>
+
+                    <div className="aspect-video bg-gray-700 rounded-lg overflow-hidden mb-4 relative">
+                      {imagePreview ? (
+                        <img
+                          src={imagePreview}
+                          alt="Event Cover"
+                          className="w-full h-full object-cover"
+                        />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center text-gray-400">
+                          <Image size={48} />
+                        </div>
+                      )}
+
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent"></div>
+
+                      <label className="absolute bottom-4 left-0 right-0 mx-auto w-max cursor-pointer">
+                        <span className="inline-block px-4 py-2 bg-cyan-400 text-gray-900 rounded-lg font-medium text-sm hover:bg-cyan-500 transition-colors">
+                          {imagePreview ? "Change Image" : "Upload Image"}
+                        </span>
+                        <input
+                          type="file"
+                          accept="image/*"
+                          className="hidden"
+                          onChange={handleImageUpload}
+                        />
+                      </label>
+                    </div>
+
+                    <p className="text-sm text-gray-400">
+                      Recommended size: 1200×600 pixels. Max file size: 5MB.
+                    </p>
+                  </div>
+                </motion.div>
+
+                {/* Event Basic Details */}
+                <motion.div variants={itemVariants} className="lg:col-span-2">
+                  <div className="bg-gray-800 rounded-xl p-6 border border-gray-700">
+                    <h2 className="text-xl font-semibold mb-4">Event Information</h2>
+
+                    <div className="space-y-4">
+                      <div>
+                        <label className="block text-gray-300 mb-2">
+                          Event Title <span className="text-red-400">*</span>
+                        </label>
+                        <input
+                          type="text"
+                          name="title"
+                          value={formData.title}
+                          onChange={handleChange}
+                          required
+                          className="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-cyan-400 focus:border-transparent transition-all"
+                          placeholder="Enter the event title"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-gray-300 mb-2">
+                          Tagline
+                        </label>
+                        <input
+                          type="text"
+                          name="tagline"
+                          value={formData.tagline}
+                          onChange={handleChange}
+                          className="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-cyan-400 focus:border-transparent transition-all"
+                          placeholder="A short catchy phrase for your event"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-gray-300 mb-2">
+                          Description <span className="text-red-400">*</span>
+                        </label>
+                        <textarea
+                          name="description"
+                          value={formData.description}
+                          onChange={handleChange}
+                          required
+                          rows="6"
+                          className="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-cyan-400 focus:border-transparent transition-all"
+                          placeholder="Describe your event in detail"
+                        ></textarea>
+                      </div>
+
+                      <div className="flex items-center">
+                        <input
+                          type="checkbox"
+                          id="featured"
+                          name="featured"
+                          checked={formData.featured}
+                          onChange={handleChange}
+                          className="h-5 w-5 rounded border-gray-600 bg-gray-700 text-cyan-400 focus:ring-cyan-400"
+                        />
+                        <label htmlFor="featured" className="ml-2 block text-gray-300">
+                          Feature this event (shows on homepage)
+                        </label>
+                      </div>
+                    </div>
+                  </div>
+                </motion.div>
+
+                {/* Tags */}
+                <motion.div variants={itemVariants} className="lg:col-span-3">
+                  <div className="bg-gray-800 rounded-xl p-6 border border-gray-700">
+                    <h2 className="text-xl font-semibold mb-4">Event Tags</h2>
+
+                    <div className="flex flex-wrap gap-2 mb-4">
+                      {formData.tags.map((tag, index) => (
+                        <span
+                          key={index}
+                          className="group bg-gray-700 border border-gray-600 rounded-full px-3 py-1 text-sm flex items-center"
+                        >
+                          #{tag}
+                          <button
+                            type="button"
+                            onClick={() => removeTag(index)}
+                            className="ml-2 text-gray-400 hover:text-red-400 transition-colors"
+                          >
+                            <X size={14} />
+                          </button>
+                        </span>
+                      ))}
+                    </div>
+
+                    <div className="flex">
+                      <input
+                        type="text"
+                        value={newTag}
+                        onChange={(e) => setNewTag(e.target.value)}
+                        className="flex-1 bg-gray-700 border border-gray-600 rounded-l-lg px-4 py-2 text-white focus:outline-none focus:ring-2 focus:ring-cyan-400 focus:border-transparent transition-all"
+                        placeholder="Add a tag (e.g. hackathon, workshop)"
+                      />
+                      <button
+                        type="button"
+                        onClick={addTag}
+                        className="bg-cyan-400 text-gray-900 rounded-r-lg px-4 py-2 font-medium hover:bg-cyan-500 transition-colors"
+                      >
+                        Add
+                      </button>
+                    </div>
+                    <p className="mt-2 text-sm text-gray-400">
+                      Tags help attendees find your event. Add relevant keywords.
+                    </p>
+                  </div>
+                </motion.div>
+              </motion.div>
             )}
-            {isEditMode && (
-              <>
-                <button
-                  onClick={() => handleUpdate(event)}
-                  disabled={saving}
-                  className="flex items-center px-4 py-2 bg-green-600 hover:bg-green-700 rounded-md transition-colors cursor-pointer"
-                >
-                  {saving ? (
-                    <>
-                      <Loader size={16} className="animate-spin mr-2" />
-                      Saving...
-                    </>
-                  ) : 'Save'}
-                </button>
-                <button
-                  onClick={toggleEditMode}
-                  className="flex items-center px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded-md transition-colors cursor-pointer"
-                >
-                  Cancel
-                </button>
-              </>
-            )}
-          </div>
-        </div>
-      </header>
 
-      <main className="container mx-auto px-4 py-6 md:py-10 pt-24">
-        {/* Success message */}
-        {success && (
-          <div className="mb-4 p-4 bg-green-900/30 border border-green-500 rounded-lg flex items-center">
-            <Check size={20} className="text-green-500 mr-2" />
-            <span className="text-green-300">Event updated successfully</span>
-          </div>
-        )}
+            {/* Details Tab */}
+            {activeTab === "details" && (
+              <motion.div
+                variants={containerVariants}
+                initial="hidden"
+                animate="visible"
+                className="grid grid-cols-1 lg:grid-cols-2 gap-6"
+              >
+                {/* Date & Time */}
+                <motion.div variants={itemVariants}>
+                  <div className="bg-gray-800 rounded-xl p-6 border border-gray-700">
+                    <h2 className="text-xl font-semibold mb-4">Date & Time</h2>
 
-        {/* Error message */}
-        {error && (
-          <div className="mb-4 p-4 bg-red-900/30 border border-red-500 rounded-lg flex items-center">
-            <AlertCircle size={20} className="text-red-500 mr-2" />
-            <span className="text-red-300">{error}</span>
-          </div>
-        )}
+                    <div className="space-y-4">
+                      <div>
+                        <label className="block text-gray-300 mb-2">
+                          Start Date & Time <span className="text-red-400">*</span>
+                        </label>
+                        <div className="relative">
+                          <DatePicker
+                            selected={formData.startDate}
+                            onChange={(date) => handleDateChange(date, "startDate")}
+                            showTimeSelect
+                            dateFormat="MMMM d, yyyy h:mm aa"
+                            className="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-cyan-400 focus:border-transparent transition-all"
+                          />
+                          <CalendarIcon size={18} className="absolute right-4 top-3.5 text-gray-400" />
+                        </div>
+                      </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          {/* Main Content */}
-          <div className="lg:col-span-2 space-y-4">
-            {/* Hero Section */}
-            <div className="relative rounded-xl overflow-hidden bg-gradient-to-r from-gray-800 to-black border border-gray-800 shadow-lg">
-              <img
-                src={event.image}
-                alt={event.title}
-                className="w-full h-64 md:h-80 object-cover opacity-80"
-              />
-              <div className="absolute top-4 right-4">
-                {event.featured && (
-                  <div className="flex items-center bg-cyan-600 px-3 py-1 rounded-full text-sm">
-                    <Star size={14} className="mr-1" />
-                    Featured
+                      <div>
+                        <label className="block text-gray-300 mb-2">
+                          End Date & Time <span className="text-red-400">*</span>
+                        </label>
+                        <div className="relative">
+                          <DatePicker
+                            selected={formData.endDate}
+                            onChange={(date) => handleDateChange(date, "endDate")}
+                            showTimeSelect
+                            dateFormat="MMMM d, yyyy h:mm aa"
+                            className="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-cyan-400 focus:border-transparent transition-all"
+                          />
+                          <CalendarIcon size={18} className="absolute right-4 top-3.5 text-gray-400" />
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="block text-gray-300 mb-2">
+                          Registration Deadline
+                        </label>
+                        <div className="relative">
+                          <DatePicker
+                            selected={formData.registrationDeadline}
+                            onChange={(date) => handleDateChange(date, "registrationDeadline")}
+                            showTimeSelect
+                            dateFormat="MMMM d, yyyy h:mm aa"
+                            className="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-cyan-400 focus:border-transparent transition-all"
+                          />
+                          <ClockIcon size={18} className="absolute right-4 top-3.5 text-gray-400" />
+                        </div>
+                      </div>
+                    </div>
+
                   </div>
-                )}
-              </div>
+                </motion.div>
 
-              <div className="p-4 space-y-4">
-                {isEditMode ? (
-                  <input
-                    type="text"
-                    name="title"
-                    value={event.title}
-                    onChange={handleInputChange}
-                    className="w-full text-2xl md:text-3xl font-bold bg-transparent border-b border-cyan-500 focus:outline-none focus:border-cyan-300 pb-1"
-                  />
-                ) : (
-                  <h2 className="text-2xl md:text-3xl font-bold text-cyan-300">{event.title}</h2>
-                )}
+                {/* Location */}
+                <motion.div variants={itemVariants}>
+                  <div className="bg-gray-800 rounded-xl p-6 border border-gray-700">
+                    <h2 className="text-xl font-semibold mb-4">Location</h2>
 
-                <div className="flex flex-col md:flex-row md:items-center md:space-x-6 space-y-2 md:space-y-0 text-gray-300">
-                  <div className="flex items-center">
-                    <Calendar size={18} className="mr-2 text-cyan-400" />
-                    {isEditMode ? (
-                      <input
-                        type="text"
-                        name="date"
-                        value={event.date}
-                        onChange={handleInputChange}
-                        className="bg-transparent border-b border-cyan-500 focus:outline-none focus:border-cyan-300"
-                      />
-                    ) : event.date}
-                  </div>
-                  <div className="flex items-center">
-                    <Clock size={18} className="mr-2 text-cyan-400" />
-                    {isEditMode ? (
-                      <input
-                        type="text"
-                        name="time"
-                        value={event.time}
-                        onChange={handleInputChange}
-                        className="bg-transparent border-b border-cyan-500 focus:outline-none focus:border-cyan-300"
-                      />
-                    ) : event.time}
-                  </div>
-                  <div className="flex items-center">
-                    <MapPin size={18} className="mr-2 text-cyan-400" />
-                    {isEditMode ? (
-                      <input
-                        type="text"
-                        name="location"
-                        value={event.location}
-                        onChange={handleInputChange}
-                        className="bg-transparent border-b border-cyan-500 focus:outline-none focus:border-cyan-300"
-                      />
-                    ) : event.location}
-                  </div>
-                </div>
-              </div>
-            </div>
+                    <div className="space-y-4">
+                      <div>
+                        <label className="block text-gray-300 mb-2">
+                          Address <span className="text-red-400">*</span>
+                        </label>
+                        <input
+                          type="text"
+                          name="location.address"
+                          value={formData.location.address}
+                          onChange={handleChange}
+                          required
+                          className="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-cyan-400 focus:border-transparent transition-all"
+                          placeholder="Street address or venue name"
+                        />
+                      </div>
 
-            {/* Description */}
-            <div className="bg-gray-800 rounded-xl p-6 border border-gray-700 shadow-md">
-              <h3 className="text-lg font-semibold mb-4 text-cyan-300">Event Description</h3>
-              {isEditMode ? (
-                <textarea
-                  name="description"
-                  value={event.description}
-                  onChange={handleInputChange}
-                  rows="5"
-                  className="w-full bg-gray-900 border border-gray-700 rounded-md p-3 focus:outline-none focus:border-cyan-500 text-gray-200"
-                ></textarea>
-              ) : (
-                <p className="text-gray-300 leading-relaxed">{event.description}</p>
-              )}
-            </div>
-
-            {/* Sessions */}
-            <div className="bg-gray-800 rounded-xl p-6 border border-gray-700 shadow-md">
-              <h3 className="text-lg font-semibold mb-4 text-cyan-300">Event Sessions</h3>
-              <div className="space-y-4">
-                {event.sessions && event.sessions.length > 0 ? (
-                  event.sessions.map((session, index) => (
-                    <div key={index} className="p-4 rounded-lg border border-gray-700 bg-gray-900 hover:border-cyan-500 transition-colors">
-                      <div className="flex flex-col md:flex-row justify-between">
+                      <div className="grid grid-cols-2 gap-4">
                         <div>
-                          <h4 className="font-medium text-white">{session.name || session.event}</h4>
-                          <p className="text-gray-400">{session.speaker}</p>
+                          <label className="block text-gray-300 mb-2">
+                            City <span className="text-red-400">*</span>
+                          </label>
+                          <input
+                            type="text"
+                            name="location.city"
+                            value={formData.location.city}
+                            onChange={handleChange}
+                            required
+                            className="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-cyan-400 focus:border-transparent transition-all"
+                            placeholder="City"
+                          />
                         </div>
-                        <div className="flex items-center mt-2 md:mt-0">
-                          <Clock size={16} className="text-cyan-400 mr-2" />
-                          <span className="text-gray-300">{session.time}</span>
-                          {isEditMode && (
-                            <button
-                              onClick={() => removeSession(index)}
-                              className="ml-3 text-red-400 hover:text-red-300"
+                        <div>
+                          <label className="block text-gray-300 mb-2">
+                            State <span className="text-red-400">*</span>
+                          </label>
+                          <input
+                            type="text"
+                            name="location.state"
+                            value={formData.location.state}
+                            onChange={handleChange}
+                            required
+                            className="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-cyan-400 focus:border-transparent transition-all"
+                            placeholder="State/Province"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-gray-300 mb-2">
+                            Country <span className="text-red-400">*</span>
+                          </label>
+                          <input
+                            type="text"
+                            name="location.country"
+                            value={formData.location.country}
+                            onChange={handleChange}
+                            required
+                            className="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-cyan-400 focus:border-transparent transition-all"
+                            placeholder="Country"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-gray-300 mb-2">
+                            Zip Code <span className="text-red-400">*</span>
+                          </label>
+                          <input
+                            type="text"
+                            name="location.zipCode"
+                            value={formData.location.zipCode}
+                            onChange={handleChange}
+                            required
+                            className="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-cyan-400 focus:border-transparent transition-all"
+                            placeholder="Postal/Zip code"
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                  </div>
+                </motion.div>
+
+                {/* Capacity & Pricing */}
+                <motion.div variants={itemVariants} className="lg:col-span-2">
+                  <div className="bg-gray-800 rounded-xl p-6 border border-gray-700">
+                    <h2 className="text-xl font-semibold mb-4">Capacity & Pricing</h2>
+
+                    <div className="space-y-4">
+                      <div>
+                        <label className="block text-gray-300 mb-2">
+                          Capacity (max attendees)
+                        </label>
+                        <div className="relative">
+                          <input
+                            type="number"
+                            name="capacity"
+                            value={formData.capacity}
+                            onChange={handleChange}
+                            min="0"
+                            className="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-cyan-400 focus:border-transparent transition-all"
+                            placeholder="Maximum number of attendees"
+                          />
+                          <Users size={18} className="absolute right-4 top-3.5 text-gray-400" />
+                        </div>
+                        <p className="mt-1 text-sm text-gray-400">
+                          Leave at 0 for unlimited capacity
+                        </p>
+                      </div>
+
+                      <div className="flex items-center mb-4">
+                        <input
+                          type="checkbox"
+                          id="isPaid"
+                          name="isPaid"
+                          checked={formData.isPaid}
+                          onChange={handleChange}
+                          className="h-5 w-5 rounded border-gray-600 bg-gray-700 text-cyan-400 focus:ring-cyan-400"
+                        />
+                        <label htmlFor="isPaid" className="ml-2 block text-gray-300">
+                          This is a paid event
+                        </label>
+                      </div>
+
+                      {formData.isPaid && (
+                        <div className="grid grid-cols-2 gap-4">
+                          <div>
+                            <label className="block text-gray-300 mb-2">
+                              Price <span className="text-red-400">*</span>
+                            </label>
+                            <div className="relative">
+                              <input
+                                type="number"
+                                name="price"
+                                value={formData.price}
+                                onChange={handleChange}
+                                required={formData.isPaid}
+                                min="0"
+                                step="0.01"
+                                className="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-3 pl-8 text-white focus:outline-none focus:ring-2 focus:ring-cyan-400 focus:border-transparent transition-all"
+                                placeholder="0.00"
+                              />
+                              <DollarSign size={16} className="absolute left-3 top-4 text-gray-400" />
+                            </div>
+                          </div>
+                          <div>
+                            <label className="block text-gray-300 mb-2">
+                              Currency <span className="text-red-400">*</span>
+                            </label>
+                            <select
+                              name="currency"
+                              value={formData.currency}
+                              onChange={handleChange}
+                              required={formData.isPaid}
+                              className="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-cyan-400 focus:border-transparent transition-all"
                             >
-                              <Trash2 size={16} />
-                            </button>
-                          )}
+                              <option value="USD">USD - US Dollar</option>
+                              <option value="EUR">EUR - Euro</option>
+                              <option value="GBP">GBP - British Pound</option>
+                              <option value="CAD">CAD - Canadian Dollar</option>
+                              <option value="AUD">AUD - Australian Dollar</option>
+                              <option value="JPY">JPY - Japanese Yen</option>
+                              <option value="INR">INR - Indian Rupee</option>
+                            </select>
+                          </div>
                         </div>
+                      )}
+                    </div>
+                  </div>
+                </motion.div>
+              </motion.div>
+            )}
+
+            {/* Timeline Tab */}
+            {activeTab === "timeline" && (
+              <motion.div
+                variants={containerVariants}
+                initial="hidden"
+                animate="visible"
+              >
+                <motion.div variants={itemVariants} className="bg-gray-800 rounded-xl p-6 border border-gray-700 mb-6">
+                  <h2 className="text-xl font-semibold mb-4">Event Timeline</h2>
+                  <p className="text-gray-400 mb-6">
+                    Add important milestones and activities that will take place during your event.
+                  </p>
+
+                  <div className="space-y-4 mb-6">
+                    <div className="grid grid-cols-3 gap-4">
+                      <div className="col-span-1">
+                        <label className="block text-gray-300 mb-2">
+                          Time <span className="text-red-400">*</span>
+                        </label>
+                        <input
+                          type="text"
+                          value={newTimelineItem.time}
+                          onChange={(e) => setNewTimelineItem({ ...newTimelineItem, time: e.target.value })}
+                          className="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-cyan-400 focus:border-transparent transition-all"
+                          placeholder="e.g. 9:00 AM"
+                        />
+                      </div>
+                      <div className="col-span-2">
+                        <label className="block text-gray-300 mb-2">
+                          Activity <span className="text-red-400">*</span>
+                        </label>
+                        <input
+                          type="text"
+                          value={newTimelineItem.event}
+                          onChange={(e) => setNewTimelineItem({ ...newTimelineItem, event: e.target.value })}
+                          className="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-cyan-400 focus:border-transparent transition-all"
+                          placeholder="e.g. Registration & Check-in"
+                        />
                       </div>
                     </div>
-                  ))
-                ) : (
-                  <p className="text-gray-400 text-center pb-2">No sessions added yet</p>
-                )}
 
-                {isEditMode && (
-                  <div className="mt-4 bg-gray-900 border border-gray-700 rounded-lg p-4">
-                    <h4 className="text-sm font-medium mb-3 text-cyan-400">Add New Session</h4>
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                      <input
-                        type="text"
-                        placeholder="Session Name"
-                        name="name"
-                        value={newSession.name}
-                        onChange={handleSessionChange}
-                        className="bg-gray-800 border border-gray-700 rounded-lg p-2 text-white focus:outline-none focus:border-cyan-500"
-                      />
-                      <input
-                        type="text"
-                        placeholder="Speaker"
-                        name="speaker"
-                        value={newSession.speaker}
-                        onChange={handleSessionChange}
-                        className="bg-gray-800 border border-gray-700 rounded-lg p-2 text-white focus:outline-none focus:border-cyan-500"
-                      />
-                      <input
-                        type="text"
-                        placeholder="Time (e.g. 9:00 AM - 10:30 AM)"
-                        name="time"
-                        value={newSession.time}
-                        onChange={handleSessionChange}
-                        className="bg-gray-800 border border-gray-700 rounded-lg p-2 text-white focus:outline-none focus:border-cyan-500"
-                      />
+                    <div className="flex justify-end">
+                      <button
+                        type="button"
+                        onClick={addTimelineItem}
+                        disabled={!newTimelineItem.time || !newTimelineItem.event}
+                        className="inline-flex items-center px-4 py-2 bg-cyan-500 hover:bg-cyan-600 text-gray-900 font-medium rounded-lg transition-colors disabled:opacity-50 disabled:pointer-events-none"
+                      >
+                        <Plus size={18} className="mr-2" />
+                        Add to Timeline
+                      </button>
                     </div>
-                    <button
-                      onClick={addSession}
-                      className="w-full mt-3 py-2 bg-cyan-600 hover:bg-cyan-700 text-white rounded-lg transition-colors"
-                    >
-                      Add Session
-                    </button>
                   </div>
-                )}
 
-                {isEditMode && event.sessions.length === 0 && (
-                  <button className="w-full p-3 border border-dashed border-cyan-500 rounded-lg text-cyan-400 hover:bg-cyan-900/20 transition-colors mt-2">
-                    + Add New Session
-                  </button>
-                )}
-              </div>
-            </div>
-          </div>
-
-          {/* Sidebar */}
-          <div className="space-y-6">
-            {/* Event Status */}
-            <div className="bg-gradient-to-br from-gray-800 to-gray-900 rounded-xl p-6 border border-gray-700 shadow-md">
-              <h3 className="text-lg font-semibold mb-4 text-cyan-300">Event Status</h3>
-              <div className="space-y-4">
-                <div className="flex justify-between items-center pb-2 border-b border-gray-700">
-                  <span className="text-gray-300">Status</span>
-                  <span className="bg-green-500/20 text-green-400 px-3 py-1 rounded-full text-sm">Active</span>
-                </div>
-                <div className="flex justify-between items-center pb-2 border-b border-gray-700">
-                  <span className="text-gray-300">Category</span>
-                  {isEditMode ? (
-                    <select
-                      name="category"
-                      value={event.category}
-                      onChange={handleInputChange}
-                      className="bg-gray-900 border border-gray-700 rounded-md p-1 text-cyan-300"
-                    >
-                      <option value="Technology">Technology</option>
-                      <option value="Workshop">Workshop</option>
-                      <option value="Conference">Conference</option>
-                      <option value="Meetup">Meetup</option>
-                      <option value="Hackathon">Hackathon</option>
-                      <option value="Webinar">Webinar</option>
-                      <option value="Other">Other</option>
-                    </select>
+                  {formData.timeline.length > 0 ? (
+                    <div className="relative border-l-2 border-gray-700 pl-6 ml-3 space-y-6">
+                      {formData.timeline.map((item, index) => (
+                        <motion.div
+                          key={index}
+                          initial={{ opacity: 0, x: -20 }}
+                          animate={{ opacity: 1, x: 0 }}
+                          className="relative bg-gray-700 rounded-lg p-4 pr-12"
+                        >
+                          <div className="absolute w-3 h-3 bg-cyan-400 rounded-full left-[-2.35rem] top-5"></div>
+                          <p className="font-semibold text-cyan-400">{item.time}</p>
+                          <p className="text-white mt-1">{item.event}</p>
+                          <button
+                            type="button"
+                            onClick={() => removeTimelineItem(index)}
+                            className="absolute top-4 right-3 text-gray-400 hover:text-red-400 transition-colors"
+                          >
+                            <X size={18} />
+                          </button>
+                        </motion.div>
+                      ))}
+                    </div>
                   ) : (
-                    <span className="text-cyan-300">{event.category}</span>
+                    <div className="text-center py-8 border border-dashed border-gray-700 rounded-lg">
+                      <Clock size={36} className="mx-auto text-gray-500 mb-3" />
+                      <p className="text-gray-400">No timeline events added yet</p>
+                      <p className="text-sm text-gray-500">Add activities to create your event schedule</p>
+                    </div>
                   )}
-                </div>
-                <div className="flex justify-between items-center pb-2 border-b border-gray-700">
-                  <span className="text-gray-300">Created by</span>
-                  <span className="text-white">{event.organizer}</span>
-                </div>
-                {isEditMode && (
-                  <div className="flex items-center pt-2">
-                    <label className="inline-flex items-center cursor-pointer">
-                      <input
-                        type="checkbox"
-                        className="sr-only peer"
-                        name="featured"
-                        checked={event.featured}
-                        onChange={(e) => setEvent({ ...event, featured: e.target.checked })}
-                      />
-                      <div className="relative w-11 h-6 bg-gray-700 rounded-full peer peer-checked:bg-cyan-600 peer-focus:ring-2 peer-focus:ring-cyan-300 dark:peer-focus:ring-cyan-800">
-                        <div className={`absolute top-[2px] left-[2px] bg-white rounded-full h-5 w-5 transition-all ${event.featured ? 'translate-x-full' : ''}`}></div>
+                </motion.div>
+              </motion.div>
+            )}
+
+            {/* Prizes Tab */}
+            {activeTab === "prizes" && (
+              <motion.div
+                variants={containerVariants}
+                initial="hidden"
+                animate="visible"
+              >
+                <motion.div variants={itemVariants} className="bg-gray-800 rounded-xl p-6 border border-gray-700 mb-6">
+                  <h2 className="text-xl font-semibold mb-4">Event Prizes</h2>
+                  <p className="text-gray-400 mb-6">
+                    Add prizes and rewards for your event participants.
+                  </p>
+
+                  <div className="space-y-4 mb-6">
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      <div>
+                        <label className="block text-gray-300 mb-2">
+                          Place/Position <span className="text-red-400">*</span>
+                        </label>
+                        <input
+                          type="text"
+                          value={newPrize.place}
+                          onChange={(e) => setNewPrize({ ...newPrize, place: e.target.value })}
+                          className="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-cyan-400 focus:border-transparent transition-all"
+                          placeholder="e.g. 1st Place, Runner-up"
+                        />
                       </div>
-                      <span className="ml-3 text-sm font-medium text-gray-300">Featured Event</span>
-                    </label>
-                  </div>
-                )}
-              </div>
-            </div>
+                      <div>
+                        <label className="block text-gray-300 mb-2">
+                          Amount/Reward <span className="text-red-400">*</span>
+                        </label>
+                        <input
+                          type="text"
+                          value={newPrize.amount}
+                          onChange={(e) => setNewPrize({ ...newPrize, amount: e.target.value })}
+                          className="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-cyan-400 focus:border-transparent transition-all"
+                          placeholder="e.g. $1000, Gaming PC"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-gray-300 mb-2">
+                          Description
+                        </label>
+                        <input
+                          type="text"
+                          value={newPrize.description}
+                          onChange={(e) => setNewPrize({ ...newPrize, description: e.target.value })}
+                          className="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-cyan-400 focus:border-transparent transition-all"
+                          placeholder="Additional details (optional)"
+                        />
+                      </div>
+                    </div>
 
-            {/* Analytics */}
-            <div className="bg-gray-800 rounded-xl p-6 border border-gray-700 shadow-md">
-              <h3 className="text-lg font-semibold mb-4 text-cyan-300">Analytics</h3>
-              <div className="space-y-6">
-                <div>
-                  <div className="flex justify-between mb-1">
-                    <span className="text-gray-300">Ticket Sales</span>
-                    <span className="text-cyan-300">{event.ticketsSold}/{event.attendees}</span>
+                    <div className="flex justify-end">
+                      <button
+                        type="button"
+                        onClick={addPrize}
+                        disabled={!newPrize.place || !newPrize.amount}
+                        className="inline-flex items-center px-4 py-2 bg-cyan-500 hover:bg-cyan-600 text-gray-900 font-medium rounded-lg transition-colors disabled:opacity-50 disabled:pointer-events-none"
+                      >
+                        <Plus size={18} className="mr-2" />
+                        Add Prize
+                      </button>
+                    </div>
                   </div>
-                  <div className="w-full bg-gray-700 rounded-full h-2.5">
-                    <div
-                      className="bg-cyan-500 h-2.5 rounded-full"
-                      style={{ width: `${event.attendees ? (event.ticketsSold / event.attendees) * 100 : 0}%` }}
-                    ></div>
-                  </div>
-                </div>
 
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="bg-gray-900 p-4 rounded-lg border border-gray-700">
-                    <div className="text-2xl font-bold text-white">{event.attendees}</div>
-                    <div className="text-sm text-gray-400">Capacity</div>
-                  </div>
-                  <div className="bg-gray-900 p-4 rounded-lg border border-gray-700">
-                    <div className="text-2xl font-bold text-cyan-400">{event.ticketsSold}</div>
-                    <div className="text-sm text-gray-400">Registered</div>
-                  </div>
-                </div>
-              </div>
-            </div>
+                  {formData.prizes.length > 0 ? (
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                      {formData.prizes.map((prize, index) => (
+                        <motion.div
+                          key={index}
+                          initial={{ opacity: 0, scale: 0.95 }}
+                          animate={{ opacity: 1, scale: 1 }}
+                          className="relative bg-gray-700 rounded-lg p-4 pr-10"
+                        >
+                          <div className="flex items-start mb-2">
+                            <div className="w-10 h-10 flex items-center justify-center bg-yellow-400/20 text-yellow-400 rounded-full mr-3">
+                              <Trophy size={18} />
+                            </div>
+                            <div>
+                              <h3 className="font-medium text-white">{prize.place}</h3>
+                              <p className="text-cyan-400 font-semibold">{prize.amount}</p>
+                            </div>
+                          </div>
+                          {prize.description && (
+                            <p className="text-sm text-gray-300 mt-2">{prize.description}</p>
+                          )}
+                          <button
+                            type="button"
+                            onClick={() => removePrize(index)}
+                            className="absolute top-3 right-2 text-gray-400 hover:text-red-400 transition-colors"
+                          >
+                            <X size={18} />
+                          </button>
+                        </motion.div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="text-center py-8 border border-dashed border-gray-700 rounded-lg">
+                      <Trophy size={36} className="mx-auto text-gray-500 mb-3" />
+                      <p className="text-gray-400">No prizes added yet</p>
+                      <p className="text-sm text-gray-500">Add prizes to motivate participants</p>
+                    </div>
+                  )}
+                </motion.div>
+              </motion.div>
+            )}
 
-            {/* Quick Actions */}
-            <div className="bg-gray-800 rounded-xl p-6 border border-gray-700 shadow-md">
-              <h3 className="text-lg font-semibold mb-4 text-cyan-300">Quick Actions</h3>
-              <div className="grid grid-cols-2 gap-3">
-                <button
-                  onClick={() => {
-                    const url = `${window.location.origin}/event/${event.id}`;
-                    navigator.clipboard.writeText(url);
-                    toast.success("Event link copied to clipboard");
-                  }}
-                  className="flex flex-col items-center justify-center p-4 bg-gray-900 hover:bg-gray-700 rounded-lg transition-colors border border-gray-700"
-                >
-                  <Share2 size={20} className="text-cyan-400 mb-2" />
-                  <span className="text-sm">Share</span>
-                </button>
-                <button
-                  onClick={() => navigate(`/organizer/events/${event.id}/attendees`)}
-                  className="flex flex-col items-center justify-center p-4 bg-gray-900 hover:bg-gray-700 rounded-lg transition-colors border border-gray-700"
-                >
-                  <Users size={20} className="text-cyan-400 mb-2" />
-                  <span className="text-sm">Attendees</span>
-                </button>
-                <button className="flex flex-col items-center justify-center p-4 bg-gray-900 hover:bg-gray-700 rounded-lg transition-colors border border-gray-700">
-                  <Music size={20} className="text-cyan-400 mb-2" />
-                  <span className="text-sm">Promo</span>
-                </button>
-                <button
-                  onClick={() => navigate(`/event/${event.id}`)}
-                  className="flex flex-col items-center justify-center p-4 bg-gray-900 hover:bg-gray-700 rounded-lg transition-colors border border-gray-700"
-                >
-                  <MessageSquare size={20} className="text-cyan-400 mb-2" />
-                  <span className="text-sm">View Event</span>
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      </main>
-
-      {/* Delete Confirmation Modal */}
-      {isDeleteModalOpen && (
-        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
-          <div className="bg-gray-800 rounded-xl p-6 max-w-md w-full border border-gray-700 shadow-lg">
-            <h3 className="text-xl font-bold mb-4 text-white">Delete Event</h3>
-            <p className="text-gray-300 mb-6">Are you sure you want to delete "{event.title}"? This action cannot be undone.</p>
-            <div className="flex justify-end space-x-3">
-              <button
-                onClick={() => setIsDeleteModalOpen(false)}
-                className="px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded-md transition-colors"
+            {/* Sponsors Tab */}
+            {activeTab === "sponsors" && (
+              <motion.div
+                variants={containerVariants}
+                initial="hidden"
+                animate="visible"
               >
-                Cancel
-              </button>
-              <button
-                onClick={confirmDelete}
-                className="px-4 py-2 bg-red-600 hover:bg-red-700 rounded-md transition-colors"
+                <motion.div variants={itemVariants} className="bg-gray-800 rounded-xl p-6 border border-gray-700 mb-6">
+                  <h2 className="text-xl font-semibold mb-4">Event Sponsors</h2>
+                  <p className="text-gray-400 mb-6">
+                    Add companies or organizations that are sponsoring your event.
+                  </p>
+
+                  <div className="space-y-4 mb-6">
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      <div>
+                        <label className="block text-gray-300 mb-2">
+                          Sponsor Name <span className="text-red-400">*</span>
+                        </label>
+                        <input
+                          type="text"
+                          value={newSponsor.name}
+                          onChange={(e) => setNewSponsor({ ...newSponsor, name: e.target.value })}
+                          className="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-cyan-400 focus:border-transparent transition-all"
+                          placeholder="Company/Organization name"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-gray-300 mb-2">
+                          Logo URL <span className="text-red-400">*</span>
+                        </label>
+                        <input
+                          type="text"
+                          value={newSponsor.logo}
+                          onChange={(e) => setNewSponsor({ ...newSponsor, logo: e.target.value })}
+                          className="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-cyan-400 focus:border-transparent transition-all"
+                          placeholder="https://example.com/logo.png"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-gray-300 mb-2">
+                          Sponsor Tier
+                        </label>
+                        <select
+                          value={newSponsor.tier}
+                          onChange={(e) => setNewSponsor({ ...newSponsor, tier: e.target.value })}
+                          className="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-cyan-400 focus:border-transparent transition-all"
+                        >
+                          <option value="platinum">Platinum</option>
+                          <option value="gold">Gold</option>
+                          <option value="silver">Silver</option>
+                          <option value="bronze">Bronze</option>
+                          <option value="partner">Partner</option>
+                        </select>
+                      </div>
+                    </div>
+
+                    <div className="flex justify-end">
+                      <button
+                        type="button"
+                        onClick={addSponsor}
+                        disabled={!newSponsor.name || !newSponsor.logo}
+                        className="inline-flex items-center px-4 py-2 bg-cyan-500 hover:bg-cyan-600 text-gray-900 font-medium rounded-lg transition-colors disabled:opacity-50 disabled:pointer-events-none"
+                      >
+                        <Plus size={18} className="mr-2" />
+                        Add Sponsor
+                      </button>
+                    </div>
+                  </div>
+
+                  {formData.sponsors.length > 0 ? (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                      {formData.sponsors.map((sponsor, index) => (
+                        <motion.div
+                          key={index}
+                          initial={{ opacity: 0, scale: 0.95 }}
+                          animate={{ opacity: 1, scale: 1 }}
+                          className="relative bg-gray-700 rounded-lg p-4 overflow-hidden"
+                        >
+                          <div className={`absolute top-0 right-0 w-24 text-center text-xs font-semibold py-1 
+                            ${sponsor.tier === 'platinum' ? 'bg-purple-400/20 text-purple-300' :
+                              sponsor.tier === 'gold' ? 'bg-yellow-400/20 text-yellow-300' :
+                                sponsor.tier === 'silver' ? 'bg-gray-400/20 text-gray-300' :
+                                  sponsor.tier === 'bronze' ? 'bg-amber-700/20 text-amber-600' :
+                                    'bg-blue-400/20 text-blue-300'}`
+                          }>
+                            {sponsor.tier.charAt(0).toUpperCase() + sponsor.tier.slice(1)}
+                          </div>
+
+                          <div className="h-16 w-full flex items-center justify-center mb-3 mt-1">
+                            <img
+                              src={sponsor.logo}
+                              alt={`${sponsor.name} logo`}
+                              className="max-h-full max-w-full object-contain"
+                            />
+                          </div>
+
+                          <p className="text-center text-white font-medium truncate">{sponsor.name}</p>
+
+                          <button
+                            type="button"
+                            onClick={() => removeSponsor(index)}
+                            className="absolute bottom-3 right-3 bg-gray-800/50 rounded-full p-1 text-gray-400 hover:text-red-400 transition-colors"
+                          >
+                            <X size={16} />
+                          </button>
+                        </motion.div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="text-center py-8 border border-dashed border-gray-700 rounded-lg">
+                      <Briefcase size={36} className="mx-auto text-gray-500 mb-3" />
+                      <p className="text-gray-400">No sponsors added yet</p>
+                      <p className="text-sm text-gray-500">Add companies or organizations supporting your event</p>
+                    </div>
+                  )}
+                </motion.div>
+              </motion.div>
+            )}
+
+            {/* FAQs Tab */}
+            {activeTab === "faqs" && (
+              <motion.div
+                variants={containerVariants}
+                initial="hidden"
+                animate="visible"
               >
-                Delete Event
-              </button>
-            </div>
+                <motion.div variants={itemVariants} className="bg-gray-800 rounded-xl p-6 border border-gray-700 mb-6">
+                  <h2 className="text-xl font-semibold mb-4">Frequently Asked Questions</h2>
+                  <p className="text-gray-400 mb-6">
+                    Add common questions and answers about your event to help attendees.
+                  </p>
+
+                  <div className="space-y-4 mb-6">
+                    <div>
+                      <label className="block text-gray-300 mb-2">
+                        Question <span className="text-red-400">*</span>
+                      </label>
+                      <input
+                        type="text"
+                        value={newFaq.question}
+                        onChange={(e) => setNewFaq({ ...newFaq, question: e.target.value })}
+                        className="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-cyan-400 focus:border-transparent transition-all"
+                        placeholder="e.g. What should I bring to the event?"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-gray-300 mb-2">
+                        Answer <span className="text-red-400">*</span>
+                      </label>
+                      <textarea
+                        value={newFaq.answer}
+                        onChange={(e) => setNewFaq({ ...newFaq, answer: e.target.value })}
+                        rows="3"
+                        className="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-cyan-400 focus:border-transparent transition-all"
+                        placeholder="Provide a clear and helpful answer"
+                      ></textarea>
+                    </div>
+
+                    <div className="flex justify-end">
+                      <button
+                        type="button"
+                        onClick={addFaq}
+                        disabled={!newFaq.question || !newFaq.answer}
+                        className="inline-flex items-center px-4 py-2 bg-cyan-500 hover:bg-cyan-600 text-gray-900 font-medium rounded-lg transition-colors disabled:opacity-50 disabled:pointer-events-none"
+                      >
+                        <Plus size={18} className="mr-2" />
+                        Add FAQ
+                      </button>
+                    </div>
+                  </div>
+
+                  {formData.faqs.length > 0 ? (
+                    <div className="space-y-4">
+                      {formData.faqs.map((faq, index) => (
+                        <motion.div
+                          key={index}
+                          initial={{ opacity: 0, y: 10 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          className="relative bg-gray-700 rounded-lg p-4 pr-10"
+                        >
+                          <h3 className="text-white font-medium mb-2">{faq.question}</h3>
+                          <p className="text-gray-300 text-sm">{faq.answer}</p>
+                          <button
+                            type="button"
+                            onClick={() => removeFaq(index)}
+                            className="absolute top-4 right-3 text-gray-400 hover:text-red-400 transition-colors"
+                          >
+                            <X size={18} />
+                          </button>
+                        </motion.div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="text-center py-8 border border-dashed border-gray-700 rounded-lg">
+                      <Info size={36} className="mx-auto text-gray-500 mb-3" />
+                      <p className="text-gray-400">No FAQs added yet</p>
+                      <p className="text-sm text-gray-500">Add common questions to help your attendees</p>
+                    </div>
+                  )}
+                </motion.div>
+              </motion.div>
+            )}
+          </motion.div>
+
+          {/* Form Actions */}
+          <div className="flex justify-between mt-8 pt-6 border-t border-gray-700">
+            <button
+              type="button"
+              onClick={() => navigate(-1)}
+              className="px-6 py-3 bg-gray-800 hover:bg-gray-700 rounded-lg transition-colors text-gray-300 font-medium cursor-pointer"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={isSubmitting}
+              className="inline-flex items-center px-6 py-2 rounded-xl bg-gradient-to-r bg-cyan-400 text-black font-medium transition-colors cursor-pointer space-x-2 hover:bg-black hover:text-cyan-400 hover:border hover:border-cyan-400 disabled:opacity-50"
+            >
+              {isSubmitting ? (
+                <>
+                  <span className="inline-block animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-gray-900 mr-2"></span>
+                  Saving...
+                </>
+              ) : (
+                <>
+                  <Save size={18} className="inline-block mr-2" />
+                  Save Changes
+                </>
+              )}
+            </button>
           </div>
-        </div>
-      )}
+        </form>
+      </div>
     </div>
   );
 }

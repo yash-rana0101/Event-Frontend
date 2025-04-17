@@ -9,6 +9,7 @@ const EventBasicInfo = ({ formData, updateFormData, errors }) => {
     { value: "seminar", label: "Seminar" },
     { value: "webinar", label: "Webinar" },
     { value: "networking", label: "Networking" },
+    { value: "hackathon", label: "Hackathon" },
     { value: "other", label: "Other" }
   ];
 

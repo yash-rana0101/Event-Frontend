@@ -6,6 +6,9 @@ import axios from "axios";
 import { useSelector } from "react-redux";
 import { motion } from "framer-motion";
 import { toast } from "react-toastify";
+import Error from "../common/Error";
+import { useLoader } from '../../context/LoaderContext';
+import { FaArrowLeft } from "react-icons/fa";
 
 export default function EventDetail() {
   const { eventId } = useParams(); // Ensure eventId is retrieved from route params
@@ -22,6 +25,13 @@ export default function EventDetail() {
   const user = useSelector(state => state.auth?.user);
   const organizer = useSelector(state => state.organizer?.user);
   const userToken = useSelector(state => state.auth?.token);
+
+  const { setIsLoading } = useLoader();
+
+  useEffect(() => {
+    setIsLoading(loading);
+    return () => setIsLoading(false);
+  }, [loading, setIsLoading]);
 
   // Fixed function to fetch event details
   const fetchEventDetails = async () => {
@@ -40,19 +50,19 @@ export default function EventDetail() {
       // Also fetch similar events (just getting a few published events for now)
       try {
         const similarResponse = await axios.get(`${apiUrl}/events/published?limit=3`);
-        
+
         // Check which property contains events array
-        const eventsArray = similarResponse.data.events || 
-                           similarResponse.data.data || 
-                           (Array.isArray(similarResponse.data) ? similarResponse.data : []);
-                           
+        const eventsArray = similarResponse.data.events ||
+          similarResponse.data.data ||
+          (Array.isArray(similarResponse.data) ? similarResponse.data : []);
+
         // Filter out the current event from similar events
         setSimilarEvents(eventsArray.filter(e => e._id !== eventId));
       } catch (err) {
         console.warn("Could not load similar events:", err);
         setSimilarEvents([]);
       }
-      
+
       // Check if user is registered for this event
       if (user && userToken) {
         try {
@@ -72,10 +82,10 @@ export default function EventDetail() {
     } catch (err) {
       console.error("Error fetching event details:", err);
       // Check if there's a specific error message from the server
-      const errorMessage = err.response?.data?.message || 
-                           err.response?.data?.error || 
-                           err.message || 
-                           "Failed to load event details";
+      const errorMessage = err.response?.data?.message ||
+        err.response?.data?.error ||
+        err.message ||
+        "Failed to load event details";
       setError(errorMessage);
     } finally {
       setLoading(false);
@@ -94,12 +104,12 @@ export default function EventDetail() {
       navigate("/auth/login", { state: { from: `/event/${eventId}` } });
       return;
     }
-    
+
     try {
       setIsRegistered(prev => !prev); // Optimistic update
-      
+
       const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000/api/v1';
-      
+
       if (!isRegistered) {
         await axios.post(
           `${apiUrl}/registrations/events/${eventId}`,
@@ -122,52 +132,10 @@ export default function EventDetail() {
     }
   };
 
-
-  // Show a loading state while fetching data
-  if (loading) {
-    return (
-      <div className=" min-h-screen text-white flex items-center justify-center">
-        <motion.div
-          className="w-12 h-12 border-4 border-cyan-400 rounded-full border-t-transparent"
-          animate={{ rotate: 360 }}
-          transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
-        />
-        <span className="ml-3 text-xl font-medium">Loading event details...</span>
-      </div>
-    );
-  }
-
   // Show error state
   if (error || !event) {
     return (
-      <div className="min-h-screen text-white p-8">
-        <div className="max-w-4xl mx-auto mt-12  rounded-xl p-6 border border-red-500/30">
-          <div className="flex items-center text-red-400 mb-4">
-            <AlertCircle size={24} className="mr-2" />
-            <h2 className="text-xl font-bold">Error Loading Event</h2>
-          </div>
-          <p className="text-gray-300 mb-6">{error || "Event not found"}</p>
-          <div className="flex space-x-4">
-            <button
-              onClick={() => navigate('/event')}
-              className="px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded-lg transition-colors flex items-center"
-            >
-              <ArrowLeft size={16} className="mr-2" />
-              Back to Events
-            </button>
-            <button
-              onClick={() => {
-                setLoading(true);
-                setError(null);
-                fetchEventDetails();
-              }}
-              className="px-4 py-2 bg-cyan-600 hover:bg-cyan-500 rounded-lg transition-colors"
-            >
-              Try Again
-            </button>
-          </div>
-        </div>
-      </div>
+      <Error />
     );
   }
 
@@ -180,8 +148,8 @@ export default function EventDetail() {
     location: (event.location?.address) || "No location specified",
     participants: `${event.attendeesCount || 0}+ Participants${event.capacity ? ` (Max: ${event.capacity})` : ''}`,
     duration: event.duration || "Check event details for timing",
-    registrationDeadline: event.registrationDeadline 
-      ? new Date(event.registrationDeadline).toLocaleDateString() 
+    registrationDeadline: event.registrationDeadline
+      ? new Date(event.registrationDeadline).toLocaleDateString()
       : "Until seats last",
     image: event.images?.[0] || "https://placehold.co/1200x600?text=No+Image+Available",
     organizer: event.organizerName || "Event Organizer",
@@ -201,6 +169,9 @@ export default function EventDetail() {
     }
   };
 
+  console.log("sponsors", formattedEvent.sponsors);
+
+  console.log("Formatted Event Data:", formattedEvent);
 
   return (
     <div className=" min-h-screen text-white">
@@ -242,24 +213,32 @@ export default function EventDetail() {
                 </div>
 
                 <div className="flex flex-col sm:flex-row gap-3 sm:items-center">
+                  <div className="flex items-center space-x-2">
+                    <FaArrowLeft size={14} className="text-cyan-500"/>
+                    <span className="relative">
+                      <Link
+                        to={`/event`}
+                        className="text-cyan-400 hover:text-cyan-300 transition-all duration-300 group"
+                      >
+                        Back to Events
+                      <span className="absolute -bottom-1 left-0 w-0 h-[2px] bg-[#00D8FF] group-hover:w-full transition-all duration-300" />
+                      </Link>
+                    </span>
+                  </div>
+
                   <button
                     onClick={handleRegister}
                     className={`
-                      px-6 py-3 rounded-lg font-semibold transition-all duration-300 flex items-center justify-center
+                      px-6 py-3 rounded-lg font-semibold transition-all duration-300 flex items-center justify-center cursor-pointer
                       ${isRegistered
                         ? "bg-gray-700 text-gray-300 border border-gray-600"
-                        : "bg-cyan-400 hover:bg-cyan-500 text-gray-900"}
+                        : "bg-cyan-400 hover:bg-black hover:text-cyan-500 hover:border text-gray-900"}
                     `}
                   >
                     {isRegistered ? "Registered" : "Register Now"}
                   </button>
 
-                  <Link to="/event" className="text-cyan-400 hover:text-cyan-300 text-sm flex items-center justify-center transition-colors duration-300">
-                    <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-                    </svg>
-                    Back to Events
-                  </Link>
+                  
                 </div>
               </div>
             </div>
@@ -268,53 +247,53 @@ export default function EventDetail() {
       </div>
 
       {/* Content Section */}
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-16 mt-8 md:mt-16">
+      <div className="max-w-6xl mx-auto px-4 sm:px-4 lg:px-8 py-8 sm:pt-28 mt-8 md:mt-16">
         <div className="flex flex-col lg:flex-row gap-8">
           {/* Main Content */}
           <div className="lg:w-2/3">
             {/* Tabs */}
-            <div className="flex border-b border-gray-700 mb-6 overflow-x-auto scrollbar-hide">
+            <div className="flex border-b border-gray-700 mb-6 overflow-x-auto scrollbar-hide ">
               <button
                 onClick={() => setActiveTab("overview")}
-                className={`px-4 py-3 font-medium transition-colors duration-300 whitespace-nowrap ${activeTab === "overview"
-                    ? "text-cyan-400 border-b-2 border-cyan-400"
-                    : "text-gray-400 hover:text-gray-200"
+                className={`px-4 py-3 font-medium transition-colors duration-300 cursor-pointer whitespace-nowrap ${activeTab === "overview"
+                  ? "text-cyan-400 border-b-2 border-cyan-400"
+                  : "text-gray-400 hover:text-gray-200"
                   }`}
               >
                 Overview
               </button>
               <button
                 onClick={() => setActiveTab("timeline")}
-                className={`px-4 py-3 font-medium transition-colors duration-300 whitespace-nowrap ${activeTab === "timeline"
-                    ? "text-cyan-400 border-b-2 border-cyan-400"
-                    : "text-gray-400 hover:text-gray-200"
+                className={`px-4 py-3 font-medium transition-colors duration-300 cursor-pointer whitespace-nowrap ${activeTab === "timeline"
+                  ? "text-cyan-400 border-b-2 border-cyan-400"
+                  : "text-gray-400 hover:text-gray-200"
                   }`}
               >
                 Timeline
               </button>
               <button
                 onClick={() => setActiveTab("prizes")}
-                className={`px-4 py-3 font-medium transition-colors duration-300 whitespace-nowrap ${activeTab === "prizes"
-                    ? "text-cyan-400 border-b-2 border-cyan-400"
-                    : "text-gray-400 hover:text-gray-200"
+                className={`px-4 py-3 font-medium transition-colors duration-300 cursor-pointer whitespace-nowrap ${activeTab === "prizes"
+                  ? "text-cyan-400 border-b-2 border-cyan-400"
+                  : "text-gray-400 hover:text-gray-200"
                   }`}
               >
                 Prizes
               </button>
               <button
                 onClick={() => setActiveTab("sponsors")}
-                className={`px-4 py-3 font-medium transition-colors duration-300 whitespace-nowrap ${activeTab === "sponsors"
-                    ? "text-cyan-400 border-b-2 border-cyan-400"
-                    : "text-gray-400 hover:text-gray-200"
+                className={`px-4 py-3 font-medium transition-colors duration-300 cursor-pointer whitespace-nowrap ${activeTab === "sponsors"
+                  ? "text-cyan-400 border-b-2 border-cyan-400"
+                  : "text-gray-400 hover:text-gray-200"
                   }`}
               >
                 Sponsors
               </button>
               <button
                 onClick={() => setActiveTab("faqs")}
-                className={`px-4 py-3 font-medium transition-colors duration-300 whitespace-nowrap ${activeTab === "faqs"
-                    ? "text-cyan-400 border-b-2 border-cyan-400"
-                    : "text-gray-400 hover:text-gray-200"
+                className={`px-4 py-3 font-medium transition-colors duration-300 cursor-pointer whitespace-nowrap ${activeTab === "faqs"
+                  ? "text-cyan-400 border-b-2 border-cyan-400"
+                  : "text-gray-400 hover:text-gray-200"
                   }`}
               >
                 FAQs
@@ -471,12 +450,12 @@ export default function EventDetail() {
                       <div
                         key={index}
                         className={`rounded-lg p-5 border ${index === 0
-                            ? "bg-gradient-to-r from-yellow-400/20 to-transparent border-yellow-400/30"
-                            : index === 1
-                              ? "bg-gradient-to-r from-gray-400/20 to-transparent border-gray-400/30"
-                              : index === 2
-                                ? "bg-gradient-to-r from-amber-600/20 to-transparent border-amber-600/30"
-                                : "bg-gray-700/50 border-gray-600"
+                          ? "bg-gradient-to-r from-yellow-400/20 to-transparent border-yellow-400/30"
+                          : index === 1
+                            ? "bg-gradient-to-r from-gray-400/20 to-transparent border-gray-400/30"
+                            : index === 2
+                              ? "bg-gradient-to-r from-amber-600/20 to-transparent border-amber-600/30"
+                              : "bg-gray-700/50 border-gray-600"
                           }`}
                       >
                         <div className="flex items-center justify-between">
@@ -489,12 +468,12 @@ export default function EventDetail() {
                             )}
                           </h3>
                           <span className={`text-xl font-bold ${index === 0
-                              ? "text-yellow-400"
-                              : index === 1
-                                ? "text-gray-300"
-                                : index === 2
-                                  ? "text-amber-600"
-                                  : "text-cyan-400"
+                            ? "text-yellow-400"
+                            : index === 1
+                              ? "text-gray-300"
+                              : index === 2
+                                ? "text-amber-600"
+                                : "text-cyan-400"
                             }`}>
                             {prize.amount}
                           </span>
@@ -511,7 +490,6 @@ export default function EventDetail() {
 
             {activeTab === "sponsors" && (
               <div className="bg-gray-800 rounded-lg p-6 border border-gray-700">
-                <h2 className="text-xl font-semibold mb-6">Our Sponsors</h2>
 
                 {formattedEvent.sponsors.length > 0 ? (
                   <>
@@ -519,12 +497,15 @@ export default function EventDetail() {
                     {formattedEvent.sponsors.filter(sponsor => sponsor.tier === "platinum").length > 0 && (
                       <div className="mb-8">
                         <h3 className="text-lg font-medium mb-4 text-gray-200">Platinum Sponsors</h3>
-                        <div className="grid grid-cols-2 md:grid-cols-3 gap-6">
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                           {formattedEvent.sponsors
                             .filter(sponsor => sponsor.tier === "platinum")
                             .map((sponsor, index) => (
-                              <div key={index} className="bg-gray-700/50 p-6 rounded-lg border border-gray-600 flex items-center justify-center">
-                                <img src={sponsor.logo} alt={sponsor.name} className="max-h-16" />
+                              <div key={index} className="bg-gray-700/50  rounded-lg border border-gray-600 flex flex-col items-center justify-center">
+                                <a href={sponsor.website} target="_blank" rel="noopener noreferrer" className="flex flex-col items-center">
+                                  <img src={sponsor.logo} alt={sponsor.name} className="max-h-20 mb-3" />
+                                  <h4 className="text-center font-medium text-gray-200">{sponsor.name}</h4>
+                                </a>
                               </div>
                             ))
                           }
@@ -536,12 +517,15 @@ export default function EventDetail() {
                     {formattedEvent.sponsors.filter(sponsor => sponsor.tier === "gold").length > 0 && (
                       <div className="mb-8">
                         <h3 className="text-lg font-medium mb-4 text-gray-200">Gold Sponsors</h3>
-                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
                           {formattedEvent.sponsors
                             .filter(sponsor => sponsor.tier === "gold")
                             .map((sponsor, index) => (
-                              <div key={index} className="bg-gray-700/50 p-4 rounded-lg border border-gray-600 flex items-center justify-center">
-                                <img src={sponsor.logo} alt={sponsor.name} className="max-h-12" />
+                              <div key={index} className="bg-gray-700/50 p-4 rounded-lg border border-gray-600 flex flex-col items-center justify-center">
+                                <a href={sponsor.website} target="_blank" rel="noopener noreferrer" className="flex flex-col items-center">
+                                  <img src={sponsor.logo} alt={sponsor.name} className="max-h-16 mb-3" />
+                                  <h4 className="text-center font-medium text-gray-200">{sponsor.name}</h4>
+                                </a>
                               </div>
                             ))
                           }
@@ -550,23 +534,26 @@ export default function EventDetail() {
                     )}
 
                     {/* Silver & Bronze Sponsors */}
-                    {formattedEvent.sponsors.filter(sponsor => 
+                    {formattedEvent.sponsors.filter(sponsor =>
                       sponsor.tier === "silver" || sponsor.tier === "bronze"
                     ).length > 0 && (
-                      <div>
-                        <h3 className="text-lg font-medium mb-4 text-gray-200">Silver & Bronze Sponsors</h3>
-                        <div className="grid grid-cols-3 md:grid-cols-6 gap-3">
-                          {formattedEvent.sponsors
-                            .filter(sponsor => sponsor.tier === "silver" || sponsor.tier === "bronze")
-                            .map((sponsor, index) => (
-                              <div key={index} className="bg-gray-700/50 p-3 rounded-lg border border-gray-600 flex items-center justify-center">
-                                <img src={sponsor.logo} alt={sponsor.name} className="max-h-10" />
-                              </div>
-                            ))
-                          }
+                        <div>
+                          <h3 className="text-lg font-medium mb-4 text-gray-200">Silver & Bronze Sponsors</h3>
+                          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
+                            {formattedEvent.sponsors
+                              .filter(sponsor => sponsor.tier === "silver" || sponsor.tier === "bronze")
+                              .map((sponsor, index) => (
+                                <div key={index} className="bg-gray-700/50 p-3 rounded-lg border border-gray-600 flex flex-col items-center justify-center">
+                                  <a href={sponsor.website} target="_blank" rel="noopener noreferrer" className="flex flex-col items-center">
+                                    <img src={sponsor.logo} alt={sponsor.name} className="max-h-12 mb-2" />
+                                    <h4 className="text-center text-sm font-medium text-gray-200">{sponsor.name}</h4>
+                                  </a>
+                                </div>
+                              ))
+                            }
+                          </div>
                         </div>
-                      </div>
-                    )}
+                      )}
                   </>
                 ) : (
                   <p className="text-gray-400 text-center py-6">No sponsor information available for this event.</p>
@@ -625,10 +612,10 @@ export default function EventDetail() {
               <button
                 onClick={handleRegister}
                 className={`
-                  w-full px-6 py-3 rounded-lg font-semibold text-center transition-all duration-300
+                  w-full px-6 py-3 rounded-lg font-semibold text-center transition-all duration-300 cursor-pointer 
                   ${isRegistered
                     ? "bg-gray-700 text-gray-300 border border-gray-600"
-                    : "bg-cyan-400 hover:bg-cyan-500 text-gray-900"}
+                    : "bg-cyan-400 hover:bg-black hover:text-cyan-500 text-gray-900 hover:border"}
                 `}
               >
                 {isRegistered ? "You're Registered!" : "Register Now"}
@@ -652,13 +639,13 @@ export default function EventDetail() {
                 />
                 <div>
                   <h3 className="font-medium text-white">{formattedEvent.organizer}</h3>
-                  <Link 
-                    to={`/organizer/profile/${formattedEvent.organizerId?._id}`}
+                  <Link
+                    to={`/organizer/profile/${formattedEvent.organizerId}`}
                     className="text-cyan-400 text-sm hover:underline"
                   >
                     View Profile
                   </Link>
-                  
+
                 </div>
               </div>
             </div>
@@ -682,7 +669,7 @@ export default function EventDetail() {
               </div>
 
               <div className="flex justify-between gap-2">
-                <button 
+                <button
                   onClick={() => {
                     navigator.clipboard.writeText(window.location.href);
                     toast.success("Event link copied to clipboard!");

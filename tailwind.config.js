@@ -11,6 +11,12 @@ const tailwindConfig = {
         whiteText: "#ffffff",
         neutralGrey: "#7E8589",
       },
+      keyframes: {
+        shimmer: {
+          "0%": { transform: "translateX(-100%)" },
+          "100%": { transform: "translateX(100%)" },
+        },
+      },
     },
   },
   plugins: [flowbite.plugin()],

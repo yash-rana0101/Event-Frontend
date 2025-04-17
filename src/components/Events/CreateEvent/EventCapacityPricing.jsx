@@ -78,11 +78,10 @@ const EventCapacityPricing = ({ formData, updateFormData, errors }) => {
               <Users size={18} className="text-cyan-500" />
             </div>
             <input
-              type="number"
+              type="text"
               id="capacity"
               name="capacity"
               min="0"
-              value={formData.capacity}
               onChange={handleChange}
               placeholder="Leave as 0 for unlimited capacity"
               className="w-full pl-10 pr-4 py-3 bg-black border border-gray-700 rounded-lg focus:outline-none focus:border-cyan-500 text-white placeholder-gray-500"
@@ -132,12 +131,11 @@ const EventCapacityPricing = ({ formData, updateFormData, errors }) => {
                   <DollarSign size={18} className="text-cyan-500" />
                 </div>
                 <input
-                  type="number"
+                  type="text"
                   id="price"
                   name="price"
                   min="0"
                   step="0.01"
-                  value={formData.price}
                   onChange={handleChange}
                   placeholder="0.00"
                   className={`w-full pl-10 pr-4 py-3 bg-black border ${errors.price ? 'border-red-500' : 'border-gray-700'

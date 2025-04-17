@@ -4,16 +4,17 @@ import { useNavigate } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
 import { motion } from 'framer-motion';
 import axios from 'axios';
-import updateProfileCompletionStatus  from '../../redux/user/organizer';
-import checkOrganizerProfileCompletion  from '../../redux/user/organizer';
 import { safelyParseToken } from '../../utils/persistFix';
 import { toast } from 'react-toastify';
+import { useLoader } from '../../context/LoaderContext';
+import { Plus, X, Twitter, Linkedin, Globe, Instagram, Facebook } from 'lucide-react';
 
 const OrganizerDetails = () => {
   const navigate = useNavigate();
   const dispatch = useDispatch();
-  const { user, token, profileDetails, profileComplete } = useSelector((state) => state.organizer);
-  
+  const { user, token } = useSelector((state) => state.organizer);
+  const { setIsLoading } = useLoader();
+
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [formData, setFormData] = useState({
@@ -22,28 +23,26 @@ const OrganizerDetails = () => {
     phone: '',
     website: '',
     location: '',
-    socialLinks: {
-      twitter: '',
-      facebook: '',
-      instagram: '',
-      linkedin: ''
-    },
-    tags: []
+    expertise: [],
+    socials: [],
+    certifications: [],
+    testimonials: [],
+    isPrivate: false,
   });
 
-  // Debug logging for initial state
+  const [currentExpertise, setCurrentExpertise] = useState('');
+  const [currentCertification, setCurrentCertification] = useState('');
+  const [currentSocial, setCurrentSocial] = useState('');
+  const [socialPlatform, setSocialPlatform] = useState('other');
+
   useEffect(() => {
-    console.log("OrganizerDetails - Initial Redux State:", {
-      profileComplete,
-      hasProfileDetails: !!profileDetails,
-      userId: user?._id || (typeof user === 'string' ? 'string-user' : 'no-id')
-    });
-  }, []);
-  
-  // Get organizer ID
+    setIsLoading(loading || submitting);
+    return () => setIsLoading(false);
+  }, [loading, submitting, setIsLoading]);
+
   const getOrganizerId = () => {
     if (!user) return null;
-    
+
     if (typeof user === 'string') {
       try {
         const parsed = JSON.parse(user);
@@ -53,150 +52,148 @@ const OrganizerDetails = () => {
         return null;
       }
     }
-    
+
     return user?._id || user?.id || user?._doc?._id;
   };
-  
-  const organizerId = getOrganizerId();
-  
-  // Load existing profile details on component mount
-  useEffect(() => {
-    const fetchProfileDetails = async () => {
-      if (!token || !organizerId) return;
-      
-      setLoading(true);
-      try {
-        // Check if we already have profile details in Redux store
-        if (profileDetails) {
-          setFormData({
-            title: profileDetails.title || '',
-            bio: profileDetails.bio || '',
-            phone: profileDetails.phone || '',
-            website: profileDetails.website || '',
-            location: profileDetails.location || '',
-            socialLinks: profileDetails.socialLinks || {
-              twitter: '',
-              facebook: '',
-              instagram: '',
-              linkedin: ''
-            },
-            tags: profileDetails.tags || []
-          });
-          setLoading(false);
-          return;
-        }
-        
-        // Force a check for profile details
-        await dispatch(checkOrganizerProfileCompletion());
-      } catch (error) {
-        console.error('Error fetching profile details:', error);
-        toast.error('Failed to load your profile details');
-      } finally {
-        setLoading(false);
-      }
-    };
-    
-    fetchProfileDetails();
-  }, [dispatch, token, organizerId, profileDetails]);
-  
-  // Update form when profileDetails change in Redux store
-  useEffect(() => {
-    if (profileDetails) {
-      console.log("Setting form data from profileDetails:", profileDetails);
-      setFormData({
-        title: profileDetails.title || '',
-        bio: profileDetails.bio || '',
-        phone: profileDetails.phone || '',
-        website: profileDetails.website || '',
-        location: profileDetails.location || '',
-        socialLinks: profileDetails.socialLinks || {
-          twitter: '',
-          facebook: '',
-          instagram: '',
-          linkedin: ''
-        },
-        tags: Array.isArray(profileDetails.tags) ? profileDetails.tags : []
-      });
-    }
-  }, [profileDetails]);
 
-  // Navigate if profile is already complete and this isn't a fresh login
-  useEffect(() => {
-    // Only redirect if profile is complete and we're not in the initial loading state
-    if (profileComplete && !loading && profileDetails) {
-      // Add a timestamp to localStorage to prevent infinite loop
-      const lastCheck = localStorage.getItem('organizer_details_last_shown');
-      const now = new Date().getTime();
-      
-      if (lastCheck && (now - parseInt(lastCheck) < 300000)) { // 5 minutes threshold
-        console.log("Profile already complete, redirecting to dashboard");
-        navigate('/organizer/dashboard');
-      } else {
-        // Update the timestamp
-        localStorage.setItem('organizer_details_last_shown', now.toString());
-      }
-    }
-  }, [profileComplete, loading, profileDetails, navigate]);
+  const organizerId = getOrganizerId();
 
   const handleChange = (e) => {
-    const { name, value } = e.target;
-    if (name.includes('.')) {
-      const [parentKey, childKey] = name.split('.');
-      setFormData(prev => ({
-        ...prev,
-        [parentKey]: {
-          ...prev[parentKey],
-          [childKey]: value
-        }
-      }));
-    } else {
-      setFormData(prev => ({ ...prev, [name]: value }));
+    const { name, value, type, checked } = e.target;
+
+    if (type === 'checkbox') {
+      setFormData(prev => ({ ...prev, [name]: checked }));
+      return;
+    }
+
+    setFormData(prev => ({ ...prev, [name]: value }));
+  };
+
+  const addExpertise = () => {
+    if (!currentExpertise.trim()) return;
+
+    setFormData(prev => ({
+      ...prev,
+      expertise: [...prev.expertise, currentExpertise.trim()]
+    }));
+    setCurrentExpertise('');
+  };
+
+  const removeExpertise = (index) => {
+    setFormData(prev => ({
+      ...prev,
+      expertise: prev.expertise.filter((_, i) => i !== index)
+    }));
+  };
+
+  const addCertification = () => {
+    if (!currentCertification.trim()) return;
+
+    setFormData(prev => ({
+      ...prev,
+      certifications: [...prev.certifications, currentCertification.trim()]
+    }));
+    setCurrentCertification('');
+  };
+
+  const removeCertification = (index) => {
+    setFormData(prev => ({
+      ...prev,
+      certifications: prev.certifications.filter((_, i) => i !== index)
+    }));
+  };
+
+  const addSocial = () => {
+    if (!currentSocial.trim()) return;
+
+    let socialUrl = currentSocial.trim();
+    if (!socialUrl.startsWith('http://') && !socialUrl.startsWith('https://')) {
+      socialUrl = 'https://' + socialUrl;
+    }
+
+    setFormData(prev => ({
+      ...prev,
+      socials: [...prev.socials, socialUrl]
+    }));
+    setCurrentSocial('');
+    setSocialPlatform('other');
+  };
+
+  const removeSocial = (index) => {
+    setFormData(prev => ({
+      ...prev,
+      socials: prev.socials.filter((_, i) => i !== index)
+    }));
+  };
+
+  const handleTestimonialChange = (index, field, value) => {
+    const updatedTestimonials = [...formData.testimonials];
+
+    if (!updatedTestimonials[index]) {
+      updatedTestimonials[index] = { name: '', position: '', comment: '', rating: 5 };
+    }
+
+    updatedTestimonials[index][field] = field === 'rating' ? parseInt(value) : value;
+
+    setFormData(prev => ({ ...prev, testimonials: updatedTestimonials }));
+  };
+
+  const addTestimonial = () => {
+    setFormData(prev => ({
+      ...prev,
+      testimonials: [...prev.testimonials, { name: '', position: '', comment: '', rating: 5 }]
+    }));
+  };
+
+  const removeTestimonial = (index) => {
+    const updatedTestimonials = [...formData.testimonials];
+    updatedTestimonials.splice(index, 1);
+    setFormData(prev => ({ ...prev, testimonials: updatedTestimonials }));
+  };
+
+  const getSocialIcon = (platform) => {
+    switch (platform) {
+      case 'twitter': return <Twitter size={18} />;
+      case 'linkedin': return <Linkedin size={18} />;
+      case 'instagram': return <Instagram size={18} />;
+      case 'facebook': return <Facebook size={18} />;
+      default: return <Globe size={18} />;
     }
   };
-  
-  const handleTagsChange = (e) => {
-    const tagsString = e.target.value;
-    // Improved tag handling - properly split by commas and handle whitespace
-    const tagsArray = tagsString.split(',')
-      .map(tag => tag.trim())
-      .filter(tag => tag.length > 0);
-      
-    setFormData(prev => ({ ...prev, tags: tagsArray }));
+
+  const detectPlatform = (url) => {
+    if (url.includes('twitter') || url.includes('x.com')) return 'twitter';
+    if (url.includes('linkedin')) return 'linkedin';
+    if (url.includes('instagram')) return 'instagram';
+    if (url.includes('facebook')) return 'facebook';
+    return 'other';
   };
-  
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setSubmitting(true);
-    
+
     try {
       if (!organizerId || !token) {
         throw new Error('Authentication required');
       }
-      
-      // Use API URL from environment variable or default
+
       const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000/api/v1';
-      
-      // Safely parse the token if needed
       const parsedToken = safelyParseToken(token);
 
-      // Validate required fields
       if (!formData.title.trim() || !formData.bio.trim() || !formData.location.trim()) {
         toast.error('Title, bio, and location are required');
         setSubmitting(false);
         return;
       }
-      
-      // Check if we're updating or creating
-      const method = profileDetails ? 'put' : 'post';
-      
+
       console.log("Submitting organizer details:", {
-        method,
         url: `${apiUrl}/organizer/${organizerId}/details`,
         data: formData
       });
-      
+
       const response = await axios({
-        method,
+        method: 'post',
         url: `${apiUrl}/organizer/${organizerId}/details`,
         data: formData,
         headers: {
@@ -204,22 +201,29 @@ const OrganizerDetails = () => {
           'Authorization': `Bearer ${parsedToken}`
         }
       });
-      
+
       console.log('Profile data saved:', response.data);
       toast.success('Profile details saved successfully');
-      
-      // Set profile completion flag in localStorage to prevent redirect loops
+
       localStorage.setItem('organizer_profile_complete', 'true');
       localStorage.setItem('organizer_details_last_shown', new Date().getTime().toString());
-      
-      // Force a profile completion check to update Redux state
-      await dispatch(updateProfileCompletionStatus(true));
-      
-      // Wait a moment to ensure state updates, then redirect
+
+      if (response.data && response.data.data) {
+        dispatch({
+          type: 'organizer/setProfileDetails',
+          payload: response.data.data
+        });
+      }
+
+      dispatch({
+        type: 'organizer/setProfileComplete',
+        payload: true
+      });
+
       setTimeout(() => {
-        navigate('/organizer/dashboard');
+        navigate('/organizer/profile');
       }, 1000);
-      
+
     } catch (error) {
       console.error('Error saving profile details:', error);
       toast.error(error.response?.data?.message || 'Failed to save profile details');
@@ -227,7 +231,7 @@ const OrganizerDetails = () => {
       setSubmitting(false);
     }
   };
-  
+
   if (loading) {
     return (
       <div className="flex justify-center items-center min-h-screen bg-black text-white">
@@ -236,7 +240,7 @@ const OrganizerDetails = () => {
       </div>
     );
   }
-  
+
   return (
     <div className="min-h-screen bg-black text-white py-12 px-4">
       <div className="max-w-4xl mx-auto">
@@ -250,7 +254,7 @@ const OrganizerDetails = () => {
             Fill in the details below so event attendees can learn more about you and your events.
           </p>
         </motion.div>
-        
+
         <motion.form
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
@@ -260,7 +264,7 @@ const OrganizerDetails = () => {
         >
           <div className="mb-6">
             <label className="block text-sm font-medium text-gray-300 mb-2">
-              Organization/Company Name <span className="text-red-500">*</span>
+              Position/Title <span className="text-red-500">*</span>
             </label>
             <input
               type="text"
@@ -269,10 +273,10 @@ const OrganizerDetails = () => {
               onChange={handleChange}
               required
               className="w-full p-3 bg-gray-800 border border-gray-700 rounded-lg text-white focus:outline-none focus:border-cyan-500"
-              placeholder="Your organization name"
+              placeholder="Your job title or position"
             />
           </div>
-          
+
           <div className="mb-6">
             <label className="block text-sm font-medium text-gray-300 mb-2">
               Bio/Description <span className="text-red-500">*</span>
@@ -284,10 +288,10 @@ const OrganizerDetails = () => {
               required
               rows={4}
               className="w-full p-3 bg-gray-800 border border-gray-700 rounded-lg text-white focus:outline-none focus:border-cyan-500"
-              placeholder="Tell attendees about your organization"
+              placeholder="Tell attendees about yourself"
             />
           </div>
-          
+
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
             <div>
               <label className="block text-sm font-medium text-gray-300 mb-2">
@@ -302,7 +306,7 @@ const OrganizerDetails = () => {
                 placeholder="Your contact number"
               />
             </div>
-            
+
             <div>
               <label className="block text-sm font-medium text-gray-300 mb-2">
                 Website
@@ -317,7 +321,7 @@ const OrganizerDetails = () => {
               />
             </div>
           </div>
-          
+
           <div className="mb-6">
             <label className="block text-sm font-medium text-gray-300 mb-2">
               Location <span className="text-red-500">*</span>
@@ -332,65 +336,260 @@ const OrganizerDetails = () => {
               placeholder="City, Country"
             />
           </div>
-          
+
           <div className="mb-6">
             <label className="block text-sm font-medium text-gray-300 mb-2">
-              Tags/Categories (comma separated)
+              Areas of Expertise
             </label>
-            <input
-              type="text"
-              value={formData.tags.join(', ')}
-              onChange={handleTagsChange}
-              className="w-full p-3 bg-gray-800 border border-gray-700 rounded-lg text-white focus:outline-none focus:border-cyan-500"
-              placeholder="tech, conference, workshop"
-            />
-            {formData.tags.length > 0 && (
-              <div className="mt-2 flex flex-wrap gap-2">
-                {formData.tags.map((tag, index) => (
-                  <span key={index} className="bg-gray-700 text-sm px-2 py-1 rounded-full">
-                    {tag}
-                  </span>
-                ))}
-              </div>
-            )}
+            <div className="flex gap-2 mb-2">
+              <input
+                type="text"
+                value={currentExpertise}
+                onChange={(e) => setCurrentExpertise(e.target.value)}
+                className="flex-1 p-3 bg-gray-800 border border-gray-700 rounded-lg text-white focus:outline-none focus:border-cyan-500"
+                placeholder="Add an area of expertise"
+                onKeyPress={(e) => e.key === 'Enter' && (e.preventDefault(), addExpertise())}
+              />
+              <button
+                type="button"
+                onClick={addExpertise}
+                className="px-3 py-2 bg-cyan-500 text-black rounded-lg hover:bg-cyan-600 transition-colors flex items-center"
+              >
+                <Plus size={20} />
+              </button>
+            </div>
+            <div className="flex flex-wrap gap-2 mt-2">
+              {formData.expertise.map((item, index) => (
+                <div key={index} className="flex items-center bg-cyan-900/30 px-3 py-1 rounded-full">
+                  <span className="text-cyan-100 mr-2">{item}</span>
+                  <button
+                    type="button"
+                    onClick={() => removeExpertise(index)}
+                    className="text-cyan-300 hover:text-red-400 transition-colors"
+                  >
+                    <X size={14} />
+                  </button>
+                </div>
+              ))}
+              {formData.expertise.length === 0 && (
+                <span className="text-gray-500 text-sm italic">No expertise areas added yet</span>
+              )}
+            </div>
           </div>
-          
+
           <div className="mb-6">
+            <label className="block text-sm font-medium text-gray-300 mb-2">
+              Certifications
+            </label>
+            <div className="flex gap-2 mb-2">
+              <input
+                type="text"
+                value={currentCertification}
+                onChange={(e) => setCurrentCertification(e.target.value)}
+                className="flex-1 p-3 bg-gray-800 border border-gray-700 rounded-lg text-white focus:outline-none focus:border-cyan-500"
+                placeholder="Add a certification"
+                onKeyPress={(e) => e.key === 'Enter' && (e.preventDefault(), addCertification())}
+              />
+              <button
+                type="button"
+                onClick={addCertification}
+                className="px-3 py-2 bg-cyan-500 text-black rounded-lg hover:bg-cyan-600 transition-colors flex items-center"
+              >
+                <Plus size={20} />
+              </button>
+            </div>
+            <div className="flex flex-wrap gap-2 mt-2">
+              {formData.certifications.map((item, index) => (
+                <div key={index} className="flex items-center bg-gray-800 px-3 py-1 rounded-full border border-gray-700">
+                  <span className="text-gray-200 mr-2">{item}</span>
+                  <button
+                    type="button"
+                    onClick={() => removeCertification(index)}
+                    className="text-gray-400 hover:text-red-400 transition-colors"
+                  >
+                    <X size={14} />
+                  </button>
+                </div>
+              ))}
+              {formData.certifications.length === 0 && (
+                <span className="text-gray-500 text-sm italic">No certifications added yet</span>
+              )}
+            </div>
+          </div>
+
+          <div className="mb-8">
             <label className="block text-sm font-medium text-gray-300 mb-2">
               Social Media Links
             </label>
-            <div className="space-y-3">
-              <div>
-                <label className="block text-xs text-gray-400 mb-1">Twitter</label>
-                <input
-                  type="url"
-                  name="socialLinks.twitter"
-                  value={formData.socialLinks.twitter}
-                  onChange={handleChange}
-                  className="w-full p-3 bg-gray-800 border border-gray-700 rounded-lg text-white focus:outline-none focus:border-cyan-500"
-                  placeholder="https://twitter.com/username"
-                />
+
+            <div className="bg-gray-800 p-4 rounded-lg border border-gray-700 mb-4">
+              <div className="flex flex-col sm:flex-row gap-3 mb-3">
+                <div className="sm:w-1/4">
+                  <select
+                    value={socialPlatform}
+                    onChange={(e) => setSocialPlatform(e.target.value)}
+                    className="w-full p-2 bg-gray-900 border border-gray-700 rounded-lg text-white focus:outline-none focus:border-cyan-500"
+                  >
+                    <option value="twitter">Twitter/X</option>
+                    <option value="linkedin">LinkedIn</option>
+                    <option value="instagram">Instagram</option>
+                    <option value="facebook">Facebook</option>
+                    <option value="other">Other</option>
+                  </select>
+                </div>
+                <div className="flex-1 flex gap-2">
+                  <input
+                    type="text"
+                    value={currentSocial}
+                    onChange={(e) => setCurrentSocial(e.target.value)}
+                    className="flex-1 p-2 bg-gray-900 border border-gray-700 rounded-lg text-white focus:outline-none focus:border-cyan-500"
+                    placeholder="https://platform.com/username"
+                    onKeyPress={(e) => e.key === 'Enter' && (e.preventDefault(), addSocial())}
+                  />
+                  <button
+                    type="button"
+                    onClick={addSocial}
+                    className="px-3 py-2 bg-cyan-500 text-black rounded-lg hover:bg-cyan-600 transition-colors flex items-center"
+                  >
+                    <Plus size={18} />
+                  </button>
+                </div>
               </div>
-              
-              <div>
-                <label className="block text-xs text-gray-400 mb-1">LinkedIn</label>
-                <input
-                  type="url"
-                  name="socialLinks.linkedin"
-                  value={formData.socialLinks.linkedin}
-                  onChange={handleChange}
-                  className="w-full p-3 bg-gray-800 border border-gray-700 rounded-lg text-white focus:outline-none focus:border-cyan-500"
-                  placeholder="https://linkedin.com/in/username"
-                />
+
+              <div className="flex flex-wrap gap-3 mt-4">
+                {formData.socials.map((url, index) => {
+                  const platform = detectPlatform(url);
+                  return (
+                    <div
+                      key={index}
+                      className="group flex items-center bg-gray-900 pl-2 pr-3 py-1.5 rounded-full hover:bg-gray-700 transition-colors"
+                    >
+                      <span className="flex items-center text-cyan-400 mr-2">
+                        {getSocialIcon(platform)}
+                      </span>
+                      <a
+                        href={url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-gray-300 mr-2 group-hover:text-white transition-colors"
+                      >
+                        {url.replace(/(https?:\/\/)?(www\.)?/i, '').substring(0, 20)}
+                        {url.replace(/(https?:\/\/)?(www\.)?/i, '').length > 20 ? '...' : ''}
+                      </a>
+                      <button
+                        type="button"
+                        onClick={() => removeSocial(index)}
+                        className="text-gray-500 hover:text-red-400 transition-colors ml-1"
+                      >
+                        <X size={14} />
+                      </button>
+                    </div>
+                  );
+                })}
+                {formData.socials.length === 0 && (
+                  <span className="text-gray-500 text-sm italic">No social links added yet</span>
+                )}
               </div>
             </div>
           </div>
-          
+
+          <div className="mb-6">
+            <h3 className="text-lg font-medium text-gray-200 mb-3">Testimonials</h3>
+            <p className="text-gray-400 text-sm mb-4">Add testimonials from clients or colleagues</p>
+
+            {formData.testimonials.map((testimonial, index) => (
+              <div key={index} className="bg-gray-800 p-4 rounded-lg mb-4 border border-gray-700">
+                <div className="flex justify-between mb-2">
+                  <h4 className="font-medium">Testimonial #{index + 1}</h4>
+                  <button
+                    type="button"
+                    onClick={() => removeTestimonial(index)}
+                    className="text-red-400 hover:text-red-500"
+                  >
+                    Remove
+                  </button>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                  <div>
+                    <label className="block text-xs text-gray-400 mb-1">Name</label>
+                    <input
+                      type="text"
+                      value={testimonial.name || ''}
+                      onChange={(e) => handleTestimonialChange(index, 'name', e.target.value)}
+                      className="w-full p-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:border-cyan-500"
+                      placeholder="Client name"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs text-gray-400 mb-1">Position</label>
+                    <input
+                      type="text"
+                      value={testimonial.position || ''}
+                      onChange={(e) => handleTestimonialChange(index, 'position', e.target.value)}
+                      className="w-full p-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:border-cyan-500"
+                      placeholder="Client position"
+                    />
+                  </div>
+                </div>
+
+                <div className="mb-4">
+                  <label className="block text-xs text-gray-400 mb-1">Comment</label>
+                  <textarea
+                    value={testimonial.comment || ''}
+                    onChange={(e) => handleTestimonialChange(index, 'comment', e.target.value)}
+                    className="w-full p-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:border-cyan-500"
+                    rows={2}
+                    placeholder="Their testimonial comment"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs text-gray-400 mb-1">Rating (1-5)</label>
+                  <select
+                    value={testimonial.rating || 5}
+                    onChange={(e) => handleTestimonialChange(index, 'rating', e.target.value)}
+                    className="w-full p-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:border-cyan-500"
+                  >
+                    <option value="1">1 - Poor</option>
+                    <option value="2">2 - Fair</option>
+                    <option value="3">3 - Good</option>
+                    <option value="4">4 - Very Good</option>
+                    <option value="5">5 - Excellent</option>
+                  </select>
+                </div>
+              </div>
+            ))}
+
+            <button
+              type="button"
+              onClick={addTestimonial}
+              className="px-4 py-2 border border-cyan-500 text-cyan-500 rounded-lg hover:bg-cyan-500 hover:text-black transition-colors"
+            >
+              + Add Testimonial
+            </button>
+          </div>
+
+          <div className="mb-6 flex items-center">
+            <input
+              type="checkbox"
+              name="isPrivate"
+              id="isPrivate"
+              checked={formData.isPrivate}
+              onChange={handleChange}
+              className="w-4 h-4 bg-gray-800 border-gray-700 rounded focus:ring-cyan-500 focus:ring-2"
+            />
+            <label htmlFor="isPrivate" className="ml-2 text-sm text-gray-300">
+              Make my profile private (only visible to event attendees)
+            </label>
+          </div>
+
           <div className="flex justify-end">
             <button
               type="submit"
               disabled={submitting}
-              className={`px-6 py-3 bg-cyan-500 hover:bg-cyan-600 text-black font-medium rounded-lg transition-colors flex items-center
+              className={`px-6 py-3 rounded-xl bg-gradient-to-r bg-cyan-400 text-black font-medium transition-colors cursor-pointer flex items-center space-x-2 hover:bg-black hover:text-cyan-400 hover:border hover:border-cyan-400
                 ${submitting ? 'opacity-70 cursor-not-allowed' : ''}`}
             >
               {submitting ? (

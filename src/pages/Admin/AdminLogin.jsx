@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { toast } from 'react-toastify';
+import { useLoader } from '../../context/LoaderContext';
 
 const AdminLogin = () => {
   const navigate = useNavigate();
@@ -10,6 +11,12 @@ const AdminLogin = () => {
     password: ''
   });
   const [loading, setLoading] = useState(false);
+  const { setIsLoading } = useLoader();
+
+  useEffect(() => {
+    setIsLoading(loading);
+    return () => setIsLoading(false);
+  }, [loading, setIsLoading]);
 
   const handleChange = (e) => {
     setFormData({
@@ -94,14 +101,7 @@ const AdminLogin = () => {
             className={`w-full py-3 rounded bg-cyan-500 text-white font-semibold hover:bg-cyan-600 transition-colors
               ${loading ? 'opacity-50 cursor-not-allowed' : ''}`}
           >
-            {loading ? (
-              <div className="flex items-center justify-center">
-                <div className="w-5 h-5 border-t-2 border-white border-solid rounded-full animate-spin mr-2"></div>
-                Logging in...
-              </div>
-            ) : (
-              'Login'
-            )}
+            Login
           </button>
         </form>
       </div>

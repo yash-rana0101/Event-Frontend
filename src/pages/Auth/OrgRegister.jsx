@@ -1,6 +1,6 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useDispatch, useSelector } from 'react-redux';
-import registerOrganizer  from '../../redux/user/organizer';
+import axios from 'axios';
 import {
   User,
   Mail,
@@ -13,11 +13,14 @@ import {
 } from 'lucide-react';
 import { toast } from "react-toastify";
 import { Link, useNavigate } from "react-router-dom";
+import { useLoader } from '../../context/LoaderContext';
 
 const Register = () => {
   const dispatch = useDispatch();
   const navigate = useNavigate();
   const { loading = false, error = null } = useSelector((state) => state.organizer || {});
+  const { setIsLoading } = useLoader();
+  const [submitting, setSubmitting] = useState(false);
   const [formData, setFormData] = useState({
     name: "",
     email: "",
@@ -29,38 +32,60 @@ const Register = () => {
   const [registered, setRegistered] = useState(false);
   const { name, email, password, phone } = formData;
 
+  useEffect(() => {
+    setIsLoading(loading || submitting);
+    return () => setIsLoading(false);
+  }, [loading, submitting, setIsLoading]);
+
   const onChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
   };
 
   const onSubmit = async (e) => {
     e.preventDefault();
+    setSubmitting(true);
 
-    // Add console logs to debug the request
     console.log("Submitting registration data:", formData);
 
-    dispatch(registerOrganizer(formData)).unwrap()
-      .then((response) => {
-        console.log("Registration successful:", response);
-        toast.success("Registration successful! Please complete your profile details.");
-        setRegistered(true);
+    try {
+      const apiUrl = import.meta.env.VITE_API_URL;
 
-        // Redirect to the details page after a short delay
-        setTimeout(() => {
-          navigate('/organizer/details');
-        }, 1500);
-      })
-      .catch((err) => {
-        console.error("Registration failed:", err);
-        toast.error(err.message || "Registration failed");
+      const response = await axios.post(`${apiUrl}/organizer/register`, formData);
+
+      console.log("Registration successful:", response.data);
+
+      if (response.data.token) {
+        localStorage.setItem('organizer_token', response.data.token);
+      }
+
+      dispatch({
+        type: 'organizer/setToken',
+        payload: response.data.token
       });
+
+      dispatch({
+        type: 'organizer/setUser',
+        payload: response.data.user || response.data
+      });
+
+      toast.success("Registration successful! Please complete your profile details.");
+      setRegistered(true);
+
+      setTimeout(() => {
+        navigate('/organizer/details');
+      }, 1500);
+    } catch (err) {
+      console.error("Registration failed:", err);
+      toast.error(err.response?.data?.message || err.message || "Registration failed");
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   const togglePasswordVisibility = () => {
     setShowPassword(!showPassword);
   };
 
-  // Show success message if registered
   if (registered) {
     return (
       <div className="min-h-screen bg-black flex items-center justify-center p-4 overflow-hidden relative">
@@ -91,7 +116,6 @@ const Register = () => {
 
   return (
     <div className="min-h-screen bg-black flex items-center justify-center p-4 overflow-hidden relative">
-      {/* Cyber Grid Background Effect */}
       <div className="absolute inset-0 pointer-events-none">
         <div className="absolute inset-0 bg-gradient-to-br from-transparent via-transparent to-cyan-500/10 opacity-20"></div>
         <div className="absolute inset-0 opacity-5" style={{
@@ -100,11 +124,9 @@ const Register = () => {
         }}></div>
       </div>
 
-      {/* Registration Container */}
       <div className="w-full max-w-md z-10 relative">
         <div className="bg-black border-2 border-cyan-500 rounded-2xl shadow-2xl shadow-cyan-500/20 overflow-hidden">
           <div className="p-8">
-            {/* Header */}
             <div className="text-center mb-10">
               <div className="flex justify-center mb-4">
                 <Zap className="h-12 w-12 text-cyan-500 animate-pulse" />
@@ -114,7 +136,6 @@ const Register = () => {
             </div>
 
             <form onSubmit={onSubmit} className="space-y-6">
-              {/* Name Input */}
               <div className="relative group">
                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                   <User className="h-5 w-5 text-cyan-500 group-focus-within:text-cyan-300 transition-colors" />
@@ -130,7 +151,6 @@ const Register = () => {
                 />
               </div>
 
-              {/* Email Input */}
               <div className="relative group">
                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                   <Mail className="h-5 w-5 text-cyan-500 group-focus-within:text-cyan-300 transition-colors" />
@@ -146,7 +166,6 @@ const Register = () => {
                 />
               </div>
 
-              {/* Organization Input */}
               <div className="relative group">
                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                   <Building className="h-5 w-5 text-cyan-500 group-focus-within:text-cyan-300 transition-colors" />
@@ -162,7 +181,6 @@ const Register = () => {
                 />
               </div>
 
-              {/* Password Input */}
               <div className="relative group">
                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                   <Lock className="h-5 w-5 text-cyan-500 group-focus-within:text-cyan-300 transition-colors" />
@@ -190,7 +208,6 @@ const Register = () => {
                 </button>
               </div>
 
-              {/* Phone Input */}
               <div className="relative group">
                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                   <Phone className="h-5 w-5 text-cyan-500 group-focus-within:text-cyan-300 transition-colors" />
@@ -205,24 +222,22 @@ const Register = () => {
                 />
               </div>
 
-              {/* Error Message */}
               {error && (
                 <div className="bg-red-500/10 border border-red-500/30 text-red-300 px-4 py-3 rounded-lg text-center uppercase tracking-wider">
                   {error}
                 </div>
               )}
 
-              {/* Submit Button */}
               <button
                 type="submit"
-                disabled={loading}
+                disabled={submitting}
                 className="w-full bg-cyan-500 text-black py-3 rounded-lg transition-all duration-300 flex items-center justify-center space-x-2 uppercase font-bold tracking-wider group hover:cursor-pointer hover:bg-black hover:text-cyan-500 hover:shadow-lg hover:border-cyan-500 hover:border"
               >
-                {loading ? (
-                  <svg className="animate-spin h-5 w-5 text-black" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                  </svg>
+                {submitting ? (
+                  <>
+                    <span>REGISTERING...</span>
+                    <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-black"></div>
+                  </>
                 ) : (
                   <>
                     <span>REGISTER</span>
@@ -231,7 +246,6 @@ const Register = () => {
                 )}
               </button>
 
-              {/* Login Link */}
               <div className="text-center mt-4">
                 <p className="text-sm text-cyan-300/70 uppercase tracking-wider">
                   ALREADY HAVE CREDENTIALS? {' '}

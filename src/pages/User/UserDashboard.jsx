@@ -11,6 +11,7 @@ import {
   Legend
 } from 'chart.js';
 import dayjs from 'dayjs';
+import { useLoader } from '../../context/LoaderContext';
 
 ChartJS.register(LineElement, CategoryScale, LinearScale, PointElement, Tooltip, Legend);
 
@@ -21,6 +22,13 @@ const UserDashboard = () => {
   const [selectedDate, setSelectedDate] = useState(null);
   const [sortOption, setSortOption] = useState('date-newest');
   const [activeTab, setActiveTab] = useState('overview');
+  const { setIsLoading } = useLoader();
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    setIsLoading(loading);
+    return () => setIsLoading(false);
+  }, [loading, setIsLoading]);
 
   useEffect(() => {
     setTimeout(() => {
@@ -34,6 +42,7 @@ const UserDashboard = () => {
           { name: 'Art Expo', date: 'May 15, 2024' }
         ]
       });
+      setLoading(false);
     }, 1000);
   }, []);
 

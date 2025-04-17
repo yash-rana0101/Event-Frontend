@@ -8,6 +8,7 @@ import { useSelector } from 'react-redux';
 import { toast } from 'react-toastify';
 import { fixPersistenceIssues, safelyParseToken } from '../../utils/persistFix';
 import eventService from '../../services/eventService';
+import { useLoader } from '../../context/LoaderContext';
 
 export default function CreateEvent() {
   const navigate = useNavigate();
@@ -15,6 +16,7 @@ export default function CreateEvent() {
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState(null);
   const [tokenValid, setTokenValid] = useState(false);
+  const { setIsLoading } = useLoader();
 
   const organizerToken = useSelector(state => state.organizer?.token);
   const user = useSelector(state => state.organizer?.user);
@@ -23,6 +25,11 @@ export default function CreateEvent() {
   useEffect(() => {
     fixPersistenceIssues();
   }, []);
+
+  useEffect(() => {
+    setIsLoading(submitting);
+    return () => setIsLoading(false);
+  }, [submitting, setIsLoading]);
 
   useEffect(() => {
     // Get the raw token from state or localStorage

@@ -24,7 +24,7 @@ const Login = () => {
   const { token: organizerToken } = useSelector(state => state.organizer);
   
   // Check for redirection after login
-  const redirectTo = location.state?.from || '/dashboard';
+  const redirectTo = location.state?.from || '/user/dashboard';
 
   useEffect(() => {
     // Fix persistence issues

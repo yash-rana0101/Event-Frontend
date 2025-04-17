@@ -110,7 +110,7 @@ const Footer = () => {
         </svg>
       </div>
 
-      
+
 
       {/* Gradient Edge */}
       <div className="relative">
@@ -144,7 +144,7 @@ const Footer = () => {
                 }}
                 transition={{ duration: 3, repeat: Infinity, repeatType: "mirror" }}
               />
-              <motion.div
+              {/* <motion.div
                 className="relative p-2 z-10"
                 whileHover={{ scale: 1.05 }}
                 transition={{ type: "spring", stiffness: 300, damping: 15 }}
@@ -155,11 +155,11 @@ const Footer = () => {
                 >
                   <img
                     src={logo2}
-                    alt="Cyber Hunter Logo"
+                    alt="Event System Logo"
                     className="w-36 h-36 object-contain"
                   />
                 </motion.div>
-              </motion.div>
+              </motion.div> */}
             </div>
 
             <motion.div
@@ -173,7 +173,7 @@ const Footer = () => {
                 }}
               >
                 <span className="bg-clip-text text-transparent bg-gradient-to-r from-cyan-400 to-cyan-600">
-                  CYBER HUNTER
+                  Event System
                 </span>
               </motion.h2>
               <motion.p
@@ -475,7 +475,7 @@ const Footer = () => {
               className="relative text-cyan-500 hover:underline cursor-pointer font-medium"
               whileHover={{ color: "#fff" }}
             >
-              Cyber Hunter
+              Event System
               <motion.span
                 className="absolute -bottom-1 left-0 w-full h-px bg-cyan-500"
                 initial={{ scaleX: 0 }}
@@ -487,7 +487,7 @@ const Footer = () => {
           </motion.p>
 
           <div className="flex space-x-8">
-            {["Terms & Conditions", "Privacy Policy", "Support"].map((item,index) => (
+            {["Terms & Conditions", "Privacy Policy", "Support"].map((item, index) => (
               <motion.a
                 key={item}
                 whileHover={{ scale: 1.05, color: "#22d3ee" }}

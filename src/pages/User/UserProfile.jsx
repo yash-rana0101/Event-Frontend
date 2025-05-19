@@ -1,180 +1,236 @@
-import { useState } from 'react';
-import ProfileHeader from '../../components/User/ProfileHeader';
-import TabNavigation from '../../components/User/TabNavigation';
-import AboutTab from '../../components/User/AboutTab';
-import EventsTab from '../../components/User/EventsTab';
-import BadgesTab from '../../components/User/BadgesTab';
-import PreferencesTab from '../../components/User/PreferencesTab';
+import { useState, useEffect } from "react";
+import { useParams, useNavigate } from "react-router-dom";
+import axios from "axios";
+import { useSelector } from "react-redux";
+import ProfileHeader from "../../components/User/ProfileHeader";
+import TabNavigation from "../../components/User/TabNavigation";
+import AboutTab from "../../components/User/AboutTab";
+import EventsTab from "../../components/User/EventsTab";
+import BadgesTab from "../../components/User/BadgesTab";
+import PreferencesTab from "../../components/User/PreferencesTab";
+import { useLoader } from '../../context/LoaderContext';
+import { Loader2, AlertCircle, ArrowLeft } from "lucide-react";
 
 export default function UserProfile() {
+  const { userId } = useParams(); // Get userId from URL parameters
+  const [profile, setProfile] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
   const [activeTab, setActiveTab] = useState('about');
-  const [expandedReview, setExpandedReview] = useState(null);
-  const [filterType, setFilterType] = useState('all');
-  const [isEditing, setIsEditing] = useState(false);
-  const [editedName, setEditedName] = useState("Alex Johnson");
-  const [editedLocation, setEditedLocation] = useState("San Francisco, CA");
+  const { setIsLoading } = useLoader();
+  const navigate = useNavigate();
 
-  // Sample user data
-  const user = {
-    name: editedName,
-    location: editedLocation,
-    email: "alex@example.com",
-    phone: "+1 (415) 555-7890",
-    website: "alexjohnson.com",
-    joinDate: "June 2023",
-    eventsAttended: 24,
-    upcomingEvents: 3,
-    followers: 178,
-    following: 205,
-    bio: "Event enthusiast and tech professional. Always on the lookout for interesting conferences, workshops, and cultural experiences. Love networking and meeting new people at events.",
-    interests: ["Tech Conferences", "Music Festivals", "Workshops", "Food & Wine", "Sports Events"],
-    attendedEvents: [
-      {
-        id: 1,
-        name: "DevCon 2024",
-        date: "February 15-17, 2024",
-        type: "Tech Conference",
-        image: "/api/placeholder/80/80",
-        location: "San Francisco Convention Center",
-        rating: 5,
-        review: "Incredible experience with amazing speakers and networking opportunities. The workshops were hands-on and I learned a lot of practical skills I could immediately apply. The venue was perfect and the organization was flawless. Would definitely attend again next year!",
-        photos: ["/api/placeholder/100/100", "/api/placeholder/100/100"]
-      },
-      {
-        id: 2,
-        name: "Summer Music Festival",
-        date: "July 22, 2024",
-        type: "Music Festival",
-        image: "/api/placeholder/80/80",
-        location: "Golden Gate Park",
-        rating: 4,
-        review: "Great lineup and atmosphere. Sound quality was excellent and the food vendors were diverse. Only downside was the long lines for the bathrooms. Overall a fantastic day of music and fun.",
-        photos: ["/api/placeholder/100/100"]
-      },
-      {
-        id: 3,
-        name: "Photography Workshop",
-        date: "September 10, 2024",
-        type: "Workshop",
-        image: "/api/placeholder/80/80",
-        location: "Downtown Arts Center",
-        rating: 3,
-        review: "The instructor was knowledgeable but the workshop was a bit too basic for my skill level. The venue was nice and equipment provided was high quality.",
-        photos: []
-      }
-    ],
-    upcomingEventsList: [
-      {
-        id: 1,
-        name: "Annual Tech Summit",
-        date: "May 15-17, 2025",
-        type: "Conference",
-        image: "/api/placeholder/80/80",
-        location: "Tech Campus",
-        ticketType: "VIP Pass"
-      },
-      {
-        id: 2,
-        name: "Jazz in the Park",
-        date: "June 22, 2025",
-        type: "Music Festival",
-        image: "/api/placeholder/80/80",
-        location: "Central Park",
-        ticketType: "General Admission"
-      },
-      {
-        id: 3,
-        name: "Culinary Experience",
-        date: "July 10, 2025",
-        type: "Workshop",
-        image: "/api/placeholder/80/80",
-        location: "Gourmet Kitchen Studio",
-        ticketType: "Workshop Pass"
-      }
-    ],
-    preferences: ["Early-bird tickets", "Front-row seating", "Networking events", "Workshop sessions"],
-    badges: [
-      { id: 1, name: "Event Explorer", description: "Attended events of 5 different types" },
-      { id: 2, name: "Feedback Champion", description: "Left reviews for 20+ events" },
-      { id: 3, name: "Early Adopter", description: "Among first 500 users on platform" }
-    ],
-    savedEvents: 7,
-    eventPhotos: 34,
-    notificationPreferences: [
-      { id: 1, name: "Event Reminders", enabled: true, description: "Get notified 24 hours before events" },
-      { id: 2, name: "New Events", enabled: true, description: "Get notified when new events match your interests" },
-      { id: 3, name: "Friends' Activities", enabled: false, description: "Get notified when friends register for events" },
-      { id: 4, name: "Promotions", enabled: true, description: "Get notified about discounts and special offers" }
-    ]
-  };
+  // Get current user from Redux store for comparison
+  const currentUser = useSelector(state => state.auth?.user);
+  const isCurrentUserProfile = currentUser &&
+    (currentUser.id === userId || currentUser._id === userId);
 
-  const toggleReview = (id) => {
-    if (expandedReview === id) {
-      setExpandedReview(null);
+  useEffect(() => {
+    setIsLoading(loading);
+    return () => setIsLoading(false);
+  }, [loading, setIsLoading]);
+
+  useEffect(() => {
+    const fetchUserProfile = async () => {
+      setLoading(true);
+      setError(null);
+
+      try {
+        if (!userId) {
+          throw new Error('User ID is missing');
+        }
+
+        const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000/api/v1';
+        console.log(`Fetching profile for user ID: ${userId} from ${apiUrl}/profiles/user/${userId}`);
+
+        const response = await axios.get(`${apiUrl}/profiles/user/${userId}`);
+
+        console.log("Profile API response:", response.data);
+
+        if (response.data && (response.data.status === 'success' || response.data.data)) {
+          // Check if data is nested in a data property or directly in response.data
+          const profileData = response.data.data || response.data;
+
+          // Create default values if any expected properties are missing
+          const safeProfile = {
+            ...profileData,
+            user: profileData.user || {
+              name: "User",
+              email: "Email not available",
+              profilePicture: null
+            },
+            bio: profileData.bio || "No bio available",
+            location: profileData.location || "Location not set",
+            joinDate: profileData.joinDate || profileData.createdAt || new Date(),
+            badges: profileData.badges || [],
+            interests: profileData.interests || [],
+            notificationPreferences: profileData.notificationPreferences || []
+          };
+
+          setProfile(safeProfile);
+          console.log("Profile data set:", safeProfile);
+        } else {
+          throw new Error(response.data?.message || 'Failed to load profile data');
+        }
+      } catch (err) {
+        console.error('Error fetching user profile:', err);
+        setError(err.response?.data?.message || err.message || 'Failed to load profile');
+      } finally {
+        // Always set loading to false when done, whether successful or not
+        setLoading(false);
+      }
+    };
+
+    if (userId) {
+      fetchUserProfile();
     } else {
-      setExpandedReview(id);
+      setLoading(false);
+      setError("User ID is required");
     }
-  };
+  }, [userId]);
 
-  const handleSave = () => {
-    setIsEditing(false);
-  };
+  // Handle loading state
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-black text-white">
+        <div className="max-w-6xl mx-auto px-4 py-12">
+          <div className="flex flex-col items-center justify-center h-60 bg-black rounded-2xl border border-cyan-900/20 relative overflow-hidden">
+            <div className="absolute inset-0 bg-gradient-to-br from-cyan-900/10 to-transparent"></div>
+            <div className="absolute top-0 left-0 w-full h-32 bg-gradient-to-r from-cyan-900/20 to-transparent opacity-50"></div>
 
-  const filteredEvents = filterType === 'all'
-    ? user.attendedEvents
-    : user.attendedEvents.filter(event => event.type.toLowerCase().includes(filterType.toLowerCase()));
-
-  return (
-    <div className="min-h-screen bg-black text-white font-sans">
-      {/* Decorative elements */}
-      <div className="fixed top-0 left-0 w-full h-full overflow-hidden pointer-events-none z-0">
-        <div className="absolute top-0 right-0 w-1/3 h-1/3 bg-cyan-500 opacity-5 rounded-full filter blur-3xl transform translate-x-1/2 -translate-y-1/2"></div>
-        <div className="absolute bottom-0 left-0 w-1/2 h-1/2 bg-cyan-500 opacity-5 rounded-full filter blur-3xl transform -translate-x-1/4 translate-y-1/4"></div>
+            <Loader2 className="h-12 w-12 text-cyan-500 animate-spin" />
+            <p className="mt-4 text-cyan-400 font-medium">Loading profile information...</p>
+            <div className="mt-2 w-48 h-1 bg-black overflow-hidden rounded-full">
+              <div className="h-full bg-cyan-500 w-1/3 animate-pulse rounded-full"></div>
+            </div>
+          </div>
+        </div>
       </div>
+    );
+  }
 
-      <div className="relative z-10 container mx-auto px-4 py-12">
-        {/* Profile Header */}
-        <ProfileHeader
-          user={user}
-          isEditing={isEditing}
-          setIsEditing={setIsEditing}
-          editedName={editedName}
-          setEditedName={setEditedName}
-          editedLocation={editedLocation}
-          setEditedLocation={setEditedLocation}
-          handleSave={handleSave}
-        />
+  // Handle error state
+  if (error) {
+    return (
+      <div className="min-h-screen bg-black text-white">
+        <div className="max-w-6xl mx-auto px-4 py-12">
+          <div className="flex flex-col items-center justify-center py-12 bg-black rounded-2xl border border-red-900/50 relative overflow-hidden">
+            <div className="absolute inset-0 bg-gradient-to-br from-red-900/10 to-transparent"></div>
 
-        {/* Tab Navigation */}
-        <TabNavigation
-          activeTab={activeTab}
-          setActiveTab={setActiveTab}
-        />
+            <div className="w-16 h-16 rounded-full bg-red-500/10 flex items-center justify-center mb-4">
+              <AlertCircle className="h-8 w-8 text-red-500" />
+            </div>
 
-        {/* Content Area */}
-        <div className="bg-black rounded-b-2xl shadow-lg p-6 md:p-8 border border-gray-800">
-          {activeTab === 'about' && (
-            <AboutTab user={user} setActiveTab={setActiveTab} />
-          )}
+            <h2 className="text-xl font-bold mb-2 text-white">Error Loading Profile</h2>
+            <p className="text-red-300 mb-6 text-center max-w-md">{error}</p>
 
-          {activeTab === 'events' && (
-            <EventsTab
-              user={user}
-              filterType={filterType}
-              setFilterType={setFilterType}
-              filteredEvents={filteredEvents}
-              expandedReview={expandedReview}
-              toggleReview={toggleReview}
+            <button
+              onClick={() => navigate(-1)}
+              className="flex items-center gap-2 px-6 py-3 bg-black text-red-400 rounded-lg border border-red-500/30 hover:bg-red-950/30 transition-all shadow-lg shadow-red-500/10"
+            >
+              <ArrowLeft size={18} />
+              <span>Go Back</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Provide a default profile when profile is null
+  if (!profile) {
+    const defaultProfile = {
+      user: {
+        name: "User",
+        email: "Loading...",
+        profilePicture: null
+      },
+      bio: "Profile information is loading...",
+      location: "Unknown",
+      joinDate: new Date(),
+      badges: [],
+      interests: [],
+      notificationPreferences: []
+    };
+
+    return (
+      <div className="min-h-screen bg-black text-white">
+        <div className="relative w-full">
+          {/* Decorative elements */}
+          <div className="absolute top-0 left-0 w-full h-64 overflow-hidden z-0">
+            <div className="absolute -top-40 -left-40 w-80 h-80 bg-cyan-500/5 rounded-full blur-3xl"></div>
+            <div className="absolute top-0 -right-20 w-60 h-60 bg-cyan-500/5 rounded-full blur-3xl"></div>
+          </div>
+
+          <div className="  relative z-10">
+            <ProfileHeader
+              profile={defaultProfile}
+              isCurrentUser={isCurrentUserProfile}
             />
-          )}
 
-          {activeTab === 'badges' && (
-            <BadgesTab user={user} />
-          )}
+            <div className="mt-8">
+              <TabNavigation
+                activeTab={activeTab}
+                setActiveTab={setActiveTab}
+                isCurrentUser={isCurrentUserProfile}
+              />
 
-          {activeTab === 'preferences' && (
-            <PreferencesTab user={user} />
-          )}
+              <div className="mt-6 bg-black rounded-2xl p-8 border border-cyan-900/20 relative overflow-hidden">
+                <div className="absolute inset-0 bg-gradient-to-br from-cyan-900/5 to-transparent"></div>
+                <div className="animate-pulse flex flex-col items-center">
+                  <div className="h-4 bg-gray-800 rounded w-3/4 mb-4"></div>
+                  <div className="h-4 bg-gray-800 rounded w-1/2 mb-4"></div>
+                  <div className="h-4 bg-gray-800 rounded w-2/3"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Main component render
+  return (
+    <div className="min-h-screen bg-black text-white">
+      <div className="relative w-full">
+        {/* Decorative elements */}
+        <div className="absolute top-0 left-0 w-full h-64 overflow-hidden z-0">
+          <div className="absolute -top-40 -left-40 w-80 h-80 bg-cyan-500/5 rounded-full blur-3xl"></div>
+          <div className="absolute top-0 -right-20 w-60 h-60 bg-cyan-500/5 rounded-full blur-3xl"></div>
+        </div>
+
+        <div className="px-4 py-8 relative z-10">
+          <ProfileHeader
+            profile={profile}
+            isCurrentUser={isCurrentUserProfile}
+          />
+
+          <div className="mt-8">
+            <TabNavigation
+              activeTab={activeTab}
+              setActiveTab={setActiveTab}
+              isCurrentUser={isCurrentUserProfile}
+            />
+
+            <div className="mt-6">
+              {activeTab === 'about' && (
+                <AboutTab profile={profile} />
+              )}
+              {activeTab === 'events' && (
+                <EventsTab userId={userId} />
+              )}
+              {activeTab === 'badges' && (
+                <BadgesTab badges={profile.badges || []} />
+              )}
+              {activeTab === 'preferences' && isCurrentUserProfile && (
+                <PreferencesTab
+                  preferences={profile.notificationPreferences || []}
+                  userId={userId}
+                />
+              )}
+            </div>
+          </div>
         </div>
       </div>
     </div>

@@ -1,91 +1,115 @@
-import { useEffect, useState } from 'react';
-import { Navigate, useLocation } from 'react-router-dom';
-import { useSelector, useDispatch } from 'react-redux';
-import { verifyUserToken } from '../redux/user/userSlice';
-import { verifyOrganizerToken } from '../redux/user/organizer';
-import { fixPersistenceIssues } from '../utils/persistFix';
+import React, { useEffect, useState } from 'react';
+import { Navigate, Outlet, useLocation } from 'react-router-dom';
+import { useSelector } from 'react-redux';
+import { useLoader } from '../context/LoaderContext';
 
-// Types of guards
-const GUARD_TYPES = {
+// Export guard types as a constant
+export const GUARD_TYPES = {
   USER: 'user',
   ORGANIZER: 'organizer',
-  ANY: 'any',
+  ADMIN: 'admin'
 };
 
-const Guard = ({ children, type = GUARD_TYPES.USER, redirectTo }) => {
+const Guard = ({ type, children }) => {
   const location = useLocation();
-  const dispatch = useDispatch();
-  const [isVerifying, setIsVerifying] = useState(true);
-  
+  const [isCheckingAuth, setIsCheckingAuth] = useState(true);
+  const { setIsLoading } = useLoader();
+
   // Get authentication state from Redux
-  const userAuth = useSelector(state => state.auth);
-  const organizerAuth = useSelector(state => state.organizer);
-  
-  // Default redirect paths
-  const defaultRedirects = {
-    [GUARD_TYPES.USER]: '/auth/login',
-    [GUARD_TYPES.ORGANIZER]: '/auth/organizer-login',
-    [GUARD_TYPES.ANY]: '/auth/login',
+  const authState = useSelector(state => state.auth);
+  const organizerState = useSelector(state => state.organizer);
+
+  // Parse user data if it's stored as a string
+  const getUser = (userData) => {
+    if (!userData) return null;
+    
+    if (typeof userData === 'string') {
+      try {
+        return JSON.parse(userData);
+      } catch (e) {
+        console.error('Error parsing user data:', e);
+        return null;
+      }
+    }
+    
+    return userData;
   };
   
-  // Determine final redirect path
-  const finalRedirectTo = redirectTo || defaultRedirects[type] || '/auth/login';
+  const user = getUser(authState?.user);
+  const userToken = authState?.token;
+  
+  const organizer = getUser(organizerState?.user);
+  const organizerToken = organizerState?.token;
+  
+  // Parse token if needed
+  const parseToken = (token) => {
+    if (!token) return null;
+    
+    if (typeof token === 'string') {
+      // Remove quotes if the token is stored with them
+      return token.replace(/^"(.*)"$/, '$1');
+    }
+    
+    return token;
+  };
+  
+  const cleanUserToken = parseToken(userToken);
+  const cleanOrganizerToken = parseToken(organizerToken);
 
+  // Set up loading state
   useEffect(() => {
-    const verifyAuth = async () => {
-      try {
-        // Fix any persistence issues with tokens
-        fixPersistenceIssues();
-        
-        // Verify tokens based on guard type
-        if (type === GUARD_TYPES.USER || type === GUARD_TYPES.ANY) {
-          if (userAuth.token) {
-            await dispatch(verifyUserToken()).unwrap();
-          }
-        }
-        
-        if (type === GUARD_TYPES.ORGANIZER || type === GUARD_TYPES.ANY) {
-          if (organizerAuth.token) {
-            await dispatch(verifyOrganizerToken()).unwrap();
-          }
-        }
-      } catch (error) {
-        console.error('Token verification failed:', error);
-      } finally {
-        setIsVerifying(false);
-      }
+    setIsLoading(isCheckingAuth);
+    
+    // Debugging - log authentication state
+    // console.log('Guard Authentication Check:', {
+    //   type,
+    //   user: Boolean(user),
+    //   userToken: Boolean(cleanUserToken),
+    //   organizer: Boolean(organizer),
+    //   organizerToken: Boolean(cleanOrganizerToken),
+    //   isCheckingAuth
+    // });
+    
+    const timer = setTimeout(() => setIsCheckingAuth(false), 500);
+    return () => {
+      clearTimeout(timer);
+      setIsLoading(false);
     };
+  }, [isCheckingAuth, setIsLoading, type, user, organizer]);
 
-    verifyAuth();
-  }, [dispatch, type, userAuth.token, organizerAuth.token]);
+  // Check if authenticated based on type
+  const isAuthenticated = () => {
+    if (type === GUARD_TYPES.USER) {
+      return Boolean(user && cleanUserToken);
+    }
+    if (type === GUARD_TYPES.ORGANIZER) {
+      return Boolean(organizer && cleanOrganizerToken);
+    }
+    return false;
+  };
 
-  // Show nothing while verifying to prevent flashes of redirect
-  if (isVerifying) {
+  // Remove loading state after checking auth
+  useEffect(() => {
+    if (isCheckingAuth) {
+      setIsCheckingAuth(false);
+    }
+  }, []);
+
+  // While checking authentication status, return null or loading component
+  if (isCheckingAuth) {
     return null;
   }
 
-  // Check if user is authenticated based on guard type
-  const isAuthenticated = (() => {
-    switch (type) {
-      case GUARD_TYPES.USER:
-        return !!userAuth.token && !!userAuth.user;
-      case GUARD_TYPES.ORGANIZER:
-        return !!organizerAuth.token && !!organizerAuth.user;
-      case GUARD_TYPES.ANY:
-        return (!!userAuth.token && !!userAuth.user) || (!!organizerAuth.token && !!organizerAuth.user);
-      default:
-        return false;
-    }
-  })();
-
-  if (!isAuthenticated) {
-    // Redirect to login with current location saved for later redirect back
-    return <Navigate to={finalRedirectTo} state={{ from: location.pathname }} replace />;
+  // If authenticated, render children or outlet
+  if (isAuthenticated()) {
+    return children || <Outlet />;
   }
 
-  return children;
+  // If not authenticated, navigate to login page
+  const loginRoute = type === GUARD_TYPES.ORGANIZER ? '/auth/organizer-login' : '/auth/login';
+  
+  // Remember the location the user was trying to access
+  return <Navigate to={loginRoute} state={{ from: location.pathname }} replace />;
 };
 
-// Export guard types for convenience
-export { GUARD_TYPES };
 export default Guard;

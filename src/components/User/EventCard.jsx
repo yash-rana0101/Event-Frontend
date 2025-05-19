@@ -1,5 +1,6 @@
 import React from 'react';
 import { Clock, MapPin, BookmarkPlus, Calendar, ChevronRight, Star } from 'lucide-react';
+import { Link } from 'react-router-dom';
 
 const EventCard = ({ event }) => {
   return (

@@ -23,7 +23,10 @@ const CalendarView = ({ calendarDays }) => {
     visible: { opacity: 1, scale: 1 }
   };
 
-  const weekdays = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+  // Use full weekday names to create unique keys
+  const weekdays = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+  // Use shorter display names
+  const displayWeekdays = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
   return (
     <div className="flex flex-col items-center w-full max-w-md mx-auto">
@@ -69,10 +72,10 @@ const CalendarView = ({ calendarDays }) => {
           </div>
         </div>
 
-        {/* Weekday headers */}
+        {/* Weekday headers - Using index to ensure unique keys */}
         <div className="grid grid-cols-7 gap-1 md:gap-2 mb-2">
-          {weekdays.map(day => (
-            <div key={day} className="text-center text-xs md:text-sm font-medium text-gray-400 py-1">
+          {displayWeekdays.map((day, index) => (
+            <div key={`weekday-${index}`} className="text-center text-xs md:text-sm font-medium text-gray-400 py-1">
               {day}
             </div>
           ))}
@@ -90,7 +93,7 @@ const CalendarView = ({ calendarDays }) => {
 
             return (
               <motion.div
-                key={index}
+                key={`calday-${index}`}
                 variants={dayVariants}
                 className="aspect-square relative"
                 onMouseEnter={() => setHoveredDay(index)}

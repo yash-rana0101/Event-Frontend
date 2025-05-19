@@ -58,51 +58,77 @@ export default function Header() {
     },
   ];
 
-  const userNav = [
-    {
-      name2: "Profile",
-      link2: "/user/profile",
-      icon: <BsPersonCircle />,
-    },
-    {
-      name2: "Dashboard",
-      link2: "/user/dashboard",
-      icon: <BsGrid3X3Gap />,
-    },
-  ];
-
-  const getOrganizerId = () => {
-    if (!currentOrganizer) return null;
-    
-    if (typeof currentOrganizer === 'string') {
-      try {
-        const parsed = JSON.parse(currentOrganizer);
-        return parsed?._id || parsed?.id || parsed?._doc?._id;
-      } catch (e) {
-        console.error('Error parsing organizer data:', e);
-        return null;
+  const getUserId = () => {
+    if (currentOrganizer) {
+      if (typeof currentOrganizer === 'string') {
+        try {
+          const parsed = JSON.parse(currentOrganizer);
+          return parsed?._id || parsed?.id || parsed?._doc?._id;
+        } catch (e) {
+          console.error('Error parsing organizer data:', e);
+          return null;
+        }
       }
+
+      return currentOrganizer?._id || currentOrganizer?.id || currentOrganizer?._doc?._id;
+    } else if (currentUser) {
+      if (typeof currentUser === 'string') {
+        try {
+          const parsed = JSON.parse(currentUser);
+          return parsed?._id || parsed?.id || parsed?._doc?._id;
+        } catch (e) {
+          console.error('Error parsing user data:', e);
+          return null;
+        }
+      }
+
+      return currentUser?._id || currentUser?.id || currentUser?._doc?._id;
     }
-    
-    return currentOrganizer?._id || currentOrganizer?.id || 
-           currentOrganizer?._doc?._id; 
+
+    return null;
   };
 
-  const organizerId = getOrganizerId();
-  
-  const organizerProfileLink = organizerId ? 
-    `/organizer/profile/${organizerId}` : 
-    '/organizer/profile';
+  const userId = getUserId();
+
+  // Only create profile link if we have a userId
+  const profileLink = userId ?
+    (currentOrganizer ? `/organizer/profile/${userId}` : `/user/profile/${userId}`) :
+    null; // Set to null if no userId available
+
+  // Redirect to login if profile link is null (no userId)
+  const handleProfileNavigation = () => {
+    if (!profileLink) {
+      // Redirect to login since we don't have a userId
+      navigate('/auth/login');
+      return;
+    }
+    navigate(profileLink);
+  };
 
   const organizerNav = [
     {
       name2: "Organizer Profile",
-      link2: organizerProfileLink,
+      link2: profileLink || "/auth/login", // Fallback to login if no profile link
       icon: <BsPersonCircle />,
+      requiresAuth: true
     },
     {
       name2: "Dashboard",
       link2: "/organizer/dashboard",
+      icon: <BsGrid3X3Gap />,
+    },
+  ];
+
+  const userNav = [
+    {
+      name2: "Profile",
+      link2: profileLink || "/auth/login", // Fallback to login if no profile link
+      icon: <BsPersonCircle />,
+      requiresAuth: true
+    },
+    {
+      name2: "Dashboard",
+      link2: "/user/dashboard",
       icon: <BsGrid3X3Gap />,
     },
   ];
@@ -128,7 +154,7 @@ export default function Header() {
       thoroughAuthCleanup('user');
       dispatch(logout());
     }
-    
+
     setIsUserDropdownOpen(false);
     navigate("/");
   };
@@ -244,24 +270,41 @@ export default function Header() {
         <nav className="hidden md:flex items-center space-x-1">
           {activeUser ? (
             <>
-              <NavLink
-                to={currentOrganizer ? organizerProfileLink : "/user/profile"}
-                className={({ isActive }) =>
-                  `group relative px-4 py-2 rounded-lg transition-all duration-300 hover:cursor-pointer ${isActive
-                    ? "text-[#00D8FF]"
-                    : "text-gray-400 hover:text-white"
-                  }`
-                }
-              >
-                <div className="flex items-center space-x-3">
-                  <BsPersonCircle size={24} />
-                  <span className="relative">
-                    {currentOrganizer ? "Profile" : "Profile"}
-                    <span className="absolute -bottom-1 left-0 w-0 h-[2px] bg-[#00D8FF] group-hover:w-full transition-all duration-300" />
-                  </span>
-                </div>
-                <div className="absolute inset-0 bg-[#00D8FF]/0 group-hover:bg-[#00D8FF]/10 rounded-lg transition-all duration-300" />
-              </NavLink>
+              {/* Replace this NavLink */}
+              {profileLink ? (
+                <NavLink
+                  to={profileLink}
+                  className={({ isActive }) =>
+                    `group relative px-4 py-2 rounded-lg transition-all duration-300 hover:cursor-pointer ${isActive
+                      ? "text-[#00D8FF]"
+                      : "text-gray-400 hover:text-white"
+                    }`
+                  }
+                >
+                  <div className="flex items-center space-x-3">
+                    <BsPersonCircle size={24} />
+                    <span className="relative">
+                      Profile
+                      <span className="absolute -bottom-1 left-0 w-0 h-[2px] bg-[#00D8FF] group-hover:w-full transition-all duration-300" />
+                    </span>
+                  </div>
+                  <div className="absolute inset-0 bg-[#00D8FF]/0 group-hover:bg-[#00D8FF]/10 rounded-lg transition-all duration-300" />
+                </NavLink>
+              ) : (
+                <button
+                  onClick={() => navigate("/auth/login")}
+                  className="group relative px-4 py-2 rounded-lg transition-all duration-300 hover:cursor-pointer text-gray-400 hover:text-white"
+                >
+                  <div className="flex items-center space-x-3">
+                    <BsPersonCircle size={24} />
+                    <span className="relative">
+                      Profile
+                      <span className="absolute -bottom-1 left-0 w-0 h-[2px] bg-[#00D8FF] group-hover:w-full transition-all duration-300" />
+                    </span>
+                  </div>
+                  <div className="absolute inset-0 bg-[#00D8FF]/0 group-hover:bg-[#00D8FF]/10 rounded-lg transition-all duration-300" />
+                </button>
+              )}
 
               <NavLink
                 to={currentOrganizer ? "/organizer/dashboard" : "/user/dashboard"}
@@ -283,7 +326,7 @@ export default function Header() {
                 <div className="absolute inset-0 bg-[#00D8FF]/0 group-hover:bg-[#00D8FF]/10 rounded-lg transition-all duration-300" />
               </NavLink>
 
-              
+
               {nav
                 .filter((item) => !item.guestOnly)
                 .map((item) => (

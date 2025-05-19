@@ -6,19 +6,25 @@ import OverviewSection from './OverviewSection';
 const NotificationsSection = ({ notifications, setActiveTab, overview = false }) => {
   const renderNotifications = () => (
     <div className="space-y-3">
-      {notifications.map((note, index) => (
-        <motion.div
-          key={note.id}
-          className="p-3 border-l-4 border-cyan-500 bg-black/30 rounded-r hover:bg-black/50 transition-colors cursor-pointer"
-          initial={{ opacity: 0, x: -10 }}
-          animate={{ opacity: 1, x: 0 }}
-          transition={{ duration: 0.3, delay: index * 0.1 }}
-          whileHover={{ x: 5 }}
-        >
-          <p className="text-white">{note.message}</p>
-          <p className="text-xs text-cyan-400 mt-1">{note.time}</p>
-        </motion.div>
-      ))}
+      {notifications.length > 0 ? (
+        notifications.map((note, index) => (
+          <motion.div
+            key={note.id}
+            className="p-3 border-l-4 border-cyan-500 bg-black/30 rounded-r hover:bg-black/50 transition-colors cursor-pointer"
+            initial={{ opacity: 0, x: -10 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ duration: 0.3, delay: index * 0.1 }}
+            whileHover={{ x: 5 }}
+          >
+            <p className="text-white">{note.message}</p>
+            <p className="text-xs text-cyan-400 mt-1">{note.time}</p>
+          </motion.div>
+        ))
+      ) : (
+        <div className="text-center p-4 bg-black/30 rounded-lg">
+          <p className="text-gray-400">No new notifications</p>
+        </div>
+      )}
     </div>
   );
 

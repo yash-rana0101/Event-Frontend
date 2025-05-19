@@ -311,7 +311,7 @@ export default function ContactPage() {
       <section className="py-16 relative">
         <div className="container mx-auto px-4 relative z-10">
           <div className="max-w-7xl mx-auto">
-            <h2 className="text-2xl font-bold mb-8 inline-block pb-2 border-b-2 border-cyan-500 flex items-center gap-2">
+            <h2 className="text-2xl font-bold mb-8 pb-2 border-b-2 border-cyan-500 flex items-center gap-2">
               <MapPin size={22} className="text-cyan-400" />
               <span className="bg-clip-text text-transparent bg-gradient-to-r from-cyan-300 to-cyan-300">
                 Our Location

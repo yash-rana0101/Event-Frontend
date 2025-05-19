@@ -25,7 +25,6 @@ const Sidebar = ({ activeTab, setActiveTab }) => {
       <nav>
         <ul className="space-y-2">
           <NavItem icon={<BookOpen size={18} />} label="Overview" active={activeTab === 'overview'} onClick={() => setActiveTab('overview')} />
-          <NavItem icon={<Calendar size={18} />} label="Calendar" active={activeTab === 'calendar'} onClick={() => setActiveTab('calendar')} />
           <NavItem icon={<Ticket size={18} />} label="My Events" active={activeTab === 'events'} onClick={() => setActiveTab('events')} />
           <NavItem icon={<Star size={18} />} label="Recommendations" active={activeTab === 'recommendations'} onClick={() => setActiveTab('recommendations')} />
           <NavItem icon={<Heart size={18} />} label="Saved Events" active={activeTab === 'saved'} onClick={() => setActiveTab('saved')} />

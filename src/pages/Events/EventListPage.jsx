@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Eye, Edit2, Trash2, Search, Filter, ChevronLeft, ChevronRight, Calendar, MapPin, Users, Clock } from 'lucide-react';
 import { FaArrowLeft, FaPlus } from "react-icons/fa";
 import { useNavigate, Link } from "react-router-dom";
@@ -34,7 +34,7 @@ const EventListPage = () => {
   const eventsPerPage = 4;
 
   // Fetch events from the API
-  const fetchEvents = async () => {
+  const fetchEvents = useCallback(async () => {
     try {
       setLoading(true);
 
@@ -48,8 +48,7 @@ const EventListPage = () => {
       if (!token) {
         throw new Error('Authentication required. Please log in again.');
       }
-
-      console.log("organizerData", organizerData);
+      
       // Get organizer ID
       let organizerId;
       if (typeof organizerData === 'string') {
@@ -102,7 +101,7 @@ const EventListPage = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [organizerToken, organizerData]);
 
   // Map backend status values to our UI status values
   const mapEventStatusToUI = (status) => {
@@ -158,7 +157,7 @@ const EventListPage = () => {
   // Effect to load events on component mount
   useEffect(() => {
     fetchEvents();
-  }, []);
+  }, [fetchEvents]);
 
   // Filter events based on search term and status
   const filteredEvents = events.filter(event => {

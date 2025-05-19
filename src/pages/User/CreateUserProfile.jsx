@@ -98,7 +98,7 @@ const CreateUserProfile = () => {
       }
 
       // Submit the form data
-      await axios.post('/api/v1/profiles/me', {
+      await axios.post(`${import.meta.env.VITE_API_URL}/profiles/me`, {
         bio: formData.bio,
         location: formData.location,
         website: formData.website,
@@ -108,6 +108,8 @@ const CreateUserProfile = () => {
       }, {
         headers: { Authorization: `Bearer ${token}` }
       });
+
+
 
       toast.success('Profile created successfully!');
       navigate('/user/profile');

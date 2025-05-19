@@ -20,6 +20,9 @@ export default function EventDetail() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [similarEvents, setSimilarEvents] = useState([]);
+  const [showCancelWarning, setShowCancelWarning] = useState(false);
+  const [wasRegistered, setWasRegistered] = useState(false);
+  const [showReregisterConfirm, setShowReregisterConfirm] = useState(false);
 
   // Get current user from Redux
   const user = useSelector(state => state.auth?.user);
@@ -72,7 +75,18 @@ export default function EventDetail() {
               headers: { Authorization: `Bearer ${userToken}` }
             }
           );
-          setIsRegistered(registrationResponse.data.isRegistered);
+
+          console.log("Registration check response:", registrationResponse.data);
+
+          // Update registration status based on backend response
+          setIsRegistered(registrationResponse.data.isRegistered &&
+            registrationResponse.data.status !== "cancelled");
+
+          // If there's a registration but it's cancelled, mark wasRegistered as true
+          if (registrationResponse.data.isRegistered &&
+            registrationResponse.data.status === "cancelled") {
+            setWasRegistered(true);
+          }
         } catch (err) {
           // If error occurs in registration check, just assume not registered
           console.warn("Error checking registration status:", err);
@@ -106,27 +120,121 @@ export default function EventDetail() {
     }
 
     try {
-      setIsRegistered(prev => !prev); // Optimistic update
-
       const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000/api/v1';
 
-      if (!isRegistered) {
-        await axios.post(
-          `${apiUrl}/registrations/events/${eventId}`,
-          {},
-          { headers: { Authorization: `Bearer ${userToken}` } }
-        );
-        toast.success("Successfully registered for event!");
-      } else {
+      // Handling cancellation flow
+      if (isRegistered) {
+        if (!showCancelWarning) {
+          // Show warning first instead of immediately cancelling
+          setShowCancelWarning(true);
+          return;
+        }
+
+        // User confirmed cancellation, proceed
+        setShowCancelWarning(false);
         await axios.delete(
           `${apiUrl}/registrations/events/${eventId}`,
           { headers: { Authorization: `Bearer ${userToken}` } }
         );
+        setIsRegistered(false);
+        setWasRegistered(true); // Mark that user was previously registered
         toast.info("Registration cancelled");
+        return;
+      }
+
+      // Handling re-registration flow for previously cancelled registrations
+      if (wasRegistered && !showReregisterConfirm) {
+        // If user previously cancelled and trying to register again, show confirmation first
+        setShowReregisterConfirm(true);
+        return;
+      }
+
+      // Reset confirmation dialog state
+      setShowReregisterConfirm(false);
+
+      try {
+        // Optimistic update for better UX
+        setIsRegistered(true);
+
+        if (wasRegistered) {
+          const response = await axios.patch(
+            `${apiUrl}/registrations/events/${eventId}/reactivate`,
+            {
+              status: "confirmed",
+              event: eventId,
+              user: user._id
+            },
+            { headers: { Authorization: `Bearer ${userToken}` } }
+          );
+
+          setWasRegistered(false);
+          toast.success("Successfully re-registered for event!");
+          return;
+        }
+        const checkResponse = await axios.get(
+          `${apiUrl}/registrations/check/${eventId}`,
+          { headers: { Authorization: `Bearer ${userToken}` } }
+        );
+
+        if (checkResponse.data.isRegistered && checkResponse.data.status !== "cancelled") {
+          toast.info("You're already registered for this event");
+          return;
+        }
+
+        if (checkResponse.data.isRegistered && checkResponse.data.status === "cancelled") {
+          await axios.patch(
+            `${apiUrl}/registrations/events/${eventId}/reactivate`,
+            {
+              status: "confirmed",
+              event: eventId,
+              user: user._id
+            },
+            { headers: { Authorization: `Bearer ${userToken}` } }
+          );
+          toast.success("Successfully re-registered for event!");
+          return;
+        }
+
+        // Otherwise create a new registration
+        const response = await axios.post(
+          `${apiUrl}/registrations/events/${eventId}`,
+          { status: "confirmed" },  // Include status in the payload
+          { headers: { Authorization: `Bearer ${userToken}` } }
+        );
+        toast.success(response.data.message || "Successfully registered for event!");
+      } catch (err) {
+        // Handle specific error responses
+        setIsRegistered(false); // Revert optimistic update
+
+        if (err.response?.status === 409) {
+          // Conflict - already registered
+          toast.info("You're already registered for this event");
+          setIsRegistered(true);
+        } else if (err.response?.status === 400) {
+          // Bad request - e.g., event capacity reached or validation errors
+          toast.warning(err.response.data.message || "Unable to register for this event");
+          console.error("Registration error details:", err.response.data);
+        } else if (err.response?.status === 404) {
+          // If reactivate endpoint not found, try regular registration as fallback
+          try {
+            const response = await axios.post(
+              `${apiUrl}/registrations/events/${eventId}`,
+              { status: "confirmed" },  // Include status in the payload
+              { headers: { Authorization: `Bearer ${userToken}` } }
+            );
+            setIsRegistered(true);
+            setWasRegistered(false);
+            toast.success(response.data.message || "Successfully registered for event!");
+          } catch (fallbackErr) {
+            toast.error(fallbackErr.response?.data?.message || "Error processing registration");
+          }
+        } else {
+          // Other errors
+          console.error("Registration error:", err);
+          toast.error(err.response?.data?.message || "Error processing registration");
+        }
       }
     } catch (err) {
-      // Revert optimistic update
-      setIsRegistered(prev => !prev);
       console.error("Registration error:", err);
       toast.error(err.response?.data?.message || "Error processing registration");
     }
@@ -147,12 +255,12 @@ export default function EventDetail() {
     date: event.date || new Date(event.startDate || Date.now()).toLocaleDateString(),
     location: (event.location?.address) || "No location specified",
     participants: `${event.attendeesCount || 0}+ Participants${event.capacity ? ` (Max: ${event.capacity})` : ''}`,
-    duration: event.duration || "Check event details for timing",
+    duration: event.duration,
     registrationDeadline: event.registrationDeadline
       ? new Date(event.registrationDeadline).toLocaleDateString()
       : "Until seats last",
     image: event.images?.[0] || "https://placehold.co/1200x600?text=No+Image+Available",
-    organizer: event.organizerName || "Event Organizer",
+    organizer: event.organizerName,
     organizerId: event.organizer,
     organizerLogo: event.organizerLogo || "https://placehold.co/80x80?text=Organizer",
     featured: event.featured || false,
@@ -214,31 +322,86 @@ export default function EventDetail() {
 
                 <div className="flex flex-col sm:flex-row gap-3 sm:items-center">
                   <div className="flex items-center space-x-2">
-                    <FaArrowLeft size={14} className="text-cyan-500"/>
+                    <FaArrowLeft size={14} className="text-cyan-500" />
                     <span className="relative">
                       <Link
                         to={`/event`}
                         className="text-cyan-400 hover:text-cyan-300 transition-all duration-300 group"
                       >
-                        Back to Events
-                      <span className="absolute -bottom-1 left-0 w-0 h-[2px] bg-[#00D8FF] group-hover:w-full transition-all duration-300" />
+                        Back 
+                        <span className="absolute -bottom-1 left-0 w-0 h-[2px] bg-[#00D8FF] group-hover:w-full transition-all duration-300" />
                       </Link>
                     </span>
                   </div>
 
-                  <button
-                    onClick={handleRegister}
-                    className={`
-                      px-6 py-3 rounded-lg font-semibold transition-all duration-300 flex items-center justify-center cursor-pointer
-                      ${isRegistered
-                        ? "bg-gray-700 text-gray-300 border border-gray-600"
-                        : "bg-cyan-400 hover:bg-black hover:text-cyan-500 hover:border text-gray-900"}
-                    `}
-                  >
-                    {isRegistered ? "Registered" : "Register Now"}
-                  </button>
+                  {showCancelWarning ? (
+                    <div className="mb-4 p-3 bg-red-900/30 border border-red-500/50 rounded-lg">
+                      <div className="flex items-start">
+                        <AlertCircle className="text-red-400 mr-2 shrink-0 mt-1" size={18} />
+                        <p className="text-sm text-red-100">
+                          Warning: Are you sure you want to cancel your registration for this event?
+                        </p>
+                      </div>
 
-                  
+                      <div className="flex gap-3 mt-3">
+                        <button
+                          onClick={() => setShowCancelWarning(false)}
+                          className="flex-1 py-2 px-4 bg-gray-700 text-gray-300 rounded-md text-sm transition-colors hover:bg-gray-600"
+                        >
+                          Keep Registration
+                        </button>
+                        <button
+                          onClick={handleRegister}
+                          className="flex-1 py-2 px-4 bg-red-500 text-white rounded-md text-sm transition-colors hover:bg-red-600"
+                        >
+                          Yes, Cancel
+                        </button>
+                      </div>
+                    </div>
+                  ) : showReregisterConfirm ? (
+                    <div className="mb-4 p-3 bg-cyan-900/30 border border-cyan-500/50 rounded-lg">
+                      <div className="flex items-start">
+                        <AlertCircle className="text-cyan-400 mr-2 shrink-0 mt-1" size={18} />
+                        <p className="text-sm text-cyan-100">
+                          You previously cancelled your registration. Would you like to register for this event again?
+                        </p>
+                      </div>
+
+                      <div className="flex gap-3 mt-3">
+                        <button
+                          onClick={() => setShowReregisterConfirm(false)}
+                          className="flex-1 py-2 px-4 bg-gray-700 text-gray-300 rounded-md text-sm transition-colors hover:bg-gray-600"
+                        >
+                          No, Cancel
+                        </button>
+                        <button
+                          onClick={handleRegister}
+                          className="flex-1 py-2 px-4 bg-cyan-500 text-white rounded-md text-sm transition-colors hover:bg-cyan-600"
+                        >
+                          Yes, Register Again
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <button
+                      onClick={handleRegister}
+                      className={`
+                        w-full px-6 py-3 rounded-lg font-semibold text-center transition-all duration-300 cursor-pointer 
+                        ${isRegistered
+                          ? "bg-red-500/80 hover:bg-red-600 text-white border border-red-400/50"
+                          : wasRegistered
+                            ? "bg-cyan-500/80 hover:bg-cyan-600 text-white border border-cyan-400/50"
+                            : "bg-cyan-400 hover:bg-black hover:text-cyan-500 text-gray-900 hover:border"}
+                    `}
+                    >
+                      {isRegistered
+                        ? "Cancel Registration"
+                        : wasRegistered
+                          ? "Register Again"
+                          : "Register Now"}
+                    </button>
+                  )}
+
                 </div>
               </div>
             </div>
@@ -609,21 +772,83 @@ export default function EventDetail() {
                 </div>
               </div>
 
-              <button
-                onClick={handleRegister}
-                className={`
-                  w-full px-6 py-3 rounded-lg font-semibold text-center transition-all duration-300 cursor-pointer 
-                  ${isRegistered
-                    ? "bg-gray-700 text-gray-300 border border-gray-600"
-                    : "bg-cyan-400 hover:bg-black hover:text-cyan-500 text-gray-900 hover:border"}
-                `}
-              >
-                {isRegistered ? "You're Registered!" : "Register Now"}
-              </button>
+              {showCancelWarning ? (
+                <div className="mb-4 p-3 bg-red-900/30 border border-red-500/50 rounded-lg">
+                  <div className="flex items-start">
+                    <AlertCircle className="text-red-400 mr-2 shrink-0 mt-1" size={18} />
+                    <p className="text-sm text-red-100">
+                      Warning: Are you sure you want to cancel your registration for this event?
+                    </p>
+                  </div>
 
-              {isRegistered && (
+                  <div className="flex gap-3 mt-3">
+                    <button
+                      onClick={() => setShowCancelWarning(false)}
+                      className="flex-1 py-2 px-4 bg-gray-700 text-gray-300 rounded-md text-sm transition-colors hover:bg-gray-600"
+                    >
+                      Keep Registration
+                    </button>
+                    <button
+                      onClick={handleRegister}
+                      className="flex-1 py-2 px-4 bg-red-500 text-white rounded-md text-sm transition-colors hover:bg-red-600"
+                    >
+                      Yes, Cancel
+                    </button>
+                  </div>
+                </div>
+              ) : showReregisterConfirm ? (
+                <div className="mb-4 p-3 bg-cyan-900/30 border border-cyan-500/50 rounded-lg">
+                  <div className="flex items-start">
+                    <AlertCircle className="text-cyan-400 mr-2 shrink-0 mt-1" size={18} />
+                    <p className="text-sm text-cyan-100">
+                      You previously cancelled your registration. Would you like to register for this event again?
+                    </p>
+                  </div>
+
+                  <div className="flex gap-3 mt-3">
+                    <button
+                      onClick={() => setShowReregisterConfirm(false)}
+                      className="flex-1 py-2 px-4 bg-gray-700 text-gray-300 rounded-md text-sm transition-colors hover:bg-gray-600"
+                    >
+                      No, Cancel
+                    </button>
+                    <button
+                      onClick={handleRegister}
+                      className="flex-1 py-2 px-4 bg-cyan-500 text-white rounded-md text-sm transition-colors hover:bg-cyan-600"
+                    >
+                      Yes, Register Again
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <button
+                  onClick={handleRegister}
+                  className={`
+                    w-full px-6 py-3 rounded-lg font-semibold text-center transition-all duration-300 cursor-pointer 
+                    ${isRegistered
+                      ? "bg-red-500/80 hover:bg-red-600 text-white border border-red-400/50"
+                      : wasRegistered
+                        ? "bg-cyan-500/80 hover:bg-cyan-600 text-white border border-cyan-400/50"
+                        : "bg-cyan-400 hover:bg-black hover:text-cyan-500 text-gray-900 hover:border"}
+                  `}
+                >
+                  {isRegistered
+                    ? "Cancel Registration"
+                    : wasRegistered
+                      ? "Register Again"
+                      : "Register Now"}
+                </button>
+              )}
+
+              {isRegistered && !showCancelWarning && (
                 <p className="text-green-400 text-sm text-center mt-3">
                   You've successfully registered for this event!
+                </p>
+              )}
+
+              {wasRegistered && !isRegistered && !showReregisterConfirm && (
+                <p className="text-gray-300 text-sm text-center mt-3">
+                  You previously cancelled your registration
                 </p>
               )}
             </div>

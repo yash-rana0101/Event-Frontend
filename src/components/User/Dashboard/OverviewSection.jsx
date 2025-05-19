@@ -6,7 +6,6 @@ import { Calendar, Star, Heart, Bell, MessageCircle, HelpCircle, Phone, Ticket }
 const OverviewSection = ({ title, icon, children }) => {
   const getIcon = () => {
     switch (icon) {
-      case 'calendar': return <Calendar size={20} />;
       case 'star': return <Star size={20} />;
       case 'heart': return <Heart size={20} />;
       case 'bell': return <Bell size={20} />;

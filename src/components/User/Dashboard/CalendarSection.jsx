@@ -8,6 +8,9 @@ const CalendarSection = ({ calendarDays, setActiveTab }) => {
   // Get current date for highlighting today
   const today = new Date().getDate();
 
+  // Use indexed weekday abbreviations to avoid duplicate keys
+  const weekdays = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => day.charAt(0));
+
   return (
     <OverviewSection title="Calendar" icon="calendar">
       <motion.div
@@ -24,27 +27,27 @@ const CalendarSection = ({ calendarDays, setActiveTab }) => {
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center space-x-2">
             <Calendar size={16} className="text-cyan-500" />
-            <span className="text-xs font-medium text-gray-300">April 2025</span>
+            <span className="text-xs font-medium text-gray-300">{new Date().toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}</span>
           </div>
           <div className="h-px flex-grow mx-2 bg-gradient-to-r from-transparent via-cyan-900/30 to-transparent"></div>
         </div>
 
-        {/* Weekday headers */}
+        {/* Weekday headers - Use index as part of the key to ensure uniqueness */}
         <div className="grid grid-cols-7 gap-1 mb-2">
-          {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map(day => (
-            <div key={day} className="text-center text-xs font-medium text-cyan-500/80">{day}</div>
+          {weekdays.map((day, index) => (
+            <div key={`weekday-${index}`} className="text-center text-xs font-medium text-cyan-500/80">{day}</div>
           ))}
         </div>
 
         {/* Calendar days */}
         <div className="grid grid-cols-7 gap-1">
-          {calendarDays.map((day, index) => {
+          {calendarDays && calendarDays.map((day, index) => {
             const isPresent = day.status === 'present';
             const isToday = day.day === today;
 
             return (
               <motion.div
-                key={index}
+                key={`calendarDay-${index}`}
                 className={`
                   relative aspect-square flex items-center justify-center 
                   text-xs md:text-sm rounded-md cursor-pointer group

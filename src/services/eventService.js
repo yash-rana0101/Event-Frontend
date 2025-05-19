@@ -1,5 +1,5 @@
 import axios from "axios";
-import { getApiBaseUrl, getApiHeaders } from "../utils/apiUtils";
+import { getApiHeaders, getApiBaseUrl } from "../utils/apiUtils";
 import { safelyParseToken } from "../utils/persistFix";
 
 // Service for event-related API calls
@@ -75,18 +75,26 @@ const eventService = {
 
   // Update event
   updateEvent: async (eventId, eventData) => {
-    // Handle image conversion to array if it's a string
-    if (eventData.images && typeof eventData.images === "string") {
-      eventData.images = [eventData.images];
-    }
-
     const config = {
-      headers: getApiHeaders(),
+      headers: {
+        "Content-Type": "application/json",
+        ...getApiHeaders(true),
+      },
     };
+
+    // Handle form data conversion similar to createEvent if needed
+    let data = eventData;
+    if (eventData instanceof FormData) {
+      config.headers["Content-Type"] = "multipart/form-data";
+    } else if (typeof eventData === "object") {
+      // Convert regular object to JSON
+      data = JSON.stringify(eventData);
+      config.headers["Content-Type"] = "application/json";
+    }
 
     const response = await axios.put(
       `${getApiBaseUrl()}/events/${eventId}`,
-      eventData,
+      data,
       config
     );
 
@@ -135,6 +143,150 @@ const eventService = {
     });
 
     return response.data;
+  },
+
+  // Get user dashboard events
+  getUserDashboardEvents: async () => {
+    // Get token from localStorage
+    const token = localStorage.getItem("token");
+
+    // Create headers object properly
+    const config = {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    };
+
+    try {
+      // Try the dashboard-specific endpoint first
+      const response = await axios.get(
+        `${getApiBaseUrl()}/profiles/me/events`,
+        config
+      );
+      return response.data;
+    } catch (err) {
+      // Fallback to registrations if dashboard endpoint fails
+      if (err.response && err.response.status === 404) {
+        const regResponse = await axios.get(
+          `${getApiBaseUrl()}/registrations`,
+          config
+        );
+        return {
+          data: regResponse.data.map((reg) => ({
+            id: reg.event?._id,
+            title: reg.event?.title || "Unnamed Event",
+            date: reg.event?.startDate || reg.registrationDate,
+            location: reg.event?.location?.address || "No location specified",
+            image: reg.event?.images?.[0] || null,
+            status: reg.status,
+          })),
+          success: true,
+        };
+      }
+      throw err;
+    }
+  },
+
+  // Get user saved events
+  getUserSavedEvents: async () => {
+    // Get token from localStorage
+    const token = localStorage.getItem("token");
+
+    // Create headers object properly
+    const config = {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    };
+
+    try {
+      const response = await axios.get(
+        `${getApiBaseUrl()}/profiles/saved-events`,
+        config
+      );
+      return response.data;
+    } catch (err) {
+      console.error("Error fetching saved events:", err);
+      throw err;
+    }
+  },
+
+  // Get user calendar data
+  getUserCalendarData: async () => {
+    // Get token from localStorage
+    const token = localStorage.getItem("token");
+
+    // Create headers object properly
+    const config = {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    };
+
+    try {
+      // Try the calendar-specific endpoint
+      const response = await axios.get(
+        `${getApiBaseUrl()}/profiles/me/calendar`,
+        config
+      );
+      return response.data;
+    } catch (err) {
+      // If 404, create fallback calendar data
+      if (err.response && err.response.status === 404) {
+        // Generate demo calendar data
+        const currentDate = new Date();
+        const daysInMonth = new Date(
+          currentDate.getFullYear(),
+          currentDate.getMonth() + 1,
+          0
+        ).getDate();
+
+        const calendarData = {
+          month: currentDate.getMonth() + 1,
+          year: currentDate.getFullYear(),
+          calendarDays: [],
+        };
+
+        // Generate empty calendar days
+        for (let day = 1; day <= daysInMonth; day++) {
+          calendarData.calendarDays.push({
+            day,
+            events: [],
+            status: "absent",
+          });
+        }
+
+        return {
+          success: true,
+          data: calendarData,
+        };
+      }
+      throw err;
+    }
+  },
+
+  // Get user recommendations
+  getUserRecommendations: async () => {
+    // Get token from localStorage
+    const token = localStorage.getItem("token");
+
+    // Create headers object properly
+    const config = {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    };
+
+    try {
+      const response = await axios.get(
+        `${getApiBaseUrl()}/profiles/me/recommendations`,
+        config
+      );
+      return response.data;
+    } catch (err) {
+      console.error("Error fetching recommendations:", err);
+      throw err;
+    }
   },
 };
 

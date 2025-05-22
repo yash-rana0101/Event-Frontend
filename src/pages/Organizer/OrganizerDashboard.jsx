@@ -83,77 +83,46 @@ const OrganizerDashboard = () => {
       };
 
       // Try different endpoint formats - the error shows we need to fix the URL
-      let response = null;
-      let allEvents = [];
-      let endpointUsed = '';
+      try {
+        // First try organizer-specific endpoint
+        const response = await axios.get(
+          `${apiUrl}/organizer/events/organizer/${organizerId}`,
+          config
+        );
 
-      // Try several possible endpoint structures that might be used by your API
-      const possibleEndpoints = [
-        `/organizer/events/organizer/${organizerId}`,  // Format used in OrganizerProfile
-      ];
+        console.log("Events fetched successfully:", response.data);
+        setEvents(response.data);
+      } catch (err1) {
+        console.warn("First endpoint failed, trying fallback:", err1);
 
-      let lastError = null;
-
-      // Try each endpoint until one works
-      for (const endpoint of possibleEndpoints) {
         try {
-          console.log(`Trying endpoint: ${apiUrl}${endpoint}`);
-          response = await axios.get(`${apiUrl}${endpoint}`, config);
+          // Try general events endpoint with organizer filter
+          const fallbackResponse = await axios.get(
+            `${apiUrl}/events`,
+            {
+              params: { organizer: organizerId },
+              headers: config.headers
+            }
+          );
 
-          if (response.data) {
-            allEvents = Array.isArray(response.data) ? response.data :
-              (response.data.events || response.data.data || []);
-            endpointUsed = endpoint;
-            console.log(`Successfully fetched data from: ${apiUrl}${endpoint}`);
-            break;
-          }
-        } catch (err) {
-          console.warn(`Endpoint ${apiUrl}${endpoint} failed:`, err.message);
-          lastError = err;
-          // Continue trying other endpoints
+          console.log("Fallback events fetched:", fallbackResponse.data);
+          setEvents(Array.isArray(fallbackResponse.data)
+            ? fallbackResponse.data
+            : fallbackResponse.data.events || []);
+        } catch (err2) {
+          console.error("All endpoints failed:", err2);
+          throw err2;
         }
       }
-
-      // If all endpoints failed
-      if (!response && lastError) {
-        // Log the comprehensive debug information
-        console.error('All endpoints failed. Details:', {
-          organizerId,
-          possibleEndpoints: possibleEndpoints.map(ep => `${apiUrl}${ep}`),
-          lastError
-        });
-
-        // Try a fallback - get all events and filter by organizer
-        try {
-          const allEventsResponse = await axios.get(`${apiUrl}/events`, config);
-          if (allEventsResponse.data) {
-            // Filter events by organizer ID
-            let events = Array.isArray(allEventsResponse.data) ?
-              allEventsResponse.data :
-              (allEventsResponse.data.events || allEventsResponse.data.data || []);
-
-            allEvents = events.filter(event =>
-              event.organizer === organizerId ||
-              event.organizer?._id === organizerId);
-
-            console.log(`Fallback: filtered ${allEvents.length} events for organizer from all events`);
-          }
-        } catch (fallbackErr) {
-          throw lastError; // If fallback also fails, throw the original error
-        }
-      }
-
-      // Process events
-      setEvents(allEvents);
 
       // Sort events into upcoming and past
       const now = new Date();
-      const upcoming = allEvents.filter(event => {
+      const upcoming = events.filter(event => {
         const eventDate = new Date(event.date || event.startDate);
         return eventDate > now;
       }).slice(0, 3); // Show only 3 upcoming events
 
-      const past = allEvents.filter(event => {
+      const past = events.filter(event => {
         const eventDate = new Date(event.date || event.startDate);
         return eventDate <= now;
       }).slice(0, 3); // Show only 3 past events
@@ -163,10 +132,10 @@ const OrganizerDashboard = () => {
 
       // Calculate basic stats
       setEventStats({
-        totalEvents: allEvents.length,
-        totalAttendees: allEvents.reduce((sum, event) => sum + (event.attendeesCount || 0), 0),
-        completionRate: Math.round((past.length / Math.max(allEvents.length, 1)) * 100) + '%',
-        cancellations: allEvents.filter(event => event.status === 'cancelled').length
+        totalEvents: events.length,
+        totalAttendees: events.reduce((sum, event) => sum + (event.attendeesCount || 0), 0),
+        completionRate: Math.round((past.length / Math.max(events.length, 1)) * 100) + '%',
+        cancellations: events.filter(event => event.status === 'cancelled').length
       });
     } catch (err) {
       console.error("Error fetching events:", err);

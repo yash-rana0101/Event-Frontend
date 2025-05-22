@@ -67,37 +67,59 @@ const EditOrgProfile = () => {
   const organizerData = useSelector(state => state.organizer);
   const loggedInUser = organizerData?.user;
 
-  // Extract user ID from possibly nested JSON structure
+  // Extract user ID from possibly nested JSON structure - improved function
   const getUserId = () => {
     if (!loggedInUser) return null;
 
+    // If it's already a simple string ID, return it
+    if (typeof loggedInUser === 'string' && /^[0-9a-fA-F]{24}$/.test(loggedInUser)) {
+      return loggedInUser;
+    }
+
+    // If it's a string but not an ID (might be serialized JSON)
     if (typeof loggedInUser === 'string') {
       try {
         const parsed = JSON.parse(loggedInUser);
-        return parsed?._id || parsed?.id || parsed?._doc?._id;
+        
+        // Check various possible locations of the ID
+        if (typeof parsed === 'string' && /^[0-9a-fA-F]{24}$/.test(parsed)) {
+          return parsed;
+        }
+        
+        if (parsed?._id && typeof parsed._id === 'string') {
+          return parsed._id;
+        }
+        
+        if (parsed?.id && typeof parsed.id === 'string') {
+          return parsed.id;
+        }
+        
+        if (parsed?._doc?._id && typeof parsed._doc._id === 'string') {
+          return parsed._doc._id;
+        }
+
+        // If no string ID found, return null
+        return null;
       } catch (e) {
+        console.error('Error parsing organizer data:', e);
         return null;
       }
     }
-
-    return loggedInUser._id || loggedInUser.id || loggedInUser?._doc?._id;
-  };
-
-  // Helper function to determine which social media icon to display
-  const getSocialIcon = (url) => {
-    const lowerUrl = url.toLowerCase();
     
-    if (lowerUrl.includes('twitter') || lowerUrl.includes('x.com')) {
-      return <Twitter size={16} className="text-cyan-500" />;
-    } else if (lowerUrl.includes('linkedin')) {
-      return <Linkedin size={16} className="text-cyan-500" />;
-    } else if (lowerUrl.includes('instagram')) {
-      return <Instagram size={16} className="text-cyan-500" />;
-    } else if (lowerUrl.includes('facebook')) {
-      return <Facebook size={16} className="text-cyan-500" />;
-    } else {
-      return <Globe size={16} className="text-cyan-500" />;
+    // If it's an object, try to extract ID directly
+    if (loggedInUser?._id && typeof loggedInUser._id === 'string') {
+      return loggedInUser._id;
     }
+    
+    if (loggedInUser?.id && typeof loggedInUser.id === 'string') {
+      return loggedInUser.id;
+    }
+    
+    if (loggedInUser?._doc?._id && typeof loggedInUser._doc._id === 'string') {
+      return loggedInUser._doc._id;
+    }
+
+    return null;
   };
 
   const loggedInUserId = getUserId();
@@ -132,7 +154,7 @@ const EditOrgProfile = () => {
           headers: { Authorization: `Bearer ${cleanToken}` }
         } : {};
 
-        // First try to get detailed profile if available
+        // First try to get detailed profile if available - use string ID
         try {
           const detailsResponse = await axios.get(`${apiUrl}/organizer/${loggedInUserId}/details`, config);
 
@@ -152,6 +174,7 @@ const EditOrgProfile = () => {
             }
           }
         } catch (detailsErr) {
+          console.log("Error fetching organizer details:", detailsErr);
           // If detailed profile not found, fall back to basic profile
           const basicResponse = await axios.get(`${apiUrl}/organizer/profile/${loggedInUserId}`, config);
           setOriginalProfile(basicResponse.data);
@@ -162,7 +185,7 @@ const EditOrgProfile = () => {
         setLoading(false);
       } catch (err) {
         console.error("Error fetching organizer profile:", err);
-        setError("Failed to load organizer profile. " + err.message);
+        setError("Failed to load organizer profile: " + (err.response?.data?.message || err.message));
         setLoading(false);
       }
     };

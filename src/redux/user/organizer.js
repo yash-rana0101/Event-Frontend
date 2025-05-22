@@ -20,6 +20,9 @@ const initialState = {
   error: null,
   tokenExpiry: null,
   profileComplete: false,
+  publicProfile: null,
+  publicProfileLoading: false,
+  publicProfileError: null,
 };
 
 // Async thunk for organizer login
@@ -105,6 +108,43 @@ export const verifyOrganizerToken = createAsyncThunk(
   }
 );
 
+// Add new action for public profile access
+export const fetchPublicOrganizerProfile = createAsyncThunk(
+  "organizer/fetchPublicProfile",
+  async (organizerId, { rejectWithValue }) => {
+    try {
+      if (!organizerId) {
+        return rejectWithValue("No organizer ID provided");
+      }
+
+      const apiUrl = import.meta.env.VITE_API_URL;
+
+      try {
+        // Use a public endpoint that doesn't require authentication
+        const response = await axios.get(
+          `${apiUrl}/public/organizer/${organizerId}`
+        );
+        return { publicProfile: response.data };
+      } catch (error) {
+        // If public endpoint fails, try the original endpoint
+        try {
+          const fallbackResponse = await axios.get(
+            `${apiUrl}/organizer/profile/${organizerId}`
+          );
+          return { publicProfile: fallbackResponse.data };
+        } catch (fallbackError) {
+          throw new Error(fallbackError.message);
+        }
+      }
+    } catch (error) {
+      console.error("Error fetching public organizer profile:", error);
+      return rejectWithValue(
+        error.message || "Failed to fetch organizer profile"
+      );
+    }
+  }
+);
+
 // Organizer slice
 const organizerSlice = createSlice({
   name: "organizer",
@@ -173,6 +213,20 @@ const organizerSlice = createSlice({
       state.token = null;
       state.tokenExpiry = null;
       state.profileComplete = false;
+    });
+
+    // Handle public profile fetching
+    builder.addCase(fetchPublicOrganizerProfile.pending, (state) => {
+      state.publicProfileLoading = true;
+      state.publicProfileError = null;
+    });
+    builder.addCase(fetchPublicOrganizerProfile.fulfilled, (state, action) => {
+      state.publicProfileLoading = false;
+      state.publicProfile = action.payload.publicProfile;
+    });
+    builder.addCase(fetchPublicOrganizerProfile.rejected, (state, action) => {
+      state.publicProfileLoading = false;
+      state.publicProfileError = action.payload;
     });
   },
 });

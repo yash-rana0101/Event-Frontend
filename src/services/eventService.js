@@ -251,8 +251,8 @@ const eventService = {
         for (let day = 1; day <= daysInMonth; day++) {
           calendarData.calendarDays.push({
             day,
-            events: [],
             status: "absent",
+            events: [],
           });
         }
 
@@ -261,6 +261,23 @@ const eventService = {
           data: calendarData,
         };
       }
+
+      // Handle authentication errors specifically
+      if (
+        err.response &&
+        (err.response.status === 401 || err.response.status === 403)
+      ) {
+        console.warn("Authentication required for calendar data");
+        // Return empty calendar data
+        return {
+          success: false,
+          message: "Authentication required",
+          data: {
+            calendarDays: [],
+          },
+        };
+      }
+
       throw err;
     }
   },
@@ -285,6 +302,19 @@ const eventService = {
       return response.data;
     } catch (err) {
       console.error("Error fetching recommendations:", err);
+      throw err;
+    }
+  },
+
+  // Get public user events
+  getPublicUserEvents: async (userId) => {
+    try {
+      const response = await axios.get(
+        `${getApiBaseUrl()}/profiles/user/${userId}/events`
+      );
+      return response.data;
+    } catch (err) {
+      console.error("Error fetching public user events:", err);
       throw err;
     }
   },

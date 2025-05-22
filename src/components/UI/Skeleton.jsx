@@ -1,6 +1,8 @@
 /* eslint-disable no-unused-vars */
 import { motion } from 'framer-motion';
 import PropTypes from 'prop-types';
+import EventDetailSkeleton from './EventDetailSkeleton';
+import ProfileSkeleton from './ProfileSkeleton';
 
 // Basic skeleton element component
 const SkeletonElement = ({ type, className = '' }) => {
@@ -57,6 +59,7 @@ const EventCardSkeleton = () => {
   );
 };
 
+
 // Main component with auto detection
 const Skeleton = ({ type = 'event', count = 6, columns = { default: 1, md: 2, lg: 3 } }) => {
   // Generate grid classes based on columns prop
@@ -69,6 +72,10 @@ const Skeleton = ({ type = 'event', count = 6, columns = { default: 1, md: 2, lg
         return [...Array(count)].map((_, index) => (
           <EventCardSkeleton key={index} />
         ));
+      case 'event-detail':
+        return <EventDetailSkeleton />;
+      case 'eventDetail': // Also support the alternative spelling for backward compatibility
+        return <EventDetailSkeleton />;
       case 'list':
         return [...Array(count)].map((_, index) => (
           <div key={index} className="flex space-x-4 p-3 bg-gray-800/50 rounded-lg">
@@ -80,23 +87,35 @@ const Skeleton = ({ type = 'event', count = 6, columns = { default: 1, md: 2, lg
           </div>
         ));
       case 'profile':
-        return (
-          <div className="flex flex-col items-center space-y-4 p-6 bg-gray-800/50 rounded-xl">
-            <SkeletonElement type="avatar" className="h-24 w-24" />
-            <SkeletonElement type="title" className="w-1/2" />
-            <SkeletonElement type="text" className="w-3/4" />
-            <div className="grid grid-cols-2 gap-4 w-full mt-2">
-              <SkeletonElement type="button" className="w-full" />
-              <SkeletonElement type="button" className="w-full" />
-            </div>
-          </div>
-        );
+        return <ProfileSkeleton />;
       default:
         return [...Array(count)].map((_, index) => (
           <SkeletonElement key={index} type="text" />
         ));
     }
   };
+
+  // For event-detail case, don't wrap in grid
+  if (type === 'event-detail' || type === 'eventDetail') {
+    return (
+      <>
+        {renderSkeletons()}
+        <style jsx>{`
+          @keyframes shimmer {
+            0% {
+              transform: translateX(-100%);
+            }
+            100% {
+              transform: translateX(100%);
+            }
+          }
+          .animate-shimmer {
+            animation: shimmer 1.5s infinite;
+          }
+        `}</style>
+      </>
+    );
+  }
 
   return (
     <>
@@ -128,12 +147,13 @@ SkeletonElement.propTypes = {
 };
 
 Skeleton.propTypes = {
-  type: PropTypes.oneOf(['event', 'list', 'profile', 'text']),
+  type: PropTypes.oneOf(['event', 'event-detail', 'eventDetail', 'list', 'profile', 'text']),
   count: PropTypes.number,
   columns: PropTypes.object
 };
 
 // For backward compatibility
 export const EventSkeleton = () => <Skeleton type="event" />;
+export { EventDetailSkeleton };
 
 export default Skeleton;

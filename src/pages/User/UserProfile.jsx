@@ -7,9 +7,9 @@ import TabNavigation from "../../components/User/TabNavigation";
 import AboutTab from "../../components/User/AboutTab";
 import EventsTab from "../../components/User/EventsTab";
 import BadgesTab from "../../components/User/BadgesTab";
-import PreferencesTab from "../../components/User/PreferencesTab";
 import { useLoader } from '../../context/LoaderContext';
 import { Loader2, AlertCircle, ArrowLeft } from "lucide-react";
+import Skeleton from "../../components/UI/Skeleton";
 
 export default function UserProfile() {
   const { userId } = useParams(); // Get userId from URL parameters
@@ -92,20 +92,7 @@ export default function UserProfile() {
   // Handle loading state
   if (loading) {
     return (
-      <div className="min-h-screen bg-black text-white">
-        <div className="max-w-6xl mx-auto px-4 py-12">
-          <div className="flex flex-col items-center justify-center h-60 bg-black rounded-2xl border border-cyan-900/20 relative overflow-hidden">
-            <div className="absolute inset-0 bg-gradient-to-br from-cyan-900/10 to-transparent"></div>
-            <div className="absolute top-0 left-0 w-full h-32 bg-gradient-to-r from-cyan-900/20 to-transparent opacity-50"></div>
-
-            <Loader2 className="h-12 w-12 text-cyan-500 animate-spin" />
-            <p className="mt-4 text-cyan-400 font-medium">Loading profile information...</p>
-            <div className="mt-2 w-48 h-1 bg-black overflow-hidden rounded-full">
-              <div className="h-full bg-cyan-500 w-1/3 animate-pulse rounded-full"></div>
-            </div>
-          </div>
-        </div>
-      </div>
+      <Skeleton type="profile" className="min-h-screen bg-black text-white mx-auto"/>
     );
   }
 
@@ -219,15 +206,6 @@ export default function UserProfile() {
               )}
               {activeTab === 'events' && (
                 <EventsTab userId={userId} />
-              )}
-              {activeTab === 'badges' && (
-                <BadgesTab badges={profile.badges || []} />
-              )}
-              {activeTab === 'preferences' && isCurrentUserProfile && (
-                <PreferencesTab
-                  preferences={profile.notificationPreferences || []}
-                  userId={userId}
-                />
               )}
             </div>
           </div>

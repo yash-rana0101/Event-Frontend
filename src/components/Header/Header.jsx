@@ -58,31 +58,70 @@ export default function Header() {
     },
   ];
 
+  // Improved function to extract user ID
   const getUserId = () => {
+    // For organizer
     if (currentOrganizer) {
+      // If it's a string ID already
+      if (typeof currentOrganizer === 'string' && /^[0-9a-fA-F]{24}$/.test(currentOrganizer)) {
+        return currentOrganizer;
+      }
+      
+      // If it's a JSON string
       if (typeof currentOrganizer === 'string') {
         try {
           const parsed = JSON.parse(currentOrganizer);
-          return parsed?._id || parsed?.id || parsed?._doc?._id;
+          
+          // Try different possible ID locations
+          if (typeof parsed === 'string' && /^[0-9a-fA-F]{24}$/.test(parsed)) {
+            return parsed;
+          }
+          
+          if (parsed?._id) return parsed._id;
+          if (parsed?.id) return parsed.id;
+          if (parsed?._doc?._id) return parsed._doc._id;
+          
+          return null;
         } catch (e) {
           console.error('Error parsing organizer data:', e);
           return null;
         }
       }
-
-      return currentOrganizer?._id || currentOrganizer?.id || currentOrganizer?._doc?._id;
-    } else if (currentUser) {
+      
+      // If it's an object
+      return currentOrganizer._id || currentOrganizer.id || currentOrganizer?._doc?._id;
+    } 
+    
+    // For regular user - same pattern
+    else if (currentUser) {
+      // If it's a string ID already
+      if (typeof currentUser === 'string' && /^[0-9a-fA-F]{24}$/.test(currentUser)) {
+        return currentUser;
+      }
+      
+      // If it's a JSON string
       if (typeof currentUser === 'string') {
         try {
           const parsed = JSON.parse(currentUser);
-          return parsed?._id || parsed?.id || parsed?._doc?._id;
+          
+          // Try different possible ID locations
+          if (typeof parsed === 'string' && /^[0-9a-fA-F]{24}$/.test(parsed)) {
+            return parsed;
+          }
+          
+          if (parsed?._id) return parsed._id;
+          if (parsed?.id) return parsed.id;
+          if (parsed?._doc?._id) return parsed._doc._id;
+          
+          return null;
         } catch (e) {
           console.error('Error parsing user data:', e);
           return null;
         }
       }
-
-      return currentUser?._id || currentUser?.id || currentUser?._doc?._id;
+      
+      // If it's an object
+      return currentUser._id || currentUser.id || currentUser?._doc?._id;
     }
 
     return null;

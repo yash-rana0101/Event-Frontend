@@ -2,7 +2,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
-import { Ticket, Users, ChevronRight, ChevronLeft, List } from 'lucide-react';
+import { Ticket, Users, ChevronRight, ChevronLeft, List, UserPlus } from 'lucide-react';
 import axios from 'axios';
 import { toast } from 'react-toastify';
 
@@ -20,6 +20,7 @@ import EventCard from '../../components/User/Dashboard/EventCard';
 import Skeleton from '../../components/UI/Skeleton';
 import { getAuthHeaders } from "../../utils/apiUtils";
 import eventService from '../../services/eventService';
+import TeamApply from '../../components/User/TeamApply';
 
 export default function UserDashboard() {
   const navigate = useNavigate();
@@ -213,7 +214,10 @@ export default function UserDashboard() {
             } catch (err) {
               console.error("Error fetching calendar data:", err);
               setCalendarData({ calendarDays: [] });
-              toast.error(`Failed to load calendar data: ${err.message}`);
+              // Don't show error toast for auth errors, just show empty state
+              if (!err.message?.includes('Authentication required')) {
+                toast.error(`Failed to load calendar: ${err.message}`);
+              }
             } finally {
               setLoadingCalendar(false);
             }
@@ -529,28 +533,32 @@ export default function UserDashboard() {
                 whileHover={{ y: -5, borderColor: 'rgba(8, 145, 178, 0.5)' }}
               >
                 <p className="text-gray-400 text-xs sm:text-sm">Events Attended</p>
-                <p className="text-lg sm:text-2xl font-bold text-white">{stats.eventsAttended}</p>
+                <p className="text-lg sm:text-2xl font-bold text-white">{stats.eventsAttended || 0}</p>
+                <p className="text-xs text-gray-500 mt-1">Previously attended events</p>
               </motion.div>
               <motion.div
                 className="bg-black/40 backdrop-blur-sm p-3 sm:p-4 rounded-lg border border-cyan-900/30"
                 whileHover={{ y: -5, borderColor: 'rgba(8, 145, 178, 0.5)' }}
               >
                 <p className="text-gray-400 text-xs sm:text-sm">Upcoming Events</p>
-                <p className="text-lg sm:text-2xl font-bold text-white">{stats.upcomingEvents}</p>
+                <p className="text-lg sm:text-2xl font-bold text-white">{stats.upcomingEvents || 0}</p>
+                <p className="text-xs text-gray-500 mt-1">Scheduled for the future</p>
               </motion.div>
               <motion.div
                 className="bg-black/40 backdrop-blur-sm p-3 sm:p-4 rounded-lg border border-cyan-900/30"
                 whileHover={{ y: -5, borderColor: 'rgba(8, 145, 178, 0.5)' }}
               >
                 <p className="text-gray-400 text-xs sm:text-sm">Saved Events</p>
-                <p className="text-lg sm:text-2xl font-bold text-white">{stats.savedEvents}</p>
+                <p className="text-lg sm:text-2xl font-bold text-white">{stats.savedEvents || 0}</p>
+                <p className="text-xs text-gray-500 mt-1">Events you're interested in</p>
               </motion.div>
               <motion.div
                 className="bg-black/40 backdrop-blur-sm p-3 sm:p-4 rounded-lg border border-cyan-900/30"
                 whileHover={{ y: -5, borderColor: 'rgba(8, 145, 178, 0.5)' }}
               >
                 <p className="text-gray-400 text-xs sm:text-sm">Event Photos</p>
-                <p className="text-lg sm:text-2xl font-bold text-white">{stats.eventPhotos}</p>
+                <p className="text-lg sm:text-2xl font-bold text-white">{stats.eventPhotos || 0}</p>
+                <p className="text-xs text-gray-500 mt-1">Shared from events</p>
               </motion.div>
             </div>
           )}
@@ -561,7 +569,7 @@ export default function UserDashboard() {
               className="px-4 sm:px-6 py-2 sm:py-3 text-sm sm:text-base rounded-xl bg-gradient-to-r bg-cyan-400 text-black font-medium transition-colors cursor-pointer flex items-center space-x-2 hover:bg-black hover:text-cyan-400 hover:border hover:border-cyan-400"
               whileHover={{ y: -2 }}
               whileTap={{ scale: 0.98 }}
-              onClick={() => navigate('/events')}
+              onClick={() => navigate('/event')}
             >
               <Ticket size={16} />
               <span>Explore Events</span>
@@ -619,12 +627,7 @@ export default function UserDashboard() {
                     </div>
                   </OverviewSection>
 
-                  {/* Recommendations Section - with proper spacing for mobile */}
-                  <RecommendationsSection
-                    recommendations={overviewRecommendations || []}
-                    setActiveTab={setActiveTab}
-                    overview={true}
-                  />
+
 
                   {/* Saved Events Section */}
                   <SavedEventsSection
@@ -684,68 +687,22 @@ export default function UserDashboard() {
                 <HelpSection />
               ) : activeTab === 'contact' ? (
                 <ContactSection events={upcomingEvents || []} />
+              ) : activeTab === 'teams' ? (
+                <div className="bg-black/30 backdrop-blur-sm rounded-lg p-6 border border-gray-800">
+                  <h2 className="text-xl text-white font-semibold mb-4 flex items-center">
+                    <UserPlus className="mr-2 text-cyan-500" size={22} />
+                    Team Management
+                  </h2>
+                  <TeamApply />
+                </div>
               ) : null}
             </motion.div>
           </AnimatePresence>
-
-          {/* Floating back to top button - appears when scrolled */}
-          <BackToTopButton contentRef={mainContentRef} />
         </motion.div>
       </div>
     </div>
   );
 }
 
-// New BackToTopButton component
-function BackToTopButton({ contentRef }) {
-  const [isVisible, setIsVisible] = useState(false);
 
-  useEffect(() => {
-    const handleScroll = () => {
-      if (!contentRef.current) return;
-
-      if (contentRef.current.scrollTop > 300) {
-        setIsVisible(true);
-      } else {
-        setIsVisible(false);
-      }
-    };
-
-    const currentRef = contentRef.current;
-    if (currentRef) {
-      currentRef.addEventListener('scroll', handleScroll);
-    }
-
-    return () => {
-      if (currentRef) {
-        currentRef.removeEventListener('scroll', handleScroll);
-      }
-    };
-  }, [contentRef]);
-
-  const scrollToTop = () => {
-    if (contentRef.current) {
-      contentRef.current.scrollTo({
-        top: 0,
-        behavior: 'smooth'
-      });
-    }
-  };
-
-  return (
-    <AnimatePresence>
-      {isVisible && (
-        <motion.button
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          exit={{ opacity: 0, y: 20 }}
-          onClick={scrollToTop}
-          className="fixed right-4 bottom-4 bg-cyan-500 text-black p-2 rounded-full shadow-lg z-40
-          hover:bg-cyan-400 transition-colors"
-        >
-          <ChevronLeft className="rotate-90" size={20} />
-        </motion.button>
-      )}
-    </AnimatePresence>
-  );
-}
+// CalendarView component

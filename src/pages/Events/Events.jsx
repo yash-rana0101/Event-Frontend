@@ -5,7 +5,7 @@ import axios from 'axios';
 import { toast } from 'react-toastify';
 import Evnetpage from "../../components/Events/Evnetpage";
 import EventSkeleton from "../../components/UI/Skeleton";
-import {useLoader}  from "../../context/LoaderContext";
+import { useLoader } from "../../context/LoaderContext";
 
 export default function Events() {
   const [events, setEvents] = useState([]);
@@ -73,6 +73,11 @@ export default function Events() {
         // Set pagination data
         if (response.data.totalPages) {
           setTotalPages(response.data.totalPages);
+        } else if (response.data.total) {
+          // Some API responses provide total count instead
+          const totalItems = response.data.total;
+          const calculatedPages = Math.ceil(totalItems / 6);
+          setTotalPages(Math.max(1, calculatedPages));
         }
 
         if (fetchedEvents.length === 0) {

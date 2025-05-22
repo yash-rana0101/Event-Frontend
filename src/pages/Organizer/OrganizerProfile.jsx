@@ -1,7 +1,7 @@
 /* eslint-disable no-unused-vars */
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { useSelector } from 'react-redux';
+import { useSelector, useDispatch } from 'react-redux';
 import axios from 'axios';
 import {
   Calendar, Mail, MapPin, Phone, Award, Users, Star, ArrowRight,
@@ -15,10 +15,12 @@ import { useLoader } from '../../context/LoaderContext';
 import Error from '../common/Error';
 import { FaPhone } from 'react-icons/fa6';
 import Skeleton from '../../components/UI/Skeleton';
+import { fetchPublicOrganizerProfile } from '../../redux/user/organizer';
 
 const OrganizerProfile = () => {
   const { organizerId } = useParams();
   const navigate = useNavigate();
+  const dispatch = useDispatch();
   const [activeSection, setActiveSection] = useState('about');
   const [isLoaded, setIsLoaded] = useState(false);
   const [expandedEvent, setExpandedEvent] = useState(null);
@@ -34,6 +36,9 @@ const OrganizerProfile = () => {
   // Get organizer from Redux store
   const organizerData = useSelector(state => state.organizer);
   const loggedInUser = organizerData?.user;
+  const publicProfile = useSelector(state => state.organizer.publicProfile);
+  const publicProfileLoading = useSelector(state => state.organizer.publicProfileLoading);
+  const publicProfileError = useSelector(state => state.organizer.publicProfileError);
 
   // Extract user ID from possibly nested JSON structure
   const getUserId = () => {
@@ -52,7 +57,10 @@ const OrganizerProfile = () => {
   };
 
   const loggedInUserId = getUserId();
-  const isOwnProfile = organizerId === loggedInUserId;
+  // Check if path is /profile/:organizerId which is public route
+  const isPublicRoute = window.location.pathname.startsWith('/profile/');
+  const isOwnProfile = organizerId === loggedInUserId && !isPublicRoute;
+  const isAuthenticated = !!loggedInUserId && !isPublicRoute;
 
   const { setIsLoading } = useLoader();
 
@@ -66,18 +74,51 @@ const OrganizerProfile = () => {
     const currentDate = new Date();
 
     // Filter past events (dates that have passed)
-    const past = events.filter(event => {
-      const eventDate = new Date(event.date || event.startDate || event.endDate);
+    const pastEvents = events.filter(event => {
+      const eventDate = new Date(event.date || event.startDate);
       return eventDate < currentDate;
     });
 
     // Filter upcoming events (dates in the future)
-    const upcoming = events.filter(event => {
-      const eventDate = new Date(event.date || event.startDate || event.endDate);
+    const upcomingEvents = events.filter(event => {
+      const eventDate = new Date(event.date || event.startDate);
       return eventDate >= currentDate;
     });
 
-    return { past, upcoming };
+    return {
+      pastEvents,
+      upcomingEvents
+    };
+  };
+
+  // Helper function to parse and sanitize organizer ID
+  const parseOrganizerId = (id) => {
+    // If it's already a valid MongoDB id (24 hex chars)
+    if (typeof id === 'string' && /^[0-9a-fA-F]{24}$/.test(id)) {
+      return id;
+    }
+
+    // Try to extract ID if it's an object or JSON string
+    if (typeof id === 'object' && id !== null) {
+      if (id._id) return id._id;
+      if (id.id) return id.id;
+      if (id._doc?._id) return id._doc._id;
+    }
+
+    // If it's a string that could be JSON
+    if (typeof id === 'string') {
+      try {
+        const parsed = JSON.parse(id);
+        if (parsed._id) return parsed._id;
+        if (parsed.id) return parsed.id;
+        if (parsed._doc?._id) return parsed._doc._id;
+      } catch (e) {
+        // Not a valid JSON string, return as is
+        return id;
+      }
+    }
+
+    return id; // Return as is if we couldn't extract a better ID
   };
 
   useEffect(() => {
@@ -86,7 +127,9 @@ const OrganizerProfile = () => {
       setError(null);
 
       try {
-        const idToFetch = organizerId || loggedInUserId;
+        // Parse and sanitize the ID
+        const cleanOrganizerId = parseOrganizerId(organizerId);
+        const idToFetch = cleanOrganizerId || loggedInUserId;
 
         if (!idToFetch) {
           setError("No organizer ID found");
@@ -94,45 +137,69 @@ const OrganizerProfile = () => {
           return;
         }
 
-        // Get API URL from environment or use fallback
-        const apiUrl = import.meta.env.VITE_API_URL;
+        console.log("Fetching organizer profile with ID:", idToFetch);
+        console.log("Is public route:", isPublicRoute);
+        console.log("Is authenticated:", isAuthenticated);
 
-        const token = organizerData?.token || localStorage.getItem('organizer_token');
-        const cleanToken = safelyParseToken(token);
+        // If this is a public view (public route or not logged in)
+        if (isPublicRoute || !isAuthenticated) {
+          // Use the Redux action to fetch public profile
+          const resultAction = await dispatch(fetchPublicOrganizerProfile(idToFetch));
 
-        const config = cleanToken ? {
-          headers: { Authorization: `Bearer ${cleanToken}` }
-        } : {};
-
-        // First try to get detailed profile if available
-        try {
-          const detailsResponse = await axios.get(`${apiUrl}/organizer/${idToFetch}/details`, config);
-
-          if (detailsResponse.data) {
-            // If basic user info is not included in details, fetch it separately
-            if (!detailsResponse.data.name || !detailsResponse.data.email) {
-              const basicResponse = await axios.get(`${apiUrl}/organizer/profile/${idToFetch}`, config);
-              setProfile({
-                ...basicResponse.data,
-                ...detailsResponse.data
-              });
-            } else {
-              setProfile(detailsResponse.data);
-            }
+          if (fetchPublicOrganizerProfile.fulfilled.match(resultAction)) {
+            setProfile(resultAction.payload.publicProfile);
+          } else {
+            throw new Error(resultAction.payload || 'Failed to load profile');
           }
-        } catch (detailsErr) {
-          // If detailed profile not found, fall back to basic profile
-          const basicResponse = await axios.get(`${apiUrl}/organizer/profile/${idToFetch}`, config);
-          setProfile(basicResponse.data);
+        } else {
+          // Authenticated and viewing own profile - original code path
+          // Get API URL from environment or use fallback
+          const apiUrl = import.meta.env.VITE_API_URL;
+
+          const token = organizerData?.token || localStorage.getItem('organizer_token');
+          const cleanToken = safelyParseToken(token);
+
+          const config = cleanToken ? {
+            headers: { Authorization: `Bearer ${cleanToken}` }
+          } : {};
+
+          // First try to get detailed profile if available
+          try {
+            const detailsResponse = await axios.get(`${apiUrl}/organizer/${idToFetch}/details`, config);
+
+            if (detailsResponse.data) {
+              // If basic user info is not included in details, fetch it separately
+              if (!detailsResponse.data.name || !detailsResponse.data.email) {
+                const basicResponse = await axios.get(`${apiUrl}/organizer/profile/${idToFetch}`, config);
+                setProfile({
+                  ...basicResponse.data,
+                  ...detailsResponse.data
+                });
+              } else {
+                setProfile(detailsResponse.data);
+              }
+            }
+          } catch (detailsErr) {
+            console.error("Error fetching organizer details:", detailsErr);
+            // If detailed profile not found, fall back to basic profile
+            const basicResponse = await axios.get(`${apiUrl}/organizer/profile/${idToFetch}`, config);
+            setProfile(basicResponse.data);
+          }
         }
 
-        // Fetch events for this organizer
+        // Fetch events for this organizer - works for both public and private
         try {
-          const eventsResponse = await axios.get(`${apiUrl}/organizer/events/organizer/${idToFetch}`, config);
+          const apiUrl = import.meta.env.VITE_API_URL;
+          const eventsResponse = await axios.get(`${apiUrl}/events?organizer=${idToFetch}`);
+
           if (eventsResponse.data && Array.isArray(eventsResponse.data)) {
-            const { past, upcoming } = filterEventsByDate(eventsResponse.data);
-            setUpcomingEvents(upcoming);
-            setPastEvents(past);
+            const { pastEvents, upcomingEvents } = filterEventsByDate(eventsResponse.data);
+            setUpcomingEvents(upcomingEvents);
+            setPastEvents(pastEvents);
+          } else if (eventsResponse.data?.events && Array.isArray(eventsResponse.data.events)) {
+            const { pastEvents, upcomingEvents } = filterEventsByDate(eventsResponse.data.events);
+            setUpcomingEvents(upcomingEvents);
+            setPastEvents(pastEvents);
           } else {
             setUpcomingEvents([]);
             setPastEvents([]);
@@ -155,7 +222,7 @@ const OrganizerProfile = () => {
     };
 
     fetchOrganizerProfile();
-  }, [organizerId, loggedInUserId]);
+  }, [organizerId, loggedInUserId, dispatch, isAuthenticated, isPublicRoute]);
 
   const handleEventClick = (eventId) => {
     if (expandedEvent === eventId) {
@@ -170,6 +237,27 @@ const OrganizerProfile = () => {
     // Simple formatting, modify as needed
     return phoneNumber.replace(/(\d{3})(\d{3})(\d{4})/, '($1) $2-$3');
   };
+
+  // Add this to fetch attended events for the profile
+  const fetchAttendedEvents = async (userId) => {
+    try {
+      const apiUrl = import.meta.env.VITE_API_URL;
+      const response = await axios.get(`${apiUrl}/profiles/user/${userId}/attended-events`);
+
+      if (response.data && response.data.data) {
+        setPastEvents(response.data.data);
+      }
+    } catch (error) {
+      console.error("Error fetching attended events:", error);
+    }
+  };
+
+  useEffect(() => {
+    // Add this inside an existing useEffect or create a new one
+    if (organizerId) {
+      fetchAttendedEvents(organizerId);
+    }
+  }, [organizerId]);
 
   if (error) {
     return (
@@ -194,10 +282,10 @@ const OrganizerProfile = () => {
   }
 
   if (loading) {
-      return (
-        <Skeleton type='profile' count={12} columns={{ default: 1, md: 1, lg: 1 }}/>
-      );
-    }
+    return (
+      <Skeleton type='profile' count={12} columns={{ default: 1, md: 1, lg: 1 }} />
+    );
+  }
 
   if (!profile) {
     return (

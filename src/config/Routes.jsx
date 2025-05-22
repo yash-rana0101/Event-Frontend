@@ -46,6 +46,7 @@ function AppRoutes() {
         <Route path="contact" element={<Contact />} />
         <Route path="about" element={<About />} />
         <Route path="organizer/profile/:organizerId" element={<OrganizerProfile />} />
+        <Route path="profile/:organizerId" element={<OrganizerProfile />} /> {/* New public route for organizer profiles */}
         <Route path="/user/profile/:userId" element={<UserProfile />} />
 
         {/* Events */}

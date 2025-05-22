@@ -13,16 +13,6 @@ const TabNavigation = ({ activeTab, setActiveTab }) => {
         className={`flex-1 py-3 text-center font-medium text-sm transition ${activeTab === 'events' ? 'bg-black text-cyan-500' : 'text-gray-300 hover:bg-black/20'}`}>
         Events & Reviews
       </button>
-      <button
-        onClick={() => setActiveTab('badges')}
-        className={`flex-1 py-3 text-center font-medium text-sm transition ${activeTab === 'badges' ? 'bg-black text-cyan-500' : 'text-gray-300 hover:bg-black/20'}`}>
-        Badges
-      </button>
-      <button
-        onClick={() => setActiveTab('preferences')}
-        className={`flex-1 py-3 text-center font-medium text-sm transition ${activeTab === 'preferences' ? 'bg-black text-cyan-500' : 'text-gray-300 hover:bg-black/20'}`}>
-        Preferences
-      </button>
     </div>
   );
 };

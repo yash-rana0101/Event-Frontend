@@ -22,7 +22,7 @@ const EventCard = ({ event, onSave, onShare }) => {
   // Handle view details click
   const handleViewDetails = () => {
     // Navigate to event detail page
-    navigate(`/events/${event.id}`);
+    navigate(`/event/${event.id}`);
   };
 
   // Handle share button click
@@ -31,7 +31,7 @@ const EventCard = ({ event, onSave, onShare }) => {
     setIsSharing(true);
 
     // Create shareable link
-    const eventUrl = `${window.location.origin}/events/${event.id}`;
+    const eventUrl = `${window.location.origin}/event/${event.id}`;
 
     // Use Web Share API if available
     if (navigator.share) {

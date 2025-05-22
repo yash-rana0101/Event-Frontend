@@ -216,6 +216,91 @@ export const extractPaginationData = (response) => {
   };
 };
 
+/**
+ * Extracts data safely from various API response formats
+ * @param {Object} response - The response object from axios
+ * @param {String} entityName - The name of the entity (e.g., 'events', 'teams')
+ * @returns {Array} - The extracted data array
+ */
+export const extractApiData = (response, entityName) => {
+  if (!response || !response.data) {
+    console.warn(`Empty response or missing data for ${entityName}`);
+    return [];
+  }
+
+  // Try to extract data from different response formats
+  let extractedData;
+
+  if (Array.isArray(response.data)) {
+    // Direct array format
+    extractedData = response.data;
+  } else if (response.data.data && Array.isArray(response.data.data)) {
+    // { data: [...] } format
+    extractedData = response.data.data;
+  } else if (
+    response.data.data &&
+    response.data.data[entityName] &&
+    Array.isArray(response.data.data[entityName])
+  ) {
+    // { data: { entityName: [...] } } format
+    extractedData = response.data.data[entityName];
+  } else if (
+    response.data[entityName] &&
+    Array.isArray(response.data[entityName])
+  ) {
+    // { entityName: [...] } format
+    extractedData = response.data[entityName];
+  } else {
+    // Last resort, try to find any array property
+    const arrayProps = Object.keys(response.data).filter((key) =>
+      Array.isArray(response.data[key])
+    );
+
+    if (arrayProps.length > 0) {
+      extractedData = response.data[arrayProps[0]];
+    } else {
+      console.warn(
+        `Could not extract ${entityName} data from response:`,
+        response.data
+      );
+      extractedData = [];
+    }
+  }
+
+  return Array.isArray(extractedData) ? extractedData : [];
+};
+
+/**
+ * A utility to help debug API responses
+ * @param {Object} response - The response object from axios
+ * @returns {Object} - Debug information about the response
+ */
+export const debugApiResponse = (response, entityName) => {
+  return {
+    hasData: !!response?.data,
+    dataType: typeof response?.data,
+    isArray: Array.isArray(response?.data),
+    hasDataProperty: !!response?.data?.data,
+    hasEntityProperty: !!response?.data?.[entityName],
+    responseKeys: response?.data ? Object.keys(response.data) : [],
+    extractedData: extractApiData(response, entityName),
+  };
+};
+
+/**
+ * Determines if an event is published based on various status fields
+ * @param {Object} event - The event object
+ * @returns {Boolean} - Whether the event should be considered published
+ */
+export const isEventPublished = (event) => {
+  return (
+    event.isPublished == true ||
+    event.status == "published" ||
+    event.status == "active" ||
+    event.published == true
+  );
+};
+
 export default {
   getApiBaseUrl,
   createApiUrl,
@@ -224,4 +309,7 @@ export default {
   apiRequest,
   formatApiError,
   extractPaginationData,
+  extractApiData,
+  debugApiResponse,
+  isEventPublished,
 };

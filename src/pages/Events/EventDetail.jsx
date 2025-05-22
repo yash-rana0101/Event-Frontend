@@ -1,14 +1,15 @@
 /* eslint-disable no-unused-vars */
 import { useState, useEffect } from "react";
 import { Link, useParams, useNavigate } from "react-router-dom";
-import { Calendar, MapPin, Users, Clock, Code, Trophy, Briefcase, ChevronDown, Share2, Heart, MessageCircle, AlertCircle, ArrowLeft } from "lucide-react";
+import { Calendar, MapPin, Users, Clock, Code, Trophy, Briefcase, ChevronDown, Share2, Heart, MessageCircle, AlertCircle, ArrowLeft, Bookmark, ExternalLink } from "lucide-react";
 import axios from "axios";
 import { useSelector } from "react-redux";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "react-toastify";
 import Error from "../common/Error";
 import { useLoader } from '../../context/LoaderContext';
 import { FaArrowLeft } from "react-icons/fa";
+import Skeleton from "../../components/UI/Skeleton";
 
 export default function EventDetail() {
   const { eventId } = useParams(); // Ensure eventId is retrieved from route params
@@ -24,6 +25,18 @@ export default function EventDetail() {
   const [wasRegistered, setWasRegistered] = useState(false);
   const [showReregisterConfirm, setShowReregisterConfirm] = useState(false);
 
+  // New state for social engagement
+  const [isSaved, setIsSaved] = useState(false);
+  const [hasLiked, setHasLiked] = useState(false);
+  const [socialStats, setSocialStats] = useState({
+    likes: 0,
+    comments: 0,
+    shares: 0,
+    saved: 0
+  });
+  const [showShareOptions, setShowShareOptions] = useState(false);
+  const [showSavedToast, setShowSavedToast] = useState(false);
+
   // Get current user from Redux
   const user = useSelector(state => state.auth?.user);
   const organizer = useSelector(state => state.organizer?.user);
@@ -36,7 +49,7 @@ export default function EventDetail() {
     return () => setIsLoading(false);
   }, [loading, setIsLoading]);
 
-  // Fixed function to fetch event details
+  // Fixed function to fetch event details with saved status
   const fetchEventDetails = async () => {
     try {
       setLoading(true);
@@ -50,9 +63,25 @@ export default function EventDetail() {
       const response = await axios.get(`${apiUrl}/events/${eventId}`);
       setEvent(response.data);
 
-      // Also fetch similar events (just getting a few published events for now)
+      // Initialize social stats from backend or defaults
+      const eventData = response.data;
+      setSocialStats({
+        likes: eventData.socialStats?.likes || 0,
+        comments: eventData.socialStats?.comments || 0,
+        shares: eventData.socialStats?.shares || 0,
+        saved: eventData.socialStats?.saved || 0
+      });
+
+      // Fetch similar events based on category or tags
       try {
-        const similarResponse = await axios.get(`${apiUrl}/events/published?limit=3`);
+        let queryParams = '';
+        if (eventData.category) {
+          queryParams = `category=${eventData.category}`;
+        } else if (eventData.tags && eventData.tags.length > 0) {
+          queryParams = `tags=${eventData.tags[0]}`;
+        }
+
+        const similarResponse = await axios.get(`${apiUrl}/events/published?limit=3&${queryParams}`);
 
         // Check which property contains events array
         const eventsArray = similarResponse.data.events ||
@@ -66,6 +95,34 @@ export default function EventDetail() {
         setSimilarEvents([]);
       }
 
+      // Check if user has saved this event
+      if (user && userToken) {
+        try {
+          const savedResponse = await axios.get(
+            `${apiUrl}/profiles/me/saved-events`,
+            {
+              headers: { Authorization: `Bearer ${userToken}` }
+            }
+          );
+
+          const savedEvents = savedResponse.data.data || [];
+          const eventIsSaved = savedEvents.some(e => e._id === eventId || e.event === eventId);
+          setIsSaved(eventIsSaved);
+
+          // Check if user has liked this event
+          const interactionResponse = await axios.get(
+            `${apiUrl}/events/${eventId}/interactions`,
+            {
+              headers: { Authorization: `Bearer ${userToken}` }
+            }
+          );
+
+          setHasLiked(interactionResponse.data.hasLiked || false);
+        } catch (err) {
+          console.warn("Error checking saved/liked status:", err);
+        }
+      }
+
       // Check if user is registered for this event
       if (user && userToken) {
         try {
@@ -75,8 +132,6 @@ export default function EventDetail() {
               headers: { Authorization: `Bearer ${userToken}` }
             }
           );
-
-          console.log("Registration check response:", registrationResponse.data);
 
           // Update registration status based on backend response
           setIsRegistered(registrationResponse.data.isRegistered &&
@@ -110,6 +165,138 @@ export default function EventDetail() {
   useEffect(() => {
     fetchEventDetails();
   }, [eventId]);
+
+  // Handle save event functionality
+  const handleSaveEvent = async () => {
+    if (!user && !organizer) {
+      toast.info("Please login to save this event");
+      navigate("/auth/login", { state: { from: `/event/${eventId}` } });
+      return;
+    }
+
+    try {
+      const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000/api/v1';
+
+      // Optimistic update
+      setIsSaved(prev => !prev);
+      setShowSavedToast(true);
+
+      if (isSaved) {
+        // Unsave the event - fix the endpoint URL structure
+        await axios.delete(`${apiUrl}/profiles/me/events/${eventId}/save`, {
+          headers: { Authorization: `Bearer ${userToken}` }
+        });
+        setSocialStats(prev => ({ ...prev, saved: Math.max(0, prev.saved - 1) }));
+        toast.success("Event removed from saved events");
+      } else {
+        // Save the event - fix the endpoint URL structure
+        await axios.post(`${apiUrl}/profiles/me/events/${eventId}/save`, {}, {
+          headers: { Authorization: `Bearer ${userToken}` }
+        });
+        setSocialStats(prev => ({ ...prev, saved: prev.saved + 1 }));
+        toast.success("Event saved successfully");
+      }
+
+      // Hide saved toast after 2 seconds
+      setTimeout(() => setShowSavedToast(false), 2000);
+
+    } catch (err) {
+      // Revert optimistic update on error
+      setIsSaved(prev => !prev);
+      console.error("Error saving/unsaving event:", err);
+      toast.error(err.response?.data?.message || "Failed to update saved events");
+    }
+  };
+
+  // Handle like event functionality
+  const handleLikeEvent = async () => {
+    if (!user && !organizer) {
+      toast.info("Please login to like this event");
+      navigate("/auth/login", { state: { from: `/event/${eventId}` } });
+      return;
+    }
+
+    try {
+      const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000/api/v1';
+
+      // Optimistic update
+      setHasLiked(prev => !prev);
+      setSocialStats(prev => ({
+        ...prev,
+        likes: hasLiked ? Math.max(0, prev.likes - 1) : prev.likes + 1
+      }));
+
+      if (hasLiked) {
+        // Unlike the event
+        await axios.delete(`${apiUrl}/events/${eventId}/like`, {
+          headers: { Authorization: `Bearer ${userToken}` }
+        });
+      } else {
+        // Like the event
+        await axios.post(`${apiUrl}/events/${eventId}/like`, {}, {
+          headers: { Authorization: `Bearer ${userToken}` }
+        });
+      }
+    } catch (err) {
+      // Revert optimistic update on error
+      setHasLiked(prev => !prev);
+      setSocialStats(prev => ({
+        ...prev,
+        likes: hasLiked ? prev.likes + 1 : Math.max(0, prev.likes - 1)
+      }));
+
+      console.error("Error liking/unliking event:", err);
+      toast.error("Failed to update like status");
+    }
+  };
+
+  // Handle share event functionality
+  const handleShareEvent = async () => {
+    try {
+      // Optimistic update
+      setSocialStats(prev => ({ ...prev, shares: prev.shares + 1 }));
+
+      const shareUrl = window.location.href;
+      const eventTitle = event?.title || 'Check out this event';
+
+      // Try to use Web Share API if available
+      if (navigator.share) {
+        await navigator.share({
+          title: eventTitle,
+          text: `Join me at ${eventTitle}!`,
+          url: shareUrl
+        });
+        toast.success("Event shared successfully");
+      } else {
+        // Fallback to clipboard if Web Share API is not available
+        await navigator.clipboard.writeText(shareUrl);
+        toast.success("Event link copied to clipboard!");
+
+        // Show share options
+        setShowShareOptions(true);
+        setTimeout(() => setShowShareOptions(false), 3000);
+      }
+
+      // Update share count on backend
+      const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000/api/v1';
+      await axios.post(`${apiUrl}/events/${eventId}/share`, {}, {
+        headers: user ? { Authorization: `Bearer ${userToken}` } : {}
+      });
+
+    } catch (err) {
+      // Revert optimistic update on error
+      setSocialStats(prev => ({ ...prev, shares: Math.max(0, prev.shares - 1) }));
+      console.error("Error sharing event:", err);
+
+      // Still try to copy to clipboard as fallback
+      try {
+        await navigator.clipboard.writeText(window.location.href);
+        toast.success("Event link copied to clipboard!");
+      } catch (clipboardErr) {
+        toast.error("Failed to share event");
+      }
+    }
+  };
 
   const handleRegister = async () => {
     // If not logged in, redirect to login page
@@ -243,7 +430,7 @@ export default function EventDetail() {
   // Show error state
   if (error || !event) {
     return (
-      <Error />
+      <Skeleton type="event-detail" />
     );
   }
 
@@ -261,7 +448,7 @@ export default function EventDetail() {
       : "Until seats last",
     image: event.images?.[0] || "https://placehold.co/1200x600?text=No+Image+Available",
     organizer: event.organizerName,
-    organizerId: event.organizer,
+    organizerId: event.organizer?._id || event.organizer, // Ensure we get the ID properly
     organizerLogo: event.organizerLogo || "https://placehold.co/80x80?text=Organizer",
     featured: event.featured || false,
     description: event.description || "No description provided for this event.",
@@ -270,19 +457,18 @@ export default function EventDetail() {
     sponsors: event.sponsors || [],
     faqs: event.faqs || [],
     tags: event.tags || [],
-    socialShare: event.socialShare || {
-      likes: 0,
-      comments: 0,
-      shares: 0
+    socialShare: {
+      likes: socialStats.likes,
+      comments: socialStats.comments,
+      shares: socialStats.shares,
+      saved: socialStats.saved
     }
   };
 
-  console.log("sponsors", formattedEvent.sponsors);
-
-  console.log("Formatted Event Data:", formattedEvent);
+  // console.log("Organizer ID:", formattedEvent.organizerId._id);
 
   return (
-    <div className=" min-h-screen text-white">
+    <div className="min-h-screen text-white">
       {/* Hero Section */}
       <div className="relative">
         <div className="h-64 sm:h-80 md:h-96 lg:h-[400px] overflow-hidden">
@@ -328,7 +514,7 @@ export default function EventDetail() {
                         to={`/event`}
                         className="text-cyan-400 hover:text-cyan-300 transition-all duration-300 group"
                       >
-                        Back 
+                        Back
                         <span className="absolute -bottom-1 left-0 w-0 h-[2px] bg-[#00D8FF] group-hover:w-full transition-all duration-300" />
                       </Link>
                     </span>
@@ -410,7 +596,7 @@ export default function EventDetail() {
       </div>
 
       {/* Content Section */}
-      <div className="max-w-6xl mx-auto px-4 sm:px-4 lg:px-8 py-8 sm:pt-28 mt-8 md:mt-16">
+      <div className="max-w-6xl mx-auto px-4 sm:px-4 lg:px-8 py-8 sm:pt-28 mt-44 md:mt-2">
         <div className="flex flex-col lg:flex-row gap-8">
           {/* Main Content */}
           <div className="lg:w-2/3">
@@ -465,7 +651,7 @@ export default function EventDetail() {
 
             {/* Tab Content */}
             {activeTab === "overview" && (
-              <div className="space-y-6">
+              <div className="space-y-6 ">
                 <div className="bg-gray-800 rounded-lg p-6 border border-gray-700">
                   <h2 className="text-xl font-semibold mb-4">About This Event</h2>
                   <p className="text-gray-300 leading-relaxed">
@@ -865,81 +1051,217 @@ export default function EventDetail() {
                 <div>
                   <h3 className="font-medium text-white">{formattedEvent.organizer}</h3>
                   <Link
-                    to={`/organizer/profile/${formattedEvent.organizerId}`}
+                    to={`/profile/${formattedEvent.organizerId}`}
                     className="text-cyan-400 text-sm hover:underline"
                   >
                     View Profile
                   </Link>
-
                 </div>
               </div>
             </div>
 
-            {/* Social Engagement */}
-            <div className="bg-gray-800 rounded-lg p-6 border border-gray-700">
+            {/* Social Engagement - Enhanced with dynamic functionality */}
+            <div className="bg-gray-800 rounded-lg p-6 border border-gray-700 relative">
               <h2 className="text-xl font-semibold mb-4">Share & Engage</h2>
               <div className="flex items-center justify-between mb-4">
-                <button className="flex-1 flex items-center justify-center gap-2 py-2 text-gray-300 hover:text-cyan-400 transition-colors">
-                  <Heart size={18} />
+                <button
+                  className={`flex-1 flex items-center justify-center gap-2 py-2 transition-colors ${hasLiked ? 'text-cyan-400' : 'text-gray-300 hover:text-cyan-400'}`}
+                  onClick={handleLikeEvent}
+                >
+                  <Heart size={18} className={hasLiked ? "fill-cyan-400" : ""} />
                   <span>{formattedEvent.socialShare.likes}</span>
                 </button>
-                <button className="flex-1 flex items-center justify-center gap-2 py-2 text-gray-300 hover:text-cyan-400 transition-colors">
+                <button
+                  className="flex-1 flex items-center justify-center gap-2 py-2 text-gray-300 hover:text-cyan-400 transition-colors"
+                  onClick={() => {
+                    const commentsSection = document.getElementById('comments-section');
+                    if (commentsSection) commentsSection.scrollIntoView({ behavior: 'smooth' });
+                  }}
+                >
                   <MessageCircle size={18} />
                   <span>{formattedEvent.socialShare.comments}</span>
                 </button>
-                <button className="flex-1 flex items-center justify-center gap-2 py-2 text-gray-300 hover:text-cyan-400 transition-colors">
+                <button
+                  className="flex-1 flex items-center justify-center gap-2 py-2 text-gray-300 hover:text-cyan-400 transition-colors relative"
+                  onClick={handleShareEvent}
+                >
                   <Share2 size={18} />
                   <span>{formattedEvent.socialShare.shares}</span>
                 </button>
+                <button
+                  className={`flex-1 flex items-center justify-center gap-2 py-2 transition-colors ${isSaved ? 'text-cyan-400' : 'text-gray-300 hover:text-cyan-400'}`}
+                  onClick={handleSaveEvent}
+                >
+                  <Bookmark size={18} className={isSaved ? "fill-cyan-400" : ""} />
+                  <span>{isSaved ? "Saved" : "Save"}</span>
+                </button>
               </div>
+
+              {/* Share options popup */}
+              <AnimatePresence>
+                {showShareOptions && (
+                  <motion.div
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: 10 }}
+                    className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 bg-gray-900 border border-gray-700 rounded-lg p-3 shadow-xl z-10 w-64"
+                  >
+                    <div className="text-sm font-medium text-gray-300 mb-2">Share this event via:</div>
+                    <div className="flex justify-around">
+                      <a
+                        href={`https://twitter.com/intent/tweet?url=${encodeURIComponent(window.location.href)}&text=${encodeURIComponent(`Check out ${event.title}!`)}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-[#1DA1F2] hover:opacity-80 transition-opacity"
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="currentColor" className="w-6 h-6">
+                          <path d="M24 4.557c-.883.392-1.832.656-2.828.775 1.017-.609 1.798-1.574 2.165-2.724-.951.564-2.005.974-3.127 1.195-.897-.957-2.178-1.555-3.594-1.555-3.179 0-5.515 2.966-4.797 6.045-4.091-.205-7.719-2.165-10.148-5.144-1.29 2.213-.669 5.108 1.523 6.574-.806-.026-1.566-.247-2.229-.616-.054 2.281 1.581 4.415 3.949 4.89-.693.188-1.452.232-2.224.084.626 1.956 2.444 3.379 4.6 3.419-2.07 1.623-4.678 2.348-7.29 2.04 2.179 1.397 4.768 2.212 7.548 2.212 9.142 0 14.307-7.721 13.995-14.646.962-.695 1.797-1.562 2.457-2.549z" />
+                        </svg>
+                      </a>
+                      <a
+                        href={`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(window.location.href)}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-[#1877F2] hover:opacity-80 transition-opacity"
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="currentColor" className="w-6 h-6">
+                          <path d="M9 8h-3v4h3v12h5v-12h3.642l.358-4h-4v-1.667c0-.955.192-1.333 1.115-1.333h2.885v-5h-3.808c-3.596 0-5.192 1.583-5.192 4.615v3.385z" />
+                        </svg>
+                      </a>
+                      <a
+                        href={`https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(window.location.href)}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-[#0A66C2] hover:opacity-80 transition-opacity"
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="currentColor" className="w-6 h-6">
+                          <path d="M4.98 3.5c0 1.381-1.11 2.5-2.48 2.5s-2.48-1.119-2.48-2.5c0-1.38 1.11-2.5 2.48-2.5s2.48 1.12 2.48 2.5zm.02 4.5h-5v16h5v-16zm7.982 0h-4.968v16h4.969v-8.399c0-4.67 6.029-5.052 6.029 0v8.399h4.988v-10.131c0-7.88-8.922-7.593-11.018-3.714v-2.155z" />
+                        </svg>
+                      </a>
+                      <a
+                        href={`mailto:?subject=${encodeURIComponent(`Join me at ${event.title}`)}&body=${encodeURIComponent(`I thought you might be interested in this event: ${event.title}.\n\nCheck it out here: ${window.location.href}`)}`}
+                        className="text-gray-300 hover:text-cyan-400 transition-colors"
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-6 h-6">
+                          <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path>
+                          <polyline points="22,6 12,13 2,6"></polyline>
+                        </svg>
+                      </a>
+                    </div>
+                    <div className="mt-2 text-xs text-center text-gray-400">Click to share via your preferred platform</div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+
+              {/* Saved confirmation toast */}
+              <AnimatePresence>
+                {showSavedToast && (
+                  <motion.div
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -10 }}
+                    className="absolute top-full left-1/2 transform -translate-x-1/2 mt-2 bg-cyan-500/80 backdrop-blur-sm text-white px-4 py-2 rounded-md shadow-lg"
+                  >
+                    {isSaved ? "Event saved to your collection" : "Event removed from your collection"}
+                  </motion.div>
+                )}
+              </AnimatePresence>
 
               <div className="flex justify-between gap-2">
                 <button
-                  onClick={() => {
-                    navigator.clipboard.writeText(window.location.href);
-                    toast.success("Event link copied to clipboard!");
-                  }}
-                  className="flex-1 bg-[#1DA1F2]/10 hover:bg-[#1DA1F2]/20 text-[#1DA1F2] py-2 rounded-md text-sm font-medium transition-colors"
+                  onClick={handleShareEvent}
+                  className="flex-1 bg-[#1DA1F2]/10 hover:bg-[#1DA1F2]/20 text-[#1DA1F2] py-2 rounded-md text-sm font-medium transition-colors flex items-center justify-center gap-2"
                 >
-                  Share Link
+                  <Share2 size={16} />
+                  Share Event
+                </button>
+                <button
+                  onClick={handleSaveEvent}
+                  className={`flex-1 py-2 rounded-md text-sm font-medium transition-colors flex items-center justify-center gap-2 ${isSaved
+                    ? "bg-cyan-500/10 text-cyan-500 hover:bg-cyan-500/20"
+                    : "bg-gray-700/50 text-gray-300 hover:bg-gray-700/70"
+                    }`}
+                >
+                  <Bookmark size={16} className={isSaved ? "fill-cyan-500" : ""} />
+                  {isSaved ? "Saved" : "Save Event"}
                 </button>
               </div>
             </div>
 
-            {/* Similar Events */}
+            {/* Similar Events - Enhanced with better display and interactivity */}
             <div className="bg-gray-800 rounded-lg p-6 border border-gray-700">
               <div className="flex items-center justify-between mb-4">
                 <h2 className="text-xl font-semibold">Similar Events</h2>
                 <Link to="/event" className="text-cyan-400 text-sm hover:underline">View All</Link>
               </div>
 
-              <div className="space-y-4">
-                {similarEvents.length > 0 ? similarEvents.map((event) => (
-                  <div key={event._id} className="flex gap-3">
-                    <img
-                      src={event.images?.[0] || "/api/placeholder/80/60"}
-                      alt={event.title}
-                      className="w-20 h-16 object-cover rounded"
-                    />
-                    <div>
-                      <Link to={`/event/${event._id}`} className="font-medium text-white text-sm hover:text-cyan-400 cursor-pointer transition-colors">
-                        {event.title}
-                      </Link>
-                      <p className="text-gray-400 text-xs mt-1">
-                        {event.date || new Date(event.startDate).toLocaleDateString()}
-                      </p>
-                      <p className="text-gray-400 text-xs">{event.location?.address || event.venue || "No location specified"}</p>
-                      <p className="text-gray-400 text-xs">{event.attendeesCount || 0}+ Participants</p>
+              {similarEvents.length > 0 ? (
+                <div className="space-y-4">
+                  {similarEvents.map((event) => (
+                    <motion.div
+                      key={event._id}
+                      className="flex gap-3 p-2 rounded-lg hover:bg-gray-700/30 transition-colors cursor-pointer"
+                      whileHover={{ scale: 1.02 }}
+                      whileTap={{ scale: 0.98 }}
+                      onClick={() => navigate(`/event/${event._id}`)}
+                    >
+                      <img
+                        src={event.images?.[0] || "/api/placeholder/80/60"}
+                        alt={event.title}
+                        className="w-20 h-16 object-cover rounded"
+                      />
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-start justify-between">
+                          <h3 className="font-medium text-white text-sm hover:text-cyan-400 cursor-pointer transition-colors truncate">
+                            {event.title}
+                          </h3>
+                          <span className="bg-cyan-500/20 text-cyan-400 text-xs px-2 py-0.5 rounded-full whitespace-nowrap ml-1">
+                            {new Date(event.startDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                          </span>
+                        </div>
+                        <div className="flex items-center text-gray-400 text-xs mt-1">
+                          <MapPin size={12} className="flex-shrink-0 mr-1" />
+                          <span className="truncate">{event.location?.address || event.venue || "No location specified"}</span>
+                        </div>
+                        <div className="flex items-center justify-between mt-1">
+                          <p className="text-gray-400 text-xs flex items-center">
+                            <Users size={12} className="flex-shrink-0 mr-1" />
+                            <span>{event.attendeesCount || 0}+ Participants</span>
+                          </p>
+                          <ExternalLink size={12} className="text-cyan-400" />
+                        </div>
+                      </div>
+                    </motion.div>
+                  ))}
+                </div>
+              ) : loading ? (
+                <div className="space-y-4">
+                  {[1, 2, 3].map(i => (
+                    <div key={i} className="flex gap-3 animate-pulse">
+                      <div className="w-20 h-16 bg-gray-700 rounded"></div>
+                      <div className="flex-1">
+                        <div className="h-4 bg-gray-700 rounded w-3/4 mb-2"></div>
+                        <div className="h-3 bg-gray-700 rounded w-1/2 mb-2"></div>
+                        <div className="h-3 bg-gray-700 rounded w-1/3"></div>
+                      </div>
                     </div>
-                  </div>
-                )) : (
-                  <p className="text-gray-400 text-center py-4">No similar events found.</p>
-                )}
-              </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="py-6 text-center">
+                  <p className="text-gray-400 mb-3">No similar events found.</p>
+                  <Link to="/event" className="px-4 py-2 bg-cyan-500 text-black rounded-md text-sm font-medium hover:bg-cyan-400 transition-colors">
+                    Browse All Events
+                  </Link>
+                </div>
+              )}
             </div>
           </div>
         </div>
       </div>
+
+      {/* Comments section anchor */}
+      <div id="comments-section"></div>
     </div>
   );
 }

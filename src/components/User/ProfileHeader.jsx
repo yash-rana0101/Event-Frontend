@@ -53,9 +53,6 @@ const ProfileHeader = ({ profile, isCurrentUser }) => {
     null;
 
   // Stats data - would be replaced with real data in implementation
-  const postCount = profile?.postCount || profile?.posts?.length || 42;
-  const followerCount = profile?.followerCount || 128;
-  const eventsAttended = profile?.eventsAttended || profile?.attendedEvents?.length || 15;
 
   return (
     <div className="bg-black rounded-xl overflow-hidden relative border border-cyan-500/20 shadow-lg shadow-cyan-500/5 backdrop-blur-sm">
@@ -95,7 +92,7 @@ const ProfileHeader = ({ profile, isCurrentUser }) => {
           {isCurrentUser && (
             <div className="hidden md:flex absolute top-4 right-4 gap-3 z-10">
               <button
-                onClick={() => navigate("/user/edit-profile")}
+                onClick={() => navigate("/user/profile/edit")}
                 className="flex items-center gap-2 px-4 py-2 bg-black/70 backdrop-blur-md text-cyan-500 rounded-lg border border-cyan-500/40 hover:bg-cyan-500/10 transition group"
               >
                 <Edit2 size={16} className="group-hover:animate-pulse" />
@@ -200,43 +197,12 @@ const ProfileHeader = ({ profile, isCurrentUser }) => {
                   <Calendar size={14} className="text-cyan-500" />
                   <span>Joined {userJoinDate}</span>
                 </div>
-
-                <div className="flex items-center gap-1.5 text-gray-300 text-sm bg-cyan-950/20 px-3 py-1.5 rounded-full border border-cyan-500/20">
-                  <Ticket size={14} className="text-cyan-500" />
-                  <span>{eventsAttended} Events</span>
-                </div>
               </div>
 
               {/* Bio section */}
               <div className="mt-4">
                 <div className="relative px-4 py-3 bg-black/40 backdrop-blur-sm rounded-lg border-l-2 border-cyan-500/50">
                   <p className="text-gray-300 text-sm md:text-base">{userBio}</p>
-                </div>
-              </div>
-
-              {/* Stats section with improved design */}
-              <div className="mt-6 flex justify-center md:justify-start">
-                <div className="grid grid-cols-3 gap-2 md:gap-4">
-                  <div className="flex flex-col items-center justify-center bg-cyan-950/10 rounded-lg px-4 py-3 border border-cyan-500/20 hover:border-cyan-500/50 transition-all">
-                    <span className="text-xl font-bold text-white">{postCount}</span>
-                    <span className="text-xs text-gray-400 flex items-center gap-1">
-                      <MessageSquare size={10} className="text-cyan-500" /> Posts
-                    </span>
-                  </div>
-
-                  <div className="flex flex-col items-center justify-center bg-cyan-950/10 rounded-lg px-4 py-3 border border-cyan-500/20 hover:border-cyan-500/50 transition-all">
-                    <span className="text-xl font-bold text-white">{followerCount}</span>
-                    <span className="text-xs text-gray-400 flex items-center gap-1">
-                      <Users size={10} className="text-cyan-500" /> Followers
-                    </span>
-                  </div>
-
-                  <div className="flex flex-col items-center justify-center bg-cyan-950/10 rounded-lg px-4 py-3 border border-cyan-500/20 hover:border-cyan-500/50 transition-all">
-                    <span className="text-xl font-bold text-white">{eventsAttended}</span>
-                    <span className="text-xs text-gray-400 flex items-center gap-1">
-                      <Ticket size={10} className="text-cyan-500" /> Events
-                    </span>
-                  </div>
                 </div>
               </div>
             </div>
@@ -246,7 +212,7 @@ const ProfileHeader = ({ profile, isCurrentUser }) => {
           {isCurrentUser && (
             <div className="md:hidden w-full mt-6">
               <Link
-                to="/user/edit-profile"
+                to="/user/profile/edit"
                 className="flex items-center justify-center gap-2 px-4 py-3 bg-gradient-to-r from-cyan-500/10 to-black text-cyan-500 rounded-lg border border-cyan-500/30 hover:bg-cyan-950/50 transition-all shadow-md shadow-cyan-500/5 w-full group"
               >
                 <Edit2 size={16} />
@@ -258,17 +224,7 @@ const ProfileHeader = ({ profile, isCurrentUser }) => {
 
           {/* Action buttons for non-current user */}
           {!isCurrentUser && (
-            <div className="mt-6 flex flex-wrap gap-3 justify-center md:justify-start">
-              <button className="px-5 py-2.5 bg-gradient-to-r from-cyan-500 to-cyan-600 text-black font-medium rounded-lg hover:from-cyan-400 hover:to-cyan-500 transition-all shadow-lg shadow-cyan-500/20 flex items-center gap-2">
-                <Users size={16} />
-                <span>Follow</span>
-              </button>
-
-              <button className="px-5 py-2.5 bg-black text-cyan-500 rounded-lg border border-cyan-500/30 hover:bg-cyan-950/30 transition-all shadow-md hover:shadow-cyan-500/10 flex items-center gap-2">
-                <MessageSquare size={16} />
-                <span>Message</span>
-              </button>
-
+            <div className="mt-6 flex flex-wrap gap-3 justify-center md:justify-end">
               <button className="px-5 py-2.5 bg-black text-cyan-500 rounded-lg border border-cyan-500/30 hover:bg-cyan-950/30 transition-all shadow-md hover:shadow-cyan-500/10 flex items-center gap-2">
                 <Share2 size={16} />
                 <span>Share</span>

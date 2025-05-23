@@ -28,6 +28,8 @@ import OrganizerDashboard from '../pages/Organizer/OrganizerDashboard';
 import OrganizerDetails from '../pages/Organizer/OrganizerDetails';
 import OrganizerProfile from '../pages/Organizer/OrganizerProfile';
 import EventAttendees from '../pages/Organizer/EventAttendees';
+import Attendance from '../pages/Events/Attendance';
+import EventReport from '../pages/Events/EventReport';
 
 // user Pages
 import UserDashboard from '../pages/User/UserDashboard';
@@ -36,7 +38,6 @@ import EditOrgProfile from '../pages/Organizer/EditOrgProfile';
 import UserProfile from '../pages/User/UserProfile';
 import EditUserProfile from '../pages/User/EditUserProfile';
 import CreateUserProfile from '../pages/User/CreateUserProfile';
-import Attendance from '../pages/Events/Attendance';
 
 function AppRoutes() {
   return (
@@ -90,6 +91,7 @@ function AppRoutes() {
           <Route path="events/list" element={<EventListPage />} />
           <Route path="events/attendance/list" element={<Attendance />} />
           <Route path="events/attendees/:eventId" element={<EventAttendees />} />
+          <Route path="events/report/list" element={<EventReport />} />
           <Route path="event/edit/:eventId" element={<EditEvent />} />
 
           {/* Legacy path support */}

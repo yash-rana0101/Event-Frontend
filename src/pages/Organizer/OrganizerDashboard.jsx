@@ -4,7 +4,7 @@ import axios from 'axios';
 import {
   Calendar, BarChart3, Users, Clock, MapPin, Settings, Bell, Search, Plus,
   CheckCircle, X, Menu, ChevronRight, Sliders, CheckSquare, Activity,
-  Sparkles, ChevronDown, MoreHorizontal, ArrowRight, AlertCircle
+  Sparkles, ChevronDown, MoreHorizontal, ArrowRight, AlertCircle, RefreshCw
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate, Link } from 'react-router-dom';
@@ -12,6 +12,7 @@ import { useLoader } from '../../context/LoaderContext';
 import { useSelector } from 'react-redux';
 import { safelyParseToken } from '../../utils/persistFix';
 import { toast } from 'react-toastify';
+import { getOrganizerMetrics, getRevenueMetrics } from '../../services/organizerService';
 
 const OrganizerDashboard = () => {
   const [activeTab, setActiveTab] = useState('overview');
@@ -31,6 +32,9 @@ const OrganizerDashboard = () => {
     cancellations: 0,
   });
   const [error, setError] = useState(null);
+  const [metrics, setMetrics] = useState(null);
+  const [metricsLoading, setMetricsLoading] = useState(true);
+  const [metricsError, setMetricsError] = useState(null);
 
   const navigate = useNavigate();
   const { setIsLoading } = useLoader();
@@ -154,9 +158,33 @@ const OrganizerDashboard = () => {
     }
   };
 
-  // Fetch all data on component mount
+  // Fetch metrics data
+  const fetchMetrics = async () => {
+    setMetricsLoading(true);
+    setMetricsError(null);
+
+    try {
+      const metricsResponse = await getOrganizerMetrics();
+      setMetrics(metricsResponse.data);
+    } catch (err) {
+      console.error("Error fetching metrics:", err);
+      setMetricsError(err.response?.data?.message || "Failed to load metrics");
+      toast.error("Failed to load metrics data");
+    } finally {
+      setMetricsLoading(false);
+    }
+  };
+
+  // Update the useEffect to fetch metrics
   useEffect(() => {
-    fetchEvents();
+    const fetchAllData = async () => {
+      await Promise.all([
+        fetchEvents(),
+        fetchMetrics()
+      ]);
+    };
+
+    fetchAllData();
   }, []);
 
   const getStatusColor = (status) => {
@@ -189,8 +217,42 @@ const OrganizerDashboard = () => {
     return event.date || new Date(event.startDate || event.createdAt).toLocaleDateString();
   };
 
-  // Generate statistics array based on real data
-  const statistics = [
+  // Update statistics generation to use real metrics data
+  const statistics = metrics ? [
+    {
+      label: "Total Events",
+      value: metrics.metrics.totalEvents.value,
+      icon: Calendar,
+      change: metrics.metrics.totalEvents.change,
+      color: "from-cyan-500 to-blue-600",
+      trend: metrics.metrics.totalEvents.trend
+    },
+    {
+      label: "Total Attendees",
+      value: metrics.metrics.totalAttendees.value,
+      icon: Users,
+      change: metrics.metrics.totalAttendees.change,
+      color: "from-cyan-400 to-teal-500",
+      trend: metrics.metrics.totalAttendees.trend
+    },
+    {
+      label: "Completion Rate",
+      value: metrics.metrics.completionRate.value,
+      icon: CheckCircle,
+      change: metrics.metrics.completionRate.change,
+      color: "from-emerald-400 to-cyan-500",
+      trend: metrics.metrics.completionRate.trend
+    },
+    {
+      label: "Cancellations",
+      value: metrics.metrics.cancellations.value,
+      icon: X,
+      change: metrics.metrics.cancellations.change,
+      color: "from-cyan-500 to-indigo-600",
+      trend: metrics.metrics.cancellations.trend
+    }
+  ] : [
+    // Fallback static data while loading
     {
       label: "Total Events",
       value: eventStats.totalEvents,
@@ -331,19 +393,40 @@ const OrganizerDashboard = () => {
             <h2 className="font-bold text-xl md:text-2xl bg-gradient-to-r from-white to-gray-300 bg-clip-text text-transparent">
               Key Metrics
             </h2>
-            <button
-              onClick={() => setIsStatsExpanded(!isStatsExpanded)}
-              className="text-sm text-cyan-500 hover:text-cyan-400 transition-colors flex items-center"
-            >
-              <span>{isStatsExpanded ? 'Show less' : 'Show more'}</span>
-              <motion.div
-                animate={{ rotate: isStatsExpanded ? 180 : 0 }}
-                transition={{ duration: 0.3 }}
+            <div className="flex items-center gap-3">
+              <button
+                onClick={fetchMetrics}
+                className="text-xs text-cyan-400 hover:text-cyan-300 flex items-center"
+                disabled={metricsLoading}
               >
-                <ChevronDown className="h-4 w-4 ml-1" />
-              </motion.div>
-            </button>
+                <RefreshCw className={`w-3 h-3 mr-1 ${metricsLoading ? 'animate-spin' : ''}`} />
+              </button>
+              <button
+                onClick={() => setIsStatsExpanded(!isStatsExpanded)}
+                className="text-sm text-cyan-500 hover:text-cyan-400 transition-colors flex items-center"
+              >
+                <span>{isStatsExpanded ? 'Show less' : 'Show more'}</span>
+                <motion.div
+                  animate={{ rotate: isStatsExpanded ? 180 : 0 }}
+                  transition={{ duration: 0.3 }}
+                >
+                  <ChevronDown className="h-4 w-4 ml-1" />
+                </motion.div>
+              </button>
+            </div>
           </motion.div>
+
+          {metricsError && (
+            <div className="bg-red-900/20 border border-red-500/30 text-red-400 rounded-xl p-4 mb-6">
+              <div className="flex items-start">
+                <AlertCircle className="w-5 h-5 mr-2 mt-0.5" />
+                <div>
+                  <p className="font-semibold">Error loading metrics</p>
+                  <p className="text-sm mt-1">{metricsError}</p>
+                </div>
+              </div>
+            </div>
+          )}
 
           <motion.div
             className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6"
@@ -392,11 +475,23 @@ const OrganizerDashboard = () => {
                   <div>
                     <p className="text-gray-400 text-sm">{stat.label}</p>
                     <h3 className="text-3xl font-bold mt-1 bg-gradient-to-r from-white to-gray-300 bg-clip-text text-transparent">
-                      {stat.value}
+                      {metricsLoading ? (
+                        <div className="w-16 h-8 bg-gray-700 animate-pulse rounded"></div>
+                      ) : (
+                        stat.value
+                      )}
                     </h3>
-                    <span className={`text-xs font-medium ${stat.change.includes('+') ? 'text-green-400' : 'text-red-400'}`}>
-                      {stat.change}
-                      <span className="text-gray-400 ml-1">from last month</span>
+                    <span className={`text-xs font-medium ${stat.change?.includes('+') ? 'text-green-400' :
+                        stat.change?.includes('-') ? 'text-red-400' : 'text-gray-400'
+                      }`}>
+                      {metricsLoading ? (
+                        <div className="w-12 h-3 bg-gray-700 animate-pulse rounded"></div>
+                      ) : (
+                        <>
+                          {stat.change}
+                          <span className="text-gray-400 ml-1">from last month</span>
+                        </>
+                      )}
                     </span>
                   </div>
                   <motion.div
@@ -413,7 +508,11 @@ const OrganizerDashboard = () => {
                 <div className="mt-4 h-2 w-full bg-gray-800/60 rounded-full overflow-hidden relative z-10">
                   <motion.div
                     className={`h-full bg-gradient-to-r ${stat.color} rounded-full`}
-                    style={{ width: typeof stat.value === 'string' ? (parseInt(stat.value) || 50) + '%' : `${Math.min(100, (stat.value / 100) * 100)}%` }}
+                    style={{
+                      width: metricsLoading ? '50%' :
+                        typeof stat.value === 'string' ? (parseInt(stat.value) || 50) + '%' :
+                          `${Math.min(100, Math.max(10, (stat.value / 100) * 100))}%`
+                    }}
                   />
                 </div>
               </motion.div>
@@ -590,15 +689,17 @@ const OrganizerDashboard = () => {
               <motion.div
                 className="bg-gray-800/50 rounded-lg p-5 border border-gray-700/30 hover:border-cyan-500/30 transition-colors cursor-pointer"
                 whileHover={{ y: -5 }}
-                onClick={() => navigate('/organizer/reports/popularity')}
+                onClick={() => navigate('/organizer/events/report/list')}
               >
                 <div className="flex items-center mb-4">
                   <div className="w-10 h-10 rounded-lg bg-purple-500/20 flex items-center justify-center mr-3">
                     <Activity className="h-5 w-5 text-purple-500" />
                   </div>
-                  <h3 className="font-medium text-lg">Event Popularity</h3>
+                  <h3 className="font-medium text-lg">Event Report</h3>
                 </div>
-                <p className="text-gray-400 text-sm">Analyze which of your events are most popular</p>
+                <p className="text-gray-400 text-sm">
+                  Analyze the Report of your All events 
+                </p>
               </motion.div>
             </div>
           </div>

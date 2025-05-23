@@ -172,6 +172,28 @@ const organizerSlice = createSlice({
       state.profileComplete = action.payload;
       localStorage.setItem("organizer_profile_complete", action.payload);
     },
+    setToken: (state, action) => {
+      state.token = action.payload;
+      // Set a 7-day expiration time for the token
+      state.tokenExpiry = new Date().getTime() + 7 * 24 * 60 * 60 * 1000;
+      localStorage.setItem("organizer_token", action.payload);
+      localStorage.setItem(
+        "organizer_token_expiry",
+        state.tokenExpiry.toString()
+      );
+    },
+    setUser: (state, action) => {
+      state.user = action.payload;
+      localStorage.setItem("organizer_user", JSON.stringify(action.payload));
+    },
+    loginSuccess: (state, action) => {
+      state.token = action.payload.token;
+      state.user = action.payload.user;
+      state.tokenExpiry = action.payload.tokenExpiry;
+      state.loading = false;
+      state.error = null;
+      state.profileComplete = action.payload.profileComplete || false;
+    },
   },
   extraReducers: (builder) => {
     // Handle login actions
@@ -184,6 +206,17 @@ const organizerSlice = createSlice({
       state.user = action.payload.user;
       state.token = action.payload.token;
       state.tokenExpiry = action.payload.tokenExpiry;
+
+      // Save to localStorage for persistence
+      localStorage.setItem("organizer_token", action.payload.token);
+      localStorage.setItem(
+        "organizer_token_expiry",
+        action.payload.tokenExpiry.toString()
+      );
+      localStorage.setItem(
+        "organizer_user",
+        JSON.stringify(action.payload.user)
+      );
     });
     builder.addCase(loginOrganizer.rejected, (state, action) => {
       state.loading = false;
@@ -232,6 +265,12 @@ const organizerSlice = createSlice({
 });
 
 // Export actions and reducer
-export const { logout, fixNullValues, setProfileComplete } =
-  organizerSlice.actions;
+export const {
+  logout,
+  fixNullValues,
+  setProfileComplete,
+  setToken,
+  setUser,
+  loginSuccess,
+} = organizerSlice.actions;
 export default organizerSlice.reducer;

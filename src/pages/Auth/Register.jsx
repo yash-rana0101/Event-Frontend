@@ -227,7 +227,7 @@ const Register = () => {
             <p className="text-center text-sm md:text-base text-cyan-300/80 tracking-wider">
               Want to <span className="text-cyan-500 font-semibold">Register</span> as an Organizer?{' '}
               <Link
-                  to="/organizer/register"
+                  to="/auth/organizer-register"
                 className="text-cyan-500 hover:text-cyan-300 font-bold underline underline-offset-4 transition-colors duration-200"
               >
                 Click here

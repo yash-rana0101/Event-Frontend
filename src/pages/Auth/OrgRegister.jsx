@@ -250,7 +250,7 @@ const Register = () => {
                 <p className="text-sm text-cyan-300/70 uppercase tracking-wider">
                   ALREADY HAVE CREDENTIALS? {' '}
                   <Link
-                    to="/organizer/login"
+                    to="/auth/organizer-login"
                     className="text-cyan-500 hover:text-cyan-300 font-bold transition-colors"
                   >
                     LOGIN

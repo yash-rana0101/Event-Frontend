@@ -1,96 +1,58 @@
+/* eslint-disable no-unused-vars */
 import { store } from "../redux/store";
 
-export const fixPersistenceIssues = () => {
-  // Get Redux state
-  const state = store.getState();
-
-  // Check localStorage for unexpected values
-  const userToken = localStorage.getItem("token");
-  const organizerToken = localStorage.getItem("organizer_token");
-
-  // Fix "null" string values
-  if (userToken === "null") {
-    console.log("Fixing user token in localStorage");
-    localStorage.removeItem("token");
-  }
-
-  if (organizerToken === "null") {
-    console.log("Fixing organizer token in localStorage");
-    localStorage.removeItem("organizer_token");
-  }
-
-  // Fix quoted token values by parsing JSON strings
-  try {
-    if (
-      organizerToken &&
-      (organizerToken.startsWith('"') || organizerToken.endsWith('"'))
-    ) {
-      console.log("Fixing double-quoted organizer token");
-      // Parse JSON string and store the actual token value
-      const parsedToken = JSON.parse(organizerToken);
-      localStorage.setItem("organizer_token", parsedToken);
-    }
-  } catch (e) {
-    console.error("Error fixing quoted token:", e);
-  }
-
-  try {
-    if (userToken && (userToken.startsWith('"') || userToken.endsWith('"'))) {
-      console.log("Fixing double-quoted user token");
-      // Parse JSON string and store the actual token value
-      const parsedToken = JSON.parse(userToken);
-      localStorage.setItem("token", parsedToken);
-    }
-  } catch (e) {
-    console.error("Error fixing quoted token:", e);
-  }
-
-  return {
-    fixed: {
-      auth: state.auth?.user === "null" || state.auth?.token === "null",
-      organizer:
-        state.organizer?.user === "null" || state.organizer?.token === "null",
-      localStorage: userToken === "null" || organizerToken === "null",
-      quotedTokens:
-        (userToken && (userToken.startsWith('"') || userToken.endsWith('"'))) ||
-        (organizerToken &&
-          (organizerToken.startsWith('"') || organizerToken.endsWith('"'))),
-    },
-  };
-};
-
 /**
- * Enhanced helper function to safely parse potentially JSON-stringified tokens
- * @param {string} token - Token that might be JSON stringified
- * @returns {string} - Properly formatted token
+ * Safely parse a token string that might be JSON or a plain string
+ * @param {string} token - Token to parse
+ * @returns {string} Parsed token
  */
 export const safelyParseToken = (token) => {
   if (!token) return null;
 
-  // If token is already a regular string, return it
-  if (typeof token === "string") {
-    // Handle tokens stored as JSON strings with quotes
-    if (token.startsWith('"') && token.endsWith('"')) {
-      try {
-        return JSON.parse(token); // This removes the surrounding quotes
-      } catch (e) {
-        console.error("Failed to parse quoted token:", e);
-        // Return the token without quotes if parsing fails
-        return token.substring(1, token.length - 1);
-      }
+  try {
+    // Try to parse as JSON
+    const parsed = JSON.parse(token);
+
+    // If it's an object with a token property, return that
+    if (parsed && typeof parsed === "object" && parsed.token) {
+      return parsed.token;
     }
 
-    // Handle escaped quotes that might remain
-    if (token.includes('"')) {
-      return token.replace(/"/g, '"');
+    // If it's a string, return the parsed value
+    if (typeof parsed === "string") {
+      return parsed;
     }
 
-    // Not a JSON string, return as is
+    // Return the original token if parsing doesn't yield useful results
+    return token;
+  } catch (e) {
+    // If it's not valid JSON, return the original token as is
     return token;
   }
+};
 
-  // If token is some other type, convert to string
-  return String(token);
+/**
+ * Check if token is expired based on expiry time
+ * @param {string} expiryTimestamp - Token expiry timestamp
+ * @param {number} bufferMinutes - Buffer time in minutes before actual expiration
+ * @returns {boolean} True if token is expired or about to expire
+ */
+export const isTokenExpired = (expiryTimestamp, bufferMinutes = 5) => {
+  if (!expiryTimestamp) return true;
+
+  try {
+    const expiryTime = parseInt(expiryTimestamp);
+    if (isNaN(expiryTime)) return true;
+
+    // Add buffer time in milliseconds to current time
+    const currentTime = new Date().getTime();
+    const bufferTime = bufferMinutes * 60 * 1000;
+
+    return currentTime + bufferTime > expiryTime;
+  } catch (e) {
+    console.error("Error checking token expiry:", e);
+    return true; // If any error, consider token expired
+  }
 };
 
 /**
@@ -167,19 +129,84 @@ export const checkAuthStatus = () => {
 
   // Check user authentication
   const userToken = state.auth?.token || localStorage.getItem("token");
-  const userAuthenticated = !!userToken && userToken !== "null";
+  const userTokenExpiry =
+    state.auth?.tokenExpiry || localStorage.getItem("token_expiry");
+  const userIsExpired = isTokenExpired(userTokenExpiry);
 
   // Check organizer authentication
   const organizerToken =
     state.organizer?.token || localStorage.getItem("organizer_token");
-  const organizerAuthenticated = !!organizerToken && organizerToken !== "null";
+  const organizerTokenExpiry =
+    state.organizer?.tokenExpiry ||
+    localStorage.getItem("organizer_token_expiry");
+  const organizerIsExpired = isTokenExpired(organizerTokenExpiry);
 
   return {
-    userAuthenticated,
-    organizerAuthenticated,
-    userToken: userToken ? safelyParseToken(userToken) : null,
-    organizerToken: organizerToken ? safelyParseToken(organizerToken) : null,
-    anyAuthenticated: userAuthenticated || organizerAuthenticated,
-    bothAuthenticated: userAuthenticated && organizerAuthenticated,
+    isAuthenticated:
+      !!(userToken && !userIsExpired) ||
+      !!(organizerToken && !organizerIsExpired),
+    user: {
+      isAuthenticated: !!(userToken && !userIsExpired),
+      token: userToken,
+      isExpired: userIsExpired,
+    },
+    organizer: {
+      isAuthenticated: !!(organizerToken && !organizerIsExpired),
+      token: organizerToken,
+      isExpired: organizerIsExpired,
+    },
   };
+};
+
+/**
+ * Fix any persistence issues by syncing localStorage with Redux
+ */
+export const fixPersistenceIssues = () => {
+  try {
+    const state = store.getState();
+
+    // Fix user auth persistence
+    if (!state.auth?.token) {
+      const token = localStorage.getItem("token");
+      const tokenExpiry = localStorage.getItem("token_expiry");
+      const user = localStorage.getItem("user");
+
+      if (token && !isTokenExpired(tokenExpiry)) {
+        store.dispatch({
+          type: "auth/loginSuccess",
+          payload: {
+            token,
+            tokenExpiry: parseInt(tokenExpiry),
+            user: user ? JSON.parse(user) : null,
+          },
+        });
+      }
+    }
+
+    // Fix organizer auth persistence
+    if (!state.organizer?.token) {
+      const token = localStorage.getItem("organizer_token");
+      const tokenExpiry = localStorage.getItem("organizer_token_expiry");
+      const user = localStorage.getItem("organizer_user");
+      const profileComplete =
+        localStorage.getItem("organizer_profile_complete") === "true";
+
+      if (token && !isTokenExpired(tokenExpiry)) {
+        store.dispatch({
+          type: "organizer/loginSuccess",
+          payload: {
+            token,
+            tokenExpiry: parseInt(tokenExpiry),
+            user: user ? JSON.parse(user) : null,
+            profileComplete,
+          },
+        });
+      }
+    }
+
+    return true;
+  } catch (e) {
+    console.error("Error fixing persistence issues:", e);
+    return false;
+  }
 };

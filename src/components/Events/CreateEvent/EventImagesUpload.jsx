@@ -23,6 +23,9 @@ const EventImagesUpload = ({ formData, updateFormData, errors, handleImagesChang
 
     // Update formData with the selected file
     updateFormData({ image: file });
+    if (typeof handleImagesChange === "function") {
+      handleImagesChange(e);
+    }
   };
 
   const removeImage = () => {

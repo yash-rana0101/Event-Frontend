@@ -16,6 +16,7 @@ export default function CreateEvent() {
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState(null);
   const [tokenValid, setTokenValid] = useState(false);
+  const [savedFormData, setSavedFormData] = useState(null);
   const { setIsLoading } = useLoader();
 
   const organizerToken = useSelector(state => state.organizer?.token);
@@ -51,6 +52,14 @@ export default function CreateEvent() {
       setTokenValid(true);
     }
   }, [organizerToken, navigate]);
+
+  // Restore form data from localStorage if present
+  useEffect(() => {
+    const saved = localStorage.getItem("event_form_data");
+    if (saved) {
+      setSavedFormData(JSON.parse(saved));
+    }
+  }, []);
 
   const handleSubmit = async (eventData) => {
     try {
@@ -88,50 +97,31 @@ export default function CreateEvent() {
         throw new Error('Organizer ID not found. Please log in again.');
       }
 
-      // Make a defensive copy of eventData to avoid mutation issues
-      const eventDataCopy = { ...eventData };
-
-      // Ensure the event data has all required properties properly initialized
-      const eventPayload = {
-        ...eventDataCopy,
-        organizer: organizerId,
-        // Initialize any potentially undefined properties with default values
-        images: Array.isArray(eventDataCopy.images) ? eventDataCopy.images : [],
-        tags: Array.isArray(eventDataCopy.tags) ? eventDataCopy.tags : [],
-        timeline: Array.isArray(eventDataCopy.timeline) ? eventDataCopy.timeline : [],
-        prizes: Array.isArray(eventDataCopy.prizes) ? eventDataCopy.prizes : [],
-        sponsors: Array.isArray(eventDataCopy.sponsors) ? eventDataCopy.sponsors : [],
-        faqs: Array.isArray(eventDataCopy.faqs) ? eventDataCopy.faqs : [],
-        // Ensure socialShare is a proper object
-        socialShare: {
-          likes: 0,
-          comments: 0,
-          shares: 0
+      // Prepare FormData for file upload
+      const formData = new FormData();
+      // Append all fields to FormData
+      for (const key in eventData) {
+        if (key === "image" && eventData[key]) {
+          formData.append("image", eventData[key]);
+        } else if (Array.isArray(eventData[key]) || typeof eventData[key] === "object") {
+          formData.append(key, JSON.stringify(eventData[key]));
+        } else if (eventData[key] !== undefined && eventData[key] !== null) {
+          formData.append(key, eventData[key]);
         }
-      };
+      }
+      formData.append("organizer", organizerId);
 
-      // Clean up images array to remove any invalid items
-      eventPayload.images = eventPayload.images
-        .filter(img => img && (typeof img === 'string' || img instanceof File || Object.keys(img).length > 0))
-        .map(img => {
-          if (typeof img === 'string' && img.startsWith('blob:')) {
-            return "https://via.placeholder.com/800x600?text=Image+Pending";
+      const apiUrl = import.meta.env.VITE_API_URL;
+      const response = await axios.post(
+        `${apiUrl}/events`,
+        formData,
+        {
+          headers: {
+            'Content-Type': 'multipart/form-data',
+            'Authorization': `Bearer ${token}`
           }
-          return img;
-        });
-
-      console.log("Sending event data:", JSON.stringify(eventPayload));
-
-      const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000/api/v1';
-      const response = await axios({
-        method: 'POST',
-        url: `${apiUrl}/events`,
-        data: eventPayload,
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
         }
-      });
+      );
 
       console.log("Event created:", response.data);
       toast.success('Event created successfully!');
@@ -163,6 +153,8 @@ export default function CreateEvent() {
         setTimeout(() => navigate('/organizer/login'), 3000);
       }
 
+      // Save form data to localStorage on error
+      localStorage.setItem("event_form_data", JSON.stringify(eventData));
       setError(errorMessage);
       toast.error(errorMessage);
     } finally {
@@ -226,6 +218,7 @@ export default function CreateEvent() {
                 <EventForm
                   onSubmit={handleSubmit}
                   submitting={submitting}
+                  initialFormData={savedFormData}
                 />
               </motion.div>
             )}

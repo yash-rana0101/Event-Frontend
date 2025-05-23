@@ -36,6 +36,7 @@ import EditOrgProfile from '../pages/Organizer/EditOrgProfile';
 import UserProfile from '../pages/User/UserProfile';
 import EditUserProfile from '../pages/User/EditUserProfile';
 import CreateUserProfile from '../pages/User/CreateUserProfile';
+import Attendance from '../pages/Events/Attendance';
 
 function AppRoutes() {
   return (
@@ -87,6 +88,7 @@ function AppRoutes() {
           <Route path="profile/edit" element={<EditOrgProfile />} />
           <Route path="details" element={<OrganizerDetails />} />
           <Route path="events/list" element={<EventListPage />} />
+          <Route path="events/attendance/list" element={<Attendance />} />
           <Route path="events/attendees/:eventId" element={<EventAttendees />} />
           <Route path="event/edit/:eventId" element={<EditEvent />} />
 

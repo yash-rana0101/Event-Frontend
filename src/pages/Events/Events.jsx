@@ -55,8 +55,6 @@ export default function Events() {
           }
         });
 
-        console.log("API Response:", response.data);
-
         // Extract events from the response
         let fetchedEvents = [];
         if (Array.isArray(response.data)) {

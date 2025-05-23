@@ -1,6 +1,7 @@
 /* eslint-disable no-unused-vars */
 import axios from "axios";
 import { toast } from "react-toastify";
+import { safelyParseToken } from "./persistFix";
 
 /**
  * Helper function to get the API base URL with fallback
@@ -301,6 +302,98 @@ export const isEventPublished = (event) => {
   );
 };
 
+/**
+ * Creates an axios instance with authorization headers
+ * @param {string} tokenType - 'user' or 'organizer'
+ * @returns {object} - Axios instance with auth headers
+ */
+export const createAuthenticatedClient = (tokenType = "user") => {
+  const tokenKey = tokenType === "organizer" ? "organizer_token" : "token";
+  const token = localStorage.getItem(tokenKey);
+  const cleanToken = safelyParseToken(token);
+
+  return axios.create({
+    baseURL: API_URL,
+    headers: cleanToken
+      ? {
+          Authorization: `Bearer ${cleanToken}`,
+          "Content-Type": "application/json",
+        }
+      : {
+          "Content-Type": "application/json",
+        },
+  });
+};
+
+/**
+ * Event attendees API
+ */
+export const attendeesApi = {
+  /**
+   * Get all attendees for an event
+   * @param {string} eventId - Event ID
+   * @returns {Promise} - API response
+   */
+  getEventAttendees: async (eventId) => {
+    const client = createAuthenticatedClient("organizer");
+    return client.get(`/organizer/events/${eventId}/attendees`);
+  },
+
+  /**
+   * Update attendee check-in status
+   * @param {string} eventId - Event ID
+   * @param {string} attendeeId - Attendee ID
+   * @param {string} status - New status ('checked-in', 'not-checked-in', 'cancelled')
+   * @returns {Promise} - API response
+   */
+  updateCheckInStatus: async (eventId, attendeeId, status) => {
+    const client = createAuthenticatedClient("organizer");
+    return client.post(
+      `/organizer/events/${eventId}/attendees/${attendeeId}/check-in`,
+      { status }
+    );
+  },
+
+  /**
+   * Add attendee manually
+   * @param {string} eventId - Event ID
+   * @param {object} attendeeData - Attendee data
+   * @returns {Promise} - API response
+   */
+  addAttendeeManually: async (eventId, attendeeData) => {
+    const client = createAuthenticatedClient("organizer");
+    return client.post(`/organizer/events/${eventId}/attendees`, attendeeData);
+  },
+};
+
+/**
+ * Handle API errors consistently
+ * @param {Error} error - Axios error
+ * @returns {object} - Standardized error object
+ */
+export const handleApiError = (error) => {
+  const defaultError = {
+    message: "An unexpected error occurred",
+    statusCode: 500,
+    data: null,
+  };
+
+  // Not an axios error
+  if (!error.response) {
+    return {
+      ...defaultError,
+      message: error.message || defaultError.message,
+    };
+  }
+
+  // Return structured error
+  return {
+    message: error.response.data?.message || defaultError.message,
+    statusCode: error.response.status,
+    data: error.response.data,
+  };
+};
+
 export default {
   getApiBaseUrl,
   createApiUrl,
@@ -312,4 +405,7 @@ export default {
   extractApiData,
   debugApiResponse,
   isEventPublished,
+  createAuthenticatedClient,
+  attendeesApi,
+  handleApiError,
 };

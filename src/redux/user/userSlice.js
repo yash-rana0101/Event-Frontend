@@ -1,7 +1,7 @@
 /* eslint-disable no-unused-vars */
 import { createSlice, createAsyncThunk } from "@reduxjs/toolkit";
 import axios from "axios";
-import { safelyParseToken } from "../../utils/persistFix";
+import  {safelyParseToken}  from "../../utils/persistFix";
 
 // Get API URL from environment or use default
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:3000/api/v1";
@@ -28,12 +28,13 @@ export const loginUser = createAsyncThunk(
     try {
       const response = await axios.post(`${API_URL}/users/login`, credentials);
 
-      // Set expiry time for token (1 day from now)
-      const expiryTime = new Date().getTime() + 24 * 60 * 60 * 1000;
+      // Set expiry time for token (7 days from now) - updated from 1 day
+      const expiryTime = new Date().getTime() + 7 * 24 * 60 * 60 * 1000;
 
       // Save to localStorage for backup/direct access
       localStorage.setItem("token", response.data.token);
       localStorage.setItem("token_expiry", expiryTime.toString());
+      localStorage.setItem("user", JSON.stringify(response.data.user));
 
       return {
         token: response.data.token,

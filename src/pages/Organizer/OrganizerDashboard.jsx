@@ -86,11 +86,9 @@ const OrganizerDashboard = () => {
       try {
         // First try organizer-specific endpoint
         const response = await axios.get(
-          `${apiUrl}/organizer/events/organizer/${organizerId}`,
+          `${apiUrl}/events/organizer/${organizerId}`,
           config
         );
-
-        console.log("Events fetched successfully:", response.data);
         setEvents(response.data);
       } catch (err1) {
         console.warn("First endpoint failed, trying fallback:", err1);
@@ -105,7 +103,6 @@ const OrganizerDashboard = () => {
             }
           );
 
-          console.log("Fallback events fetched:", fallbackResponse.data);
           setEvents(Array.isArray(fallbackResponse.data)
             ? fallbackResponse.data
             : fallbackResponse.data.events || []);
@@ -565,7 +562,7 @@ const OrganizerDashboard = () => {
               <motion.div
                 className="bg-gray-800/50 rounded-lg p-5 border border-gray-700/30 hover:border-cyan-500/30 transition-colors cursor-pointer"
                 whileHover={{ y: -5 }}
-                onClick={() => navigate('/organizer/reports/attendance')}
+                onClick={() => navigate('/organizer/events/attendance/list')}
               >
                 <div className="flex items-center mb-4">
                   <div className="w-10 h-10 rounded-lg bg-cyan-500/20 flex items-center justify-center mr-3">

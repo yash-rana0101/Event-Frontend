@@ -45,8 +45,6 @@ export default function UserProfile() {
 
         const response = await axios.get(`${apiUrl}/profiles/user/${userId}`);
 
-        console.log("Profile API response:", response.data);
-
         if (response.data && (response.data.status === 'success' || response.data.data)) {
           // Check if data is nested in a data property or directly in response.data
           const profileData = response.data.data || response.data;

@@ -409,7 +409,6 @@ export default function TeamApplyPage() {
               limit: 100 // Get more events to ensure we have enough options
             }
           });
-          console.log("Events API Response:", eventsResponse.data);
 
           // Extract events data from different possible response formats
           let eventsData;

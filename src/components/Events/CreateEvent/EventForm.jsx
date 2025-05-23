@@ -13,51 +13,54 @@ import EventPrizes from './EventPrizes';
 import EventSponsors from './EventSponsors';
 import EventFAQs from './EventFAQs';
 
-const EventForm = ({ onSubmit, submitting: initialSubmitting }) => {
+const EventForm = ({ onSubmit, submitting: initialSubmitting, initialFormData }) => {
   const navigate = useNavigate();
   const [submitting, setSubmitting] = useState(initialSubmitting || false);
 
   // Add error state
   const [submitError, setSubmitError] = useState(null);
 
-  const [formData, setFormData] = useState({
-    title: '',
-    tagline: '', // Added tagline field to match schema
-    description: '',
-    category: '',
-    date: '', // Keep for UI, but will format as needed for API
-    startDate: '',
-    endDate: '',
-    duration: '', // Added duration field
-    location: {
-      address: '',
-      city: '',
-      state: '',
-      country: '',
-      zipCode: '',
-      coordinates: {
-        lat: null,
-        lng: null,
+  const [formData, setFormData] = useState(() => {
+    // Use initialFormData if provided, otherwise default
+    return initialFormData || {
+      title: '',
+      tagline: '', 
+      description: '',
+      category: '',
+      date: '', 
+      startDate: '',
+      endDate: '',
+      duration: '',
+      location: {
+        address: '',
+        city: '',
+        state: '',
+        country: '',
+        zipCode: '',
+        coordinates: {
+          lat: null,
+          lng: null,
+        },
       },
-    },
-    capacity: 0,
-    isPaid: false,
-    price: 0,
-    currency: 'USD',
-    registrationDeadline: '',
-    images: [],
-    tags: [],
-    isPublished: false,
-    timeline: [],
-    prizes: [],
-    sponsors: [],
-    faqs: [],
-    featured: false, // Added featured field
-    socialShare: {
-      likes: 0,
-      comments: 0,
-      shares: 0
-    },
+      capacity: 0,
+      isPaid: false,
+      price: 0,
+      currency: 'USD',
+      registrationDeadline: '',
+      image: '', // <-- use image for single image upload
+      tags: [],
+      isPublished: false,
+      timeline: [],
+      prizes: [],
+      sponsors: [],
+      faqs: [],
+      featured: false, // Added featured field
+      socialShare: {
+        likes: 0,
+        comments: 0,
+        shares: 0
+      },
+    };
   });
 
   const [currentStep, setCurrentStep] = useState(1);
@@ -192,19 +195,11 @@ const EventForm = ({ onSubmit, submitting: initialSubmitting }) => {
   };
 
   const handleImagesChange = (e) => {
-    const files = Array.from(e.target.files);
-
-    if (files.length > 0) {
-      // Create preview URLs for displaying images
-      const newPreviewUrls = files.map(file => URL.createObjectURL(file));
-
-      // Update preview URLs
-      setImagePreviews(prev => [...prev, ...newPreviewUrls]);
-
-      // Store the actual File objects in formData
+    const file = e.target.files[0];
+    if (file) {
       setFormData(prev => ({
         ...prev,
-        images: [...prev.images, ...files]
+        image: file
       }));
     }
   };
@@ -218,7 +213,7 @@ const EventForm = ({ onSubmit, submitting: initialSubmitting }) => {
     { step: 6, component: <EventPrizes formData={formData} updateFormData={updateFormData} errors={errors} /> },
     { step: 7, component: <EventSponsors formData={formData} updateFormData={updateFormData} errors={errors} /> },
     { step: 8, component: <EventFAQs formData={formData} updateFormData={updateFormData} errors={errors} /> },
-    { step: 9, component: <EventImagesUpload formData={formData} updateFormData={updateFormData} errors={errors} handleImagesChange={handleImagesChange} imagePreviews={imagePreviews} /> }
+    { step: 9, component: <EventImagesUpload formData={formData} updateFormData={updateFormData} errors={errors} handleImagesChange={handleImagesChange} /> }
   ];
 
   // Progress percentage
@@ -273,7 +268,7 @@ const EventForm = ({ onSubmit, submitting: initialSubmitting }) => {
             transition={{ duration: 0.3 }}
           ></motion.div>
         </div>
-        <div className="flex justify-between mt-2 text-xs text-gray-500">
+        <div className="hidden md:flex justify-between mt-2 text-xs text-gray-500">
           <div className={currentStep >= 1 ? "text-cyan-500" : ""}>Basic Info</div>
           <div className={currentStep >= 2 ? "text-cyan-500" : ""}>Date & Time</div>
           <div className={currentStep >= 3 ? "text-cyan-500" : ""}>Location</div>

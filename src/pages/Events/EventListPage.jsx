@@ -31,6 +31,7 @@ const EventListPage = () => {
   const organizerToken = useSelector(state => state.organizer?.token);
   const organizerData = useSelector(state => state.organizer?.user);
 
+
   const eventsPerPage = 4;
 
   // Fetch events from the API
@@ -48,37 +49,61 @@ const EventListPage = () => {
       if (!token) {
         throw new Error('Authentication required. Please log in again.');
       }
-      
-      // Get organizer ID
+
+      // Get organizer ID - more robust handling
       let organizerId;
-      if (typeof organizerData === 'string') {
+      if (!organizerData) {
+        // Try to get from localStorage as fallback
+        const localOrganizerData = localStorage.getItem('organizer_data');
+        if (localOrganizerData) {
+          try {
+            const parsed = JSON.parse(localOrganizerData);
+            organizerId = parsed?._id || parsed?.id || (parsed?._doc && parsed._doc._id);
+            console.log("Retrieved organizerId from localStorage:", organizerId);
+          } catch (e) {
+            console.error('Error parsing local organizer data:', e);
+          }
+        }
+      } else if (typeof organizerData === 'string') {
         try {
           const parsed = JSON.parse(organizerData);
-          organizerId = parsed?._doc._id;
+          organizerId = parsed?._id || parsed?.id || (parsed?._doc && parsed._doc._id);
+          console.log("Retrieved organizerId from string data:", organizerId);
         } catch (e) {
-          console.error('Error parsing organizer data:', e);
+          console.error('Error parsing organizer data string:', e);
         }
-      } else if (organizerData) {
-        organizerId = organizerData._doc._id;
+      } else {
+        // Object format - try multiple possible paths to get the ID
+        organizerId = organizerData.id ||
+          organizerData._id ||
+          (organizerData._doc && organizerData._doc._id);
       }
 
       if (!organizerId) {
         toast.error('Could not determine organizer ID. Please log in again.');
-        // navigate('/organizer/login');
+        navigate('/organizer/login');
         return;
       }
 
       const apiUrl = import.meta.env.VITE_API_URL;
 
-      const response = await axios.get(`${apiUrl}/organizer/events/organizer/${organizerId}`, {
+      // Use only the fallback endpoint
+      const response = await axios.get(`${apiUrl}/events/organizer/${organizerId}`, {
         headers: {
           Authorization: `Bearer ${token}`
         }
       });
 
+      // Handle the case where the response is empty or unexpected
+      if (!response.data || response.data.error) {
+        throw new Error(response.data?.error || "Received empty response from server");
+      }
 
       // Format the events to match our UI structure
-      const formattedEvents = response.data.map(event => ({
+      const eventsArray = Array.isArray(response.data) ? response.data :
+        (response.data.events || response.data.data || []);
+
+      const formattedEvents = eventsArray.map(event => ({
         id: event._id,
         title: event.title,
         date: event.date || new Date(event.startDate).toLocaleDateString(),
@@ -210,7 +235,7 @@ const EventListPage = () => {
   // Remove the loading UI
   if (loading && events.length === 0) {
     return (
-        <Skeleton type='list' count={8} columns={{ default: 1, md: 1, lg: 1 }} />
+      <Skeleton type='list' count={8} columns={{ default: 1, md: 1, lg: 1 }} />
     );
   }
 
@@ -229,10 +254,10 @@ const EventListPage = () => {
               Try Again
             </button>
             <button
-              onClick={() => navigate('/organizer/dashboard')}
+              onClick={() => navigate(-1)}
               className="mt-4 ml-4 px-4 py-2 bg-gray-700 text-white rounded-lg hover:bg-gray-800"
             >
-              Back to Dashboard
+              Back 
             </button>
           </div>
         </div>
@@ -369,6 +394,14 @@ const EventListPage = () => {
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                           <div className="flex justify-end space-x-2">
+                            {/* Fix View Attendees link - use absolute path instead of relative path */}
+                            <Link
+                              to={`/organizer/events/attendees/${event.id}`}
+                              className="bg-gray-800/50 text-gray-300 hover:bg-gray-800/80 p-2 rounded-full transition-colors duration-200"
+                              title="View Attendees"
+                            >
+                              <Users className="h-4 w-4" />
+                            </Link>
                             <Link
                               to={`/event/${event.id}`}
                               className="bg-cyan-900/30 text-cyan-400 hover:bg-cyan-900/50 p-2 rounded-full transition-colors duration-200"

@@ -157,3 +157,6 @@ img {
   cursor: pointer;
  }
 
+ input[type="date"]::-webkit-calendar-picker-indicator {
+  filter: invert(1) sepia(1) saturate(5) hue-rotate(180deg);
+}

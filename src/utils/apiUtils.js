@@ -311,6 +311,7 @@ export const createAuthenticatedClient = (tokenType = "user") => {
   const tokenKey = tokenType === "organizer" ? "organizer_token" : "token";
   const token = localStorage.getItem(tokenKey);
   const cleanToken = safelyParseToken(token);
+  const API_URL = getApiBaseUrl();
 
   return axios.create({
     baseURL: API_URL,
@@ -335,8 +336,13 @@ export const attendeesApi = {
    * @returns {Promise} - API response
    */
   getEventAttendees: async (eventId) => {
-    const client = createAuthenticatedClient("organizer");
-    return client.get(`/organizer/events/${eventId}/attendees`);
+    try {
+      const client = createAuthenticatedClient("organizer");
+      return await client.get(`/organizer/events/${eventId}/attendees`);
+    } catch (error) {
+      console.error("Error fetching attendees:", error);
+      throw handleApiError(error);
+    }
   },
 
   /**
@@ -347,11 +353,16 @@ export const attendeesApi = {
    * @returns {Promise} - API response
    */
   updateCheckInStatus: async (eventId, attendeeId, status) => {
-    const client = createAuthenticatedClient("organizer");
-    return client.post(
-      `/organizer/events/${eventId}/attendees/${attendeeId}/check-in`,
-      { status }
-    );
+    try {
+      const client = createAuthenticatedClient("organizer");
+      return await client.post(
+        `/organizer/events/${eventId}/attendees/${attendeeId}/check-in`,
+        { status }
+      );
+    } catch (error) {
+      console.error("Error updating check-in status:", error);
+      throw handleApiError(error);
+    }
   },
 
   /**
@@ -361,8 +372,31 @@ export const attendeesApi = {
    * @returns {Promise} - API response
    */
   addAttendeeManually: async (eventId, attendeeData) => {
-    const client = createAuthenticatedClient("organizer");
-    return client.post(`/organizer/events/${eventId}/attendees`, attendeeData);
+    try {
+      const client = createAuthenticatedClient("organizer");
+      return await client.post(
+        `/organizer/events/${eventId}/attendees`,
+        attendeeData
+      );
+    } catch (error) {
+      console.error("Error adding attendee:", error);
+      throw handleApiError(error);
+    }
+  },
+
+  /**
+   * Get event report with attendees data
+   * @param {string} eventId - Event ID
+   * @returns {Promise} - API response
+   */
+  getEventReport: async (eventId) => {
+    try {
+      const client = createAuthenticatedClient("organizer");
+      return await client.get(`/reports/events/${eventId}/attendance`);
+    } catch (error) {
+      console.error("Error fetching event report:", error);
+      throw handleApiError(error);
+    }
   },
 };
 
@@ -376,6 +410,7 @@ export const handleApiError = (error) => {
     message: "An unexpected error occurred",
     statusCode: 500,
     data: null,
+    status: 500,
   };
 
   // Not an axios error
@@ -390,6 +425,7 @@ export const handleApiError = (error) => {
   return {
     message: error.response.data?.message || defaultError.message,
     statusCode: error.response.status,
+    status: error.response.status,
     data: error.response.data,
   };
 };

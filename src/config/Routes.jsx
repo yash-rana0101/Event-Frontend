@@ -30,6 +30,7 @@ import OrganizerProfile from '../pages/Organizer/OrganizerProfile';
 import EventAttendees from '../pages/Organizer/EventAttendees';
 import Attendance from '../pages/Events/Attendance';
 import EventReport from '../pages/Events/EventReport';
+import ViewEventReport from '../pages/Events/ViewEventReport';
 
 // user Pages
 import UserDashboard from '../pages/User/UserDashboard';
@@ -38,6 +39,7 @@ import EditOrgProfile from '../pages/Organizer/EditOrgProfile';
 import UserProfile from '../pages/User/UserProfile';
 import EditUserProfile from '../pages/User/EditUserProfile';
 import CreateUserProfile from '../pages/User/CreateUserProfile';
+import OrganizerPublicProfile from '../pages/Organizer/organizerPublicProfile';
 
 function AppRoutes() {
   return (
@@ -47,8 +49,7 @@ function AppRoutes() {
         <Route index element={<Home />} />
         <Route path="contact" element={<Contact />} />
         <Route path="about" element={<About />} />
-        <Route path="organizer/profile/:organizerId" element={<OrganizerProfile />} />
-        <Route path="profile/:organizerId" element={<OrganizerProfile />} /> {/* New public route for organizer profiles */}
+        <Route path="organizer/profile/:organizerId" element={<OrganizerPublicProfile />} />
         <Route path="/user/profile/:userId" element={<UserProfile />} />
 
         {/* Events */}
@@ -91,6 +92,7 @@ function AppRoutes() {
           <Route path="events/list" element={<EventListPage />} />
           <Route path="events/attendance/list" element={<Attendance />} />
           <Route path="events/attendees/:eventId" element={<EventAttendees />} />
+          <Route path="events/report/:eventId" element={<ViewEventReport />} />
           <Route path="events/report/list" element={<EventReport />} />
           <Route path="event/edit/:eventId" element={<EditEvent />} />
 

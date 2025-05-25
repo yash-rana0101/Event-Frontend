@@ -1051,7 +1051,7 @@ export default function EventDetail() {
                 <div>
                   <h3 className="font-medium text-white">{formattedEvent.organizer}</h3>
                   <Link
-                    to={`/profile/${formattedEvent.organizerId}`}
+                    to={`/organizer/profile/${formattedEvent.organizerId}`}
                     className="text-cyan-400 text-sm hover:underline"
                   >
                     View Profile

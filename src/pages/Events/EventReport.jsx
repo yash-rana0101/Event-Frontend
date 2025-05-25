@@ -64,15 +64,34 @@ const EventReport = () => {
         { headers: { Authorization: `Bearer ${token}` } }
       );
 
-      if (response.data && Array.isArray(response.data.data)) {
+      // Check if response exists and has the expected structure
+      if (response && response.data && Array.isArray(response.data.data)) {
         setEvents(response.data.data);
+      } else if (response && response.data && Array.isArray(response.data)) {
+        // Fallback if data is directly in response.data
+        setEvents(response.data);
       } else {
-        throw new Error('Invalid response format');
+        throw new Error('Invalid response format or no data received');
       }
 
     } catch (err) {
       console.error("Error fetching completed events:", err);
-      setError(err.response?.data?.message || err.message || "Failed to fetch completed events");
+
+      // Better error message handling
+      let errorMessage = "Failed to fetch completed events";
+
+      if (err.response) {
+        // Server responded with error status
+        errorMessage = err.response.data?.message || `Server error: ${err.response.status}`;
+      } else if (err.request) {
+        // Request was made but no response received
+        errorMessage = "No response from server. Please check your connection.";
+      } else {
+        // Something else happened
+        errorMessage = err.message || "An unexpected error occurred";
+      }
+
+      setError(errorMessage);
       toast.error("Could not load completed events. Please try again later.");
     } finally {
       setLoading(false);

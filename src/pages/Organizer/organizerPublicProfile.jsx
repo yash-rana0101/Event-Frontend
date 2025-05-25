@@ -1,6 +1,6 @@
 /* eslint-disable no-unused-vars */
 import React, { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { useSelector, useDispatch } from 'react-redux';
 import axios from 'axios';
 import {
@@ -17,9 +17,10 @@ import { FaPhone } from 'react-icons/fa6';
 import Skeleton from '../../components/UI/Skeleton';
 import { fetchPublicOrganizerProfile } from '../../redux/user/organizer';
 
-const OrganizerProfile = () => {
+const OrganizerPublicProfile = () => {
   const { organizerId } = useParams();
   const navigate = useNavigate();
+  const urllocation = useLocation();
   const dispatch = useDispatch();
   const [activeSection, setActiveSection] = useState('about');
   const [isLoaded, setIsLoaded] = useState(false);
@@ -55,12 +56,6 @@ const OrganizerProfile = () => {
 
     return loggedInUser._id || loggedInUser.id || loggedInUser?._doc?._id;
   };
-
-  const loggedInUserId = getUserId();
-  // Check if path is /profile/:organizerId which is public route
-  const isPublicRoute = window.location.pathname.startsWith('/profile/');
-  const isOwnProfile = organizerId === loggedInUserId && !isPublicRoute;
-  const isAuthenticated = !!loggedInUserId && !isPublicRoute;
 
   const { setIsLoading } = useLoader();
 
@@ -111,7 +106,7 @@ const OrganizerProfile = () => {
         const parsed = JSON.parse(id);
         if (parsed._id) return parsed._id;
         if (parsed.id) return parsed.id;
-        if (parsed._doc?._id) return parsed._doc._id;
+        if (parsed._doc?._id) return id._doc._id;
       } catch (e) {
         // Not a valid JSON string, return as is
         return id;
@@ -129,136 +124,101 @@ const OrganizerProfile = () => {
       try {
         // Parse and sanitize the ID
         const cleanOrganizerId = parseOrganizerId(organizerId);
-        const idToFetch = cleanOrganizerId || loggedInUserId;
 
-        if (!idToFetch) {
+        if (!cleanOrganizerId) {
           setError("No organizer ID found");
           setLoading(false);
           return;
         }
-        // If this is a public view (public route or not logged in)
-        if (isPublicRoute || !isAuthenticated) {
-          // Use the Redux action to fetch public profile
-          const resultAction = await dispatch(fetchPublicOrganizerProfile(idToFetch));
+        // Always use public API endpoint
+        const apiUrl = import.meta.env.VITE_API_URL;
 
-          if (fetchPublicOrganizerProfile.fulfilled.match(resultAction)) {
-            setProfile(resultAction.payload.publicProfile);
-          } else {
-            const errorMessage = resultAction.payload || resultAction.error?.message || 'Failed to load profile';
-            throw new Error(typeof errorMessage === 'string' ? errorMessage : 'Failed to load profile');
-          }
-        } else {
-          // Authenticated and viewing own profile - original code path
-          // Get API URL from environment or use fallback
-          const apiUrl = import.meta.env.VITE_API_URL;
+        try {
+          const publicResponse = await axios.get(`${apiUrl}/organizer/public/profile/${cleanOrganizerId}`);
 
-          const token = organizerData?.token || localStorage.getItem('token') || null;
+          if (publicResponse.data && publicResponse.data.success) {
+            // Extract the actual data from the wrapped response
+            const responseData = publicResponse.data.data;
+            // Structure the profile data from the new API format with better error handling
+            const profileData = {
+              // Basic organizer info with fallbacks
+              _id: responseData.organizer?._id || cleanOrganizerId,
+              name: responseData.organizer?.name || 'Unnamed Organizer',
+              email: responseData.organizer?.email || '',
+              organization: responseData.organizer?.organization || '',
+              createdAt: responseData.organizer?.createdAt || '',
 
-          const cleanToken = safelyParseToken(token);
+              // Detailed profile info with fallbacks
+              title: responseData.details?.title || 'Event Organizer',
+              company: responseData.details?.company || responseData.organizer?.organization || '',
+              location: responseData.details?.location || '',
+              phone: responseData.details?.phone || '',
+              bio: responseData.details?.bio || 'No bio provided',
+              expertise: responseData.details?.expertise || [],
+              socials: responseData.details?.socials || [],
+              certifications: responseData.details?.certifications || [],
 
-          const config = cleanToken ? {
-            headers: { Authorization: `Bearer ${cleanToken}` }
-          } : {};
-
-          // Fetch detailed profile data
-          try {
-            const detailsResponse = await axios.get(`${apiUrl}/organizer/public/profile/${idToFetch}`, config);
-
-            if (detailsResponse.data && detailsResponse.data.success) {
-              const responseData = detailsResponse.data.data;
-
-              // Combine organizer and details data
-              const combinedProfile = {
-                // Basic organizer info
-                ...responseData.organizer,
-                // Detailed profile info
-                ...responseData.details,
-                // Statistics
-                stats: responseData.details.stats || responseData.statistics || {
-                  eventsHosted: responseData.statistics?.totalEvents || 0,
-                  totalAttendees: responseData.statistics?.totalAttendees || "0",
-                  clientSatisfaction: responseData.details?.stats?.clientSatisfaction || "N/A",
-                  awards: responseData.details?.stats?.awards || 0
-                }
-              };
-
-              setProfile(combinedProfile);
-
-              // Set testimonials from API response
-              if (responseData.testimonials && Array.isArray(responseData.testimonials)) {
-                // Update the profile with testimonials
-                setProfile(prev => ({
-                  ...prev,
-                  testimonials: responseData.testimonials
-                }));
+              // Statistics - use the stats from details, fallback to statistics
+              stats: responseData.details?.stats || {
+                eventsHosted: responseData.statistics?.totalEvents || 0,
+                totalAttendees: responseData.statistics?.totalAttendees?.toString() || "0",
+                clientSatisfaction: "N/A",
+                awards: 0
               }
-
-              // Process events data
-              if (responseData.events && Array.isArray(responseData.events)) {
-                const { pastEvents, upcomingEvents } = filterEventsByDate(responseData.events);
-                setUpcomingEvents(upcomingEvents);
-                setPastEvents(pastEvents);
-              } else {
-                setUpcomingEvents([]);
-                setPastEvents([]);
-              }
-
-              setEventsLoading(false);
-            } else {
-              // If detailed profile not found, fall back to basic profile
-              const basicResponse = await axios.get(`${apiUrl}/organizer/profile/${idToFetch}`, config);
-              setProfile(basicResponse.data);
+            };
+            setProfile(profileData);
+            // Set testimonials from API response
+            if (responseData.testimonials && Array.isArray(responseData.testimonials)) {
+              setProfile(prev => ({
+                ...prev,
+                testimonials: responseData.testimonials
+              }));
             }
-          } catch (detailsErr) {
-            console.error("Error fetching organizer details:", detailsErr);
-            // If detailed profile not found, fall back to basic profile
-            const basicResponse = await axios.get(`${apiUrl}/organizer/profile/${idToFetch}`, config);
-            setProfile(basicResponse.data);
-          }
-        }
 
-        // Only fetch events separately if not already loaded from details endpoint
-        if (!isPublicRoute && isAuthenticated) {
-          // Events are already loaded from the details endpoint for authenticated users
-        } else {
-          // Fetch events for public route
-          try {
-            const apiUrl = import.meta.env.VITE_API_URL;
-            const eventsResponse = await axios.get(`${apiUrl}/events?organizer=${idToFetch}`);
-
-            if (eventsResponse.data && Array.isArray(eventsResponse.data)) {
-              const { pastEvents, upcomingEvents } = filterEventsByDate(eventsResponse.data);
-              setUpcomingEvents(upcomingEvents);
-              setPastEvents(pastEvents);
-            } else if (eventsResponse.data?.events && Array.isArray(eventsResponse.data.events)) {
-              const { pastEvents, upcomingEvents } = filterEventsByDate(eventsResponse.data.events);
+            // Process events data from the new API format
+            if (responseData.events && Array.isArray(responseData.events)) {
+              const { pastEvents, upcomingEvents } = filterEventsByDate(responseData.events);
               setUpcomingEvents(upcomingEvents);
               setPastEvents(pastEvents);
             } else {
               setUpcomingEvents([]);
               setPastEvents([]);
             }
-          } catch (eventsErr) {
-            console.error("Error fetching events:", eventsErr);
-            setUpcomingEvents([]);
-            setPastEvents([]);
-          } finally {
+
             setEventsLoading(false);
+          } else {
+            throw new Error('Invalid API response format or unsuccessful request');
           }
+        } catch (apiErr) {
+          console.error("Error fetching organizer profile:", apiErr);
+          console.error("API Error Response:", apiErr.response?.data); // Debug log
+
+          // More specific error handling
+          if (apiErr.response?.status === 404) {
+            setError("Organizer profile not found");
+          } else if (apiErr.response?.status === 500) {
+            setError("Server error. Please try again later.");
+          } else if (apiErr.response?.status === 400) {
+            setError("Invalid organizer ID provided");
+          } else {
+            const errorMessage = apiErr.response?.data?.message || apiErr.message || "Unknown error";
+            setError(`Failed to load organizer profile: ${errorMessage}`);
+          }
+          setLoading(false);
+          return;
         }
 
         setIsLoaded(true);
         setLoading(false);
       } catch (err) {
-        console.error("Error fetching organizer profile:", err);
-        const errorMessage = "Failed to load organizer profile";
-        setError(`Failed to load organizer profile. ${errorMessage}`);
+        console.error("Error in fetchOrganizerProfile:", err);
+        setError("An unexpected error occurred while loading the profile");
         setLoading(false);
       }
     };
 
     fetchOrganizerProfile();
-  }, [organizerId, loggedInUserId, dispatch, isAuthenticated, isPublicRoute]);
+  }, [organizerId]); // Removed dependencies on authentication state
 
   const handleEventClick = (eventId) => {
     if (expandedEvent === eventId) {
@@ -273,20 +233,6 @@ const OrganizerProfile = () => {
     // Simple formatting, modify as needed
     return phoneNumber.replace(/(\d{3})(\d{3})(\d{4})/, '($1) $2-$3');
   };
-
-  // Add this to fetch attended events for the profile
-  // const fetchAttendedEvents = async (userId) => {
-  //   try {
-  //     const apiUrl = import.meta.env.VITE_API_URL;
-  //     const response = await axios.get(`${apiUrl}/profiles/user/${userId}/attended-events`);
-
-  //     if (response.data && response.data.data) {
-  //       setPastEvents(response.data.data);
-  //     }
-  //   } catch (error) {
-  //     console.error("Error fetching attended events:", error);
-  //   }
-  // };
 
   useEffect(() => {
     // Add this inside an existing useEffect or create a new one
@@ -329,22 +275,22 @@ const OrganizerProfile = () => {
     );
   }
 
-  // Get basic information, with fallbacks
-  const name = profile.name || profile?.user?.name || 'Unnamed Organizer';
-  const company = profile.company || profile.organization || '';
-  const email = profile.email || profile?.user?.email || '';
-  const location = profile.location || '';
-  const phone = profile.phone || '';
-  const bio = profile.bio || 'No bio provided';
+  // Get basic information, with fallbacks for the new API structure
+  const name = profile?.name || 'Unnamed Organizer';
+  const company = profile?.company || profile?.organization || '';
+  const email = profile?.email || '';
+  const location = profile?.location || '';
+  const phone = profile?.phone || '';
+  const bio = profile?.bio || 'No bio provided';
 
   // Extract profile data with fallbacks
-  const expertise = profile.expertise || [];
-  const certifications = profile.certifications || [];
-  const socials = profile.socials || [];
-  const testimonials = profile.testimonials || [];
+  const expertise = profile?.expertise || [];
+  const certifications = profile?.certifications || [];
+  const socials = profile?.socials || [];
+  const testimonials = profile?.testimonials || [];
 
   // Add default stats if not available - updated to handle the new API structure
-  const stats = profile.stats || {
+  const stats = profile?.stats || {
     eventsHosted: upcomingEvents.length + pastEvents.length || 0,
     totalAttendees: "0",
     clientSatisfaction: "N/A",
@@ -440,33 +386,20 @@ const OrganizerProfile = () => {
                 )}
               </div>
 
-              {/* Contact Button */}
-              {!isOwnProfile && (
-                <button
-                  onClick={() => {
-                    if (email) {
-                      window.location.href = `mailto:${email}`;
-                    } else {
-                      toast.info("Contact information not available");
-                    }
-                  }}
-                  className="md:self-center bg-cyan-500 text-black px-6 py-3 rounded-full font-bold flex items-center transform transition-transform hover:scale-105 hover:shadow-cyan-900 hover:shadow-lg hover:text-cyan-500 hover:bg-black hover:border hover:border-cyan-500 cursor-pointer"
-                >
-                  <Mail className="w-5 h-5 mr-2" />
-                  Contact
-                </button>
-              )}
-
-              {/* Edit Profile Button (for own profile) */}
-              {isOwnProfile && (
-                <button
-                  onClick={() => navigate('/organizer/profile/edit')}
-                  className="md:self-center bg-cyan-500 text-black hover:text-cyan-500 hover:bg-black hover:border hover:border-cyan-500 px-6 py-3 rounded-full font-bold flex items-center transform transition-transform hover:scale-105 hover:shadow-cyan-900 hover:shadow-lg cursor-pointer"
-                >
-                  <ArrowRight className="w-5 h-5 mr-2" />
-                  Edit Profile
-                </button>
-              )}
+              {/* Contact Button - Always show for public profiles */}
+              <button
+                onClick={() => {
+                  if (email) {
+                    window.location.href = `mailto:${email}`;
+                  } else {
+                    toast.info("Contact information not available");
+                  }
+                }}
+                className="md:self-center bg-cyan-500 text-black px-6 py-3 rounded-full font-bold flex items-center transform transition-transform hover:scale-105 hover:shadow-cyan-900 hover:shadow-lg hover:text-cyan-500 hover:bg-black hover:border hover:border-cyan-500 cursor-pointer"
+              >
+                <Mail className="w-5 h-5 mr-2" />
+                Contact
+              </button>
             </div>
 
             {/* Stats Row */}
@@ -662,7 +595,7 @@ const OrganizerProfile = () => {
                                     </div>
                                     <div className="flex items-center">
                                       <MapPin size={14} className="mr-1" />
-                                      {event.location?.address || event.venue || "No location specified"}
+                                      {event.location?.address || event.location || event.venue || "No location specified"}
                                     </div>
                                     <div className="flex items-center">
                                       <Users size={14} className="mr-1" />
@@ -758,7 +691,7 @@ const OrganizerProfile = () => {
                                     </div>
                                     <div className="flex items-center">
                                       <MapPin size={14} className="mr-1" />
-                                      {event.location?.address || event.venue || "No location specified"}
+                                      {event.location?.address || event.location || event.venue || "No location specified"}
                                     </div>
                                     <div className="flex items-center">
                                       <Users size={14} className="mr-1" />
@@ -899,11 +832,11 @@ const OrganizerProfile = () => {
                       )}
 
                       <button
-                        onClick={() => navigate(`/organizer/events/list`)}
+                        onClick={() => navigate(`/events`)}
                         className="bg-transparent border border-cyan-500 text-cyan-500 px-6 py-3 rounded-xl font-bold flex items-center justify-center transform transition-transform hover:scale-105"
                       >
-                        <FaPhone className="w-5 h-5 mr-2  " />
-                        Call to Action
+                        <FaPhone className="w-5 h-5 mr-2" />
+                        View All Events
                       </button>
                     </div>
                   </div>
@@ -917,4 +850,4 @@ const OrganizerProfile = () => {
   );
 };
 
-export default OrganizerProfile;
+export default OrganizerPublicProfile;

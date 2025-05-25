@@ -1,11 +1,13 @@
 import axios from "axios";
 import { safelyParseToken } from "../utils/persistFix";
+import {store} from "../redux/store"; // Import the Redux store directly
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:3000/api/v1";
 
 // Get auth config helper
 const getAuthConfig = () => {
-  const token = safelyParseToken(localStorage.getItem("organizer_token"));
+  const organizerToken = store.getState().organizer.token;
+  const token = safelyParseToken(organizerToken);
 
   if (!token) {
     throw new Error("No authentication token found");

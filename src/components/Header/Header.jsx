@@ -131,7 +131,7 @@ export default function Header() {
 
   // Only create profile link if we have a userId
   const profileLink = userId ?
-    (currentOrganizer ? `/organizer/profile/${userId}` : `/user/profile/${userId}`) :
+    (currentOrganizer ? `/organizer/profile` : `/user/profile/${userId}`) :
     null; // Set to null if no userId available
 
   // Redirect to login if profile link is null (no userId)
@@ -230,7 +230,6 @@ export default function Header() {
 
     const userToken = localStorage.getItem("token");
     if (userToken && userToken !== "null") {
-      console.log("Found user token, verifying...");
       dispatch(verifyUserToken());
     }
   }, [dispatch]);

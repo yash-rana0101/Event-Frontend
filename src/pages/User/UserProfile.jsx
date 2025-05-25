@@ -40,8 +40,7 @@ export default function UserProfile() {
           throw new Error('User ID is missing');
         }
 
-        const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000/api/v1';
-        console.log(`Fetching profile for user ID: ${userId} from ${apiUrl}/profiles/user/${userId}`);
+        const apiUrl = import.meta.env.VITE_API_URL;
 
         const response = await axios.get(`${apiUrl}/profiles/user/${userId}`);
 
@@ -66,7 +65,6 @@ export default function UserProfile() {
           };
 
           setProfile(safeProfile);
-          console.log("Profile data set:", safeProfile);
         } else {
           throw new Error(response.data?.message || 'Failed to load profile data');
         }

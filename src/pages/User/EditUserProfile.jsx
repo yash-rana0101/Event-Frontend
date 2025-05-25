@@ -5,23 +5,7 @@ import { useSelector } from 'react-redux';
 import { toast } from 'react-toastify';
 import axios from 'axios';
 import { motion, AnimatePresence } from 'framer-motion';
-import {
-  User,
-  Save,
-  X,
-  MapPin,
-  Globe,
-  Phone,
-  Link as LinkIcon,
-  Tag,
-  Bell,
-  Camera,
-  Loader,
-  ArrowLeft,
-  Trash2,
-  Plus,
-  AlertTriangle
-} from 'lucide-react';
+import {User,Save,X,MapPin,Globe,Phone,Link as Tag,Camera,Loader,ArrowLeft,Trash2,Plus,AlertTriangle } from 'lucide-react';
 import { useLoader } from '../../context/LoaderContext';
 import Skeleton from '../../components/UI/Skeleton';
 
@@ -32,6 +16,8 @@ const EditUserProfile = () => {
 
   // Get current user from Redux store for comparison
   const currentUser = useSelector(state => state.auth?.user);
+  const currentUserId = currentUser?._id || currentUser?.id;
+
   const isCurrentUserProfile = currentUser &&
     (currentUser.id == userId || currentUser._id == userId);
 
@@ -296,7 +282,7 @@ const EditUserProfile = () => {
 
       if (response.data.success) {
         toast.success('Profile updated successfully!');
-        navigate(`/user/profile/${userId}`);
+        navigate(`/user/profile/${currentUserId}`);
       } else {
         throw new Error(response.data.message || "Failed to update profile");
       }
@@ -313,7 +299,7 @@ const EditUserProfile = () => {
     if (hasChanges) {
       setShowUnsavedChangesModal(true);
     } else {
-      navigate(`/user/profile`);
+      navigate(-1);
     }
   };
 
@@ -371,7 +357,7 @@ const EditUserProfile = () => {
             className="flex items-center gap-2 text-gray-400 hover:text-cyan-500 transition-colors"
           >
             <ArrowLeft size={18} />
-            <span>Back to Profile</span>
+            <span>Back</span>
           </button>
 
           <div className="text-sm text-cyan-500">

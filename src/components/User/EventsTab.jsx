@@ -68,14 +68,6 @@ const EventsTab = ({ userId }) => {
           // Get detailed event data
           const detailedEvent = detailedEventsData[eventId] || {};
 
-          // Debug log to see what data we're working with
-          console.log(`Processing event ${eventId}:`, {
-            detailedTitle: detailedEvent?.title,
-            regEventTitle: registration.event?.title,
-            detailedEvent: detailedEvent,
-            regEvent: registration.event
-          });
-
           // Access the event object properly from either detailed data or registration
           const eventData = {
             id: eventId,

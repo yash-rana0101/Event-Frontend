@@ -1,7 +1,7 @@
 /* eslint-disable no-unused-vars */
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { admin } from '../../services/adminApi';
+import admin  from '../../services/adminApi';
 import { toast } from 'react-toastify';
 import { RefreshCw, Save, Check } from 'lucide-react';
 
@@ -93,7 +93,6 @@ export default function AdminSettings() {
         admin.getProfile(),
         admin.getSystemSettings(),
         admin.getNotificationSettings(),
-        admin.getAppearanceSettings(),
         admin.getApiSettings(),
         admin.getBackupSettings()
       ]);

@@ -1,6 +1,6 @@
 import { api } from "./api";
 
-export const adminApi = {
+export const admin = {
   // Get all settings (returns combined data) with better error handling
   getProfile: () =>
     api
@@ -95,3 +95,5 @@ const retryApiCall = async (apiCall, maxRetries = 3, delay = 1000) => {
     }
   }
 };
+
+export default admin;

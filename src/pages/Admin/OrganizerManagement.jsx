@@ -1,89 +1,257 @@
 /* eslint-disable no-unused-vars */
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Search, Filter, MoreVertical, CheckCircle, XCircle, Ban, Trash2,
   Eye, Edit, Shield, AlertTriangle, Users, Calendar, DollarSign,
   Star, Clock, MapPin, Mail, Phone, Globe, ChevronDown, Plus,
-  Download, RefreshCw, User, UserCheck, UserX, UserMinus
+  Download, RefreshCw, User, UserCheck, UserX, UserMinus, Loader
 } from 'lucide-react';
+import { organizerService } from '../../services/adminService';
+import { toast } from 'react-toastify';
+import { useLoader } from '../../context/LoaderContext';
+import { useAuth } from '../../context/AuthContext';
+import { useNavigate } from 'react-router-dom';
+import { useSelector } from 'react-redux';
 
 export default function OrganizerManagement() {
+  // Authentication and navigation
+  const authContext = useAuth();
+  const navigate = useNavigate();
+  const adminToken = useSelector((state) => state.auth.token);
+  // Check if user is admin
+  const reduxUser = useSelector((state) => state.auth.user);
+  const isAdmin = reduxUser?.role === 'admin';
+
+  // Check admin privileges
+  if (isAdmin) {
+    console.log('Admin privileges confirmed');
+  }
+
+
+
+  // Parse user and token from context or localStorage
+  const getAuthData = () => {
+    try {
+      // Prefer Redux token over context/localStorage
+      if (adminToken) {
+        // Try to get user from context or localStorage
+        let user = null;
+
+        if (authContext?.user) {
+          user = typeof authContext.user === 'string' ? JSON.parse(authContext.user) : authContext.user;
+        } else {
+          // Fallback to localStorage for user data
+          const persistAuth = localStorage.getItem('persist:auth');
+          if (persistAuth) {
+            const authData = JSON.parse(persistAuth);
+            user = authData.user ? JSON.parse(authData.user) : null;
+          }
+        }
+
+        return {
+          user,
+          token: adminToken,
+          logout: authContext?.logout || (() => {
+            localStorage.removeItem('persist:auth');
+            navigate('/admin/login');
+          })
+        };
+      }
+
+      // Fallback to context
+      if (authContext?.user && authContext?.token) {
+        return {
+          user: typeof authContext.user === 'string' ? JSON.parse(authContext.user) : authContext.user,
+          token: typeof authContext.token === 'string' ? authContext.token.replace(/"/g, '') : authContext.token,
+          logout: authContext.logout || (() => {
+            localStorage.removeItem('persist:auth');
+            navigate('/admin/login');
+          })
+        };
+      }
+
+      // Fallback to localStorage
+      const persistAuth = localStorage.getItem('persist:auth');
+      if (persistAuth) {
+        const authData = JSON.parse(persistAuth);
+        const user = authData.user ? JSON.parse(authData.user) : null;
+        const token = authData.token ? authData.token.replace(/"/g, '') : null;
+
+        return {
+          user,
+          token,
+          logout: authContext?.logout || (() => {
+            localStorage.removeItem('persist:auth');
+            navigate('/admin/login');
+          })
+        };
+      }
+
+      return { user: null, token: null, logout: () => navigate('/admin/login') };
+    } catch (error) {
+      console.error('Error parsing auth data:', error);
+      return { user: null, token: null, logout: () => navigate('/admin/login') };
+    }
+  };
+
+  const { user, token, logout } = getAuthData();
+
+  // Debug log to check token
+  useEffect(() => {
+    console.log('Auth Debug:', {
+      adminToken,
+      contextToken: authContext?.token,
+      finalToken: token,
+      user: user
+    });
+  }, [adminToken, authContext?.token, token, user]);
+
+  // State management
+  const [organizers, setOrganizers] = useState([]);
+  const [stats, setStats] = useState({
+    total: 0,
+    pending: 0,
+    approved: 0,
+    suspendedBlocked: 0
+  });
+  const [loading, setLoading] = useState(true);
+  const [actionLoading, setActionLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [filterStatus, setFilterStatus] = useState('all');
   const [showActionModal, setShowActionModal] = useState(false);
   const [actionType, setActionType] = useState('');
   const [selectedOrganizer, setSelectedOrganizer] = useState(null);
   const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = 10;
+  const [pagination, setPagination] = useState({});
+  const [reason, setReason] = useState('');
 
-  // Mock data - replace with actual API calls
-  const [organizers, setOrganizers] = useState([
-    {
-      id: 1,
-      name: 'TechCorp Events',
-      email: 'admin@techcorp.com',
-      phone: '+1 234 567 8901',
-      website: 'techcorp.com',
-      status: 'pending',
-      joinDate: '2024-01-15',
-      eventsCount: 0,
-      totalRevenue: '$0',
-      rating: 0,
-      location: 'San Francisco, CA',
-      avatar: 'TC',
-      lastActivity: '2 hours ago',
-      documents: ['business_license.pdf', 'tax_id.pdf']
-    },
-    {
-      id: 2,
-      name: 'EventMaster Pro',
-      email: 'contact@eventmaster.com',
-      phone: '+1 345 678 9012',
-      website: 'eventmaster.com',
-      status: 'approved',
-      joinDate: '2023-08-20',
-      eventsCount: 45,
-      totalRevenue: '$89,234',
-      rating: 4.9,
-      location: 'New York, NY',
-      avatar: 'EM',
-      lastActivity: '30 minutes ago',
-      documents: ['business_license.pdf', 'insurance.pdf', 'certification.pdf']
-    },
-    {
-      id: 3,
-      name: 'Music Festival Co',
-      email: 'info@musicfest.com',
-      phone: '+1 456 789 0123',
-      website: 'musicfest.com',
-      status: 'suspended',
-      joinDate: '2023-05-10',
-      eventsCount: 12,
-      totalRevenue: '$23,450',
-      rating: 3.8,
-      location: 'Los Angeles, CA',
-      avatar: 'MF',
-      lastActivity: '1 week ago',
-      documents: ['business_license.pdf']
-    },
-    {
-      id: 4,
-      name: 'Conference Kings',
-      email: 'hello@confkings.com',
-      phone: '+1 567 890 1234',
-      website: 'confkings.com',
-      status: 'blocked',
-      joinDate: '2023-12-05',
-      eventsCount: 8,
-      totalRevenue: '$15,680',
-      rating: 2.5,
-      location: 'Chicago, IL',
-      avatar: 'CK',
-      lastActivity: '2 weeks ago',
-      documents: ['business_license.pdf', 'tax_id.pdf']
+  const itemsPerPage = 10;
+  const { setIsLoading } = useLoader();
+
+  // Update loader context
+  useEffect(() => {
+    setIsLoading(loading || actionLoading);
+    return () => setIsLoading(false);
+  }, [loading, actionLoading, setIsLoading]);
+
+  // Check authentication and authorization
+  useEffect(() => {
+    if (!token) {
+      toast.error('Please login to access this page');
+      navigate('/admin/login');
+      return;
     }
-  ]);
+
+    if (!user || user.role !== 'admin') {
+      toast.error('Access denied. Admin privileges required.');
+      navigate('/');
+      return;
+    }
+  }, [token, user, navigate]);
+
+  // Fetch organizers data
+  const fetchOrganizers = async () => {
+    try {
+      setLoading(true);
+
+      // Double check authentication before making request
+      if (!token) {
+        toast.error('Authentication token missing. Please login again.');
+        if (logout) logout();
+        navigate('/admin/login');
+        return;
+      }
+
+      const params = {
+        page: currentPage,
+        limit: itemsPerPage,
+        search: searchQuery,
+        status: filterStatus,
+        sortBy: 'createdAt',
+        sortOrder: 'desc'
+      };
+
+      const response = await organizerService.getAllOrganizers(params);
+      setOrganizers(response.data.organizers);
+      setPagination(response.data.pagination);
+    } catch (error) {
+      console.error('Error fetching organizers:', error);
+
+      // Handle authentication errors
+      if (error.response?.status === 401) {
+        toast.error('Session expired. Please login again.');
+        if (logout) logout();
+        navigate('/admin/login');
+        return;
+      }
+
+      toast.error(error.response?.data?.message || 'Failed to fetch organizers');
+      setOrganizers([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  console.log('Organizers fetched:', organizers);
+
+  // Fetch statistics
+  const fetchStats = async () => {
+    try {
+      // Check authentication before making request
+      if (!token) {
+        return;
+      }
+
+      const response = await organizerService.getOrganizerStats();
+      // Map backend keys to frontend keys
+      const statsData = response.data;
+      setStats({
+        total: statsData.totalOrganizers || 0,
+        pending: statsData.pendingOrganizers || 0,
+        approved: statsData.activeOrganizers || 0,
+        suspendedBlocked: (statsData.suspendedOrganizers || 0) + (statsData.blockedOrganizers || 0) // if you have these fields
+      });
+    } catch (error) {
+      console.error('Error fetching stats:', error);
+
+      // Handle authentication errors
+      if (error.response?.status === 401) {
+        toast.error('Session expired. Please login again.');
+        if (logout) logout();
+        navigate('/admin/login');
+        return;
+      }
+
+      toast.error('Failed to fetch statistics');
+    }
+  };
+
+  // Initial data fetch
+  useEffect(() => {
+    fetchOrganizers();
+    fetchStats();
+  }, [currentPage, searchQuery, filterStatus]);
+
+  // Debounced search
+  useEffect(() => {
+    const delayedSearch = setTimeout(() => {
+      if (currentPage !== 1) {
+        setCurrentPage(1);
+      } else {
+        fetchOrganizers();
+      }
+    }, 500);
+
+    console.log("organizer stats:", stats);
+
+    return () => clearTimeout(delayedSearch);
+  }, [searchQuery]);
+
+  // Status filter change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [filterStatus]);
 
   const getStatusColor = (status) => {
     switch (status) {
@@ -91,6 +259,7 @@ export default function OrganizerManagement() {
       case 'approved': return 'bg-green-500/20 text-green-400 border-green-500/30';
       case 'suspended': return 'bg-orange-500/20 text-orange-400 border-orange-500/30';
       case 'blocked': return 'bg-red-500/20 text-red-400 border-red-500/30';
+      case 'rejected': return 'bg-gray-500/20 text-gray-400 border-gray-500/30';
       default: return 'bg-gray-500/20 text-gray-400 border-gray-500/30';
     }
   };
@@ -101,6 +270,7 @@ export default function OrganizerManagement() {
       case 'approved': return CheckCircle;
       case 'suspended': return AlertTriangle;
       case 'blocked': return Ban;
+      case 'rejected': return XCircle;
       default: return User;
     }
   };
@@ -108,45 +278,225 @@ export default function OrganizerManagement() {
   const handleAction = (organizer, action) => {
     setSelectedOrganizer(organizer);
     setActionType(action);
+    setReason('');
     setShowActionModal(true);
   };
 
-  const confirmAction = () => {
-    if (selectedOrganizer && actionType) {
-      setOrganizers(prev => prev.map(org =>
-        org.id === selectedOrganizer.id
-          ? { ...org, status: actionType === 'approve' ? 'approved' : actionType === 'suspend' ? 'suspended' : actionType === 'block' ? 'blocked' : org.status }
-          : org
-      ));
+  const confirmAction = async () => {
+    if (!selectedOrganizer || !actionType) return;
+
+    try {
+      setActionLoading(true);
+
+      // Check authentication before making request
+      if (!token) {
+        toast.error('Authentication token missing. Please login again.');
+        if (logout) logout();
+        navigate('/admin/login');
+        return;
+      }
 
       if (actionType === 'delete') {
-        setOrganizers(prev => prev.filter(org => org.id !== selectedOrganizer.id));
+        await organizerService.deleteOrganizer(selectedOrganizer._id);
+        toast.success('Organizer deleted successfully');
+      } else if (actionType === 'view') {
+        // Handle view action - could open a detailed modal or navigate to detail page
+        const response = await organizerService.getOrganizerById(selectedOrganizer._id);
+        console.log('Organizer details:', response.data);
+        toast.info('Organizer details loaded');
+      } else {
+        // Status update actions (approve, reject, suspend, block)
+        await organizerService.updateOrganizerStatus(selectedOrganizer._id, actionType, reason);
+        toast.success(`Organizer ${actionType}d successfully`);
       }
+
+      // Refresh data
+      await fetchOrganizers();
+      await fetchStats();
+    } catch (error) {
+      console.error('Error performing action:', error);
+
+      // Handle authentication errors
+      if (error.response?.status === 401) {
+        toast.error('Session expired. Please login again.');
+        if (logout) logout();
+        navigate('/admin/login');
+        return;
+      }
+
+      toast.error(error.response?.data?.message || `Failed to ${actionType} organizer`);
+    } finally {
+      setActionLoading(false);
+      setShowActionModal(false);
+      setSelectedOrganizer(null);
+      setActionType('');
+      setReason('');
     }
-    setShowActionModal(false);
-    setSelectedOrganizer(null);
-    setActionType('');
   };
 
-  const filteredOrganizers = organizers.filter(organizer => {
-    const matchesSearch = organizer.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      organizer.email.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesFilter = filterStatus === 'all' || organizer.status === filterStatus;
-    return matchesSearch && matchesFilter;
-  });
+  const handleRefresh = () => {
+    fetchOrganizers();
+    fetchStats();
+    toast.success('Data refreshed successfully');
+  };
 
-  const totalPages = Math.ceil(filteredOrganizers.length / itemsPerPage);
-  const paginatedOrganizers = filteredOrganizers.slice(
-    (currentPage - 1) * itemsPerPage,
-    currentPage * itemsPerPage
-  );
+  const handleExport = () => {
+    // Check if we have data to export
+    if (!organizers.length) {
+      toast.warning('No data to export');
+      return;
+    }
 
-  const stats = [
-    { label: 'Total Organizers', value: organizers.length, icon: Users, color: 'from-cyan-500 to-blue-600' },
-    { label: 'Pending Approval', value: organizers.filter(o => o.status === 'pending').length, icon: Clock, color: 'from-yellow-500 to-orange-600' },
-    { label: 'Active Organizers', value: organizers.filter(o => o.status === 'approved').length, icon: UserCheck, color: 'from-green-500 to-emerald-600' },
-    { label: 'Suspended/Blocked', value: organizers.filter(o => ['suspended', 'blocked'].includes(o.status)).length, icon: UserX, color: 'from-red-500 to-pink-600' }
+    try {
+      // Implement CSV export functionality
+      const csvData = organizers.map(org => ({
+        Name: org.name,
+        Email: org.email,
+        Phone: org.phone || '',
+        Status: org.status,
+        'Join Date': new Date(org.createdAt).toLocaleDateString(),
+        'Events Count': org.eventsCount || 0,
+        'Total Revenue': org.totalRevenue || 0,
+        Location: org.profile?.location || org.location || ''
+      }));
+
+      const csvContent = [
+        Object.keys(csvData[0]).join(','),
+        ...csvData.map(row => Object.values(row).map(value =>
+          // Escape commas and quotes in CSV values
+          typeof value === 'string' && value.includes(',') ? `"${value.replace(/"/g, '""')}"` : value
+        ).join(','))
+      ].join('\n');
+
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.setAttribute('hidden', '');
+      a.setAttribute('href', url);
+      a.setAttribute('download', `organizers-${new Date().toISOString().split('T')[0]}.csv`);
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      window.URL.revokeObjectURL(url);
+
+      toast.success('Data exported successfully');
+    } catch (error) {
+      console.error('Error exporting data:', error);
+      toast.error('Failed to export data');
+    }
+  };
+
+  const formatCurrency = (amount) => {
+    if (typeof amount === 'number') {
+      return new Intl.NumberFormat('en-US', {
+        style: 'currency',
+        currency: 'USD'
+      }).format(amount);
+    }
+    return amount || '$0';
+  };
+
+  const formatDate = (dateString) => {
+    return new Date(dateString).toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric'
+    });
+  };
+
+  const getActionButtons = (organizer) => {
+    const buttons = [];
+
+    // View button (always available)
+    buttons.push({
+      action: 'view',
+      icon: Eye,
+      color: 'bg-cyan-500/20 text-cyan-400 hover:bg-cyan-500/30',
+      title: 'View Details'
+    });
+
+    // Status-specific action buttons
+    if (organizer.status === 'pending') {
+      buttons.push({
+        action: 'approve',
+        icon: CheckCircle,
+        color: 'bg-green-500/20 text-green-400 hover:bg-green-500/30',
+        title: 'Approve'
+      });
+      buttons.push({
+        action: 'reject',
+        icon: XCircle,
+        color: 'bg-red-500/20 text-red-400 hover:bg-red-500/30',
+        title: 'Reject'
+      });
+    }
+
+    if (organizer.status === 'approved') {
+      buttons.push({
+        action: 'suspend',
+        icon: AlertTriangle,
+        color: 'bg-orange-500/20 text-orange-400 hover:bg-orange-500/30',
+        title: 'Suspend'
+      });
+    }
+
+    if (organizer.status === 'suspended') {
+      buttons.push({
+        action: 'approve',
+        icon: CheckCircle,
+        color: 'bg-green-500/20 text-green-400 hover:bg-green-500/30',
+        title: 'Reactivate'
+      });
+      buttons.push({
+        action: 'block',
+        icon: Ban,
+        color: 'bg-red-500/20 text-red-400 hover:bg-red-500/30',
+        title: 'Block'
+      });
+    }
+
+    // Delete button (available for non-active organizers)
+    if (organizer.status !== 'approved') {
+      buttons.push({
+        action: 'delete',
+        icon: Trash2,
+        color: 'bg-red-500/20 text-red-400 hover:bg-red-500/30',
+        title: 'Delete'
+      });
+    }
+
+    return buttons;
+  };
+
+  const statsCards = [
+    { label: 'Total Organizers', value: stats.total, icon: Users, color: 'from-cyan-500 to-blue-600' },
+    { label: 'Pending Approval', value: stats.pending, icon: Clock, color: 'from-yellow-500 to-orange-600' },
+    { label: 'Active Organizers', value: stats.approved, icon: UserCheck, color: 'from-green-500 to-emerald-600' },
+    { label: 'Suspended/Blocked', value: stats.suspendedBlocked, icon: UserX, color: 'from-red-500 to-pink-600' }
   ];
+
+  // Don't render anything if not authenticated
+  if (!token || !user || user.role !== 'admin') {
+    return (
+      <div className="min-h-screen bg-black text-white flex items-center justify-center">
+        <div className="flex flex-col items-center space-y-4">
+          <Loader className="w-8 h-8 animate-spin text-cyan-400" />
+          <p className="text-gray-400">Checking authentication...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (loading && organizers.length === 0) {
+    return (
+      <div className="min-h-screen bg-black text-white flex items-center justify-center">
+        <div className="flex flex-col items-center space-y-4">
+          <Loader className="w-8 h-8 animate-spin text-cyan-400" />
+          <p className="text-gray-400">Loading organizers...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-black text-white relative overflow-hidden">
@@ -172,7 +522,7 @@ export default function OrganizerManagement() {
 
         {/* Stats Cards */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 mb-8">
-          {stats.map((stat, index) => (
+          {statsCards.map((stat, index) => (
             <motion.div
               key={stat.label}
               initial={{ opacity: 0, y: 20 }}
@@ -221,6 +571,7 @@ export default function OrganizerManagement() {
                   <option value="approved">Approved</option>
                   <option value="suspended">Suspended</option>
                   <option value="blocked">Blocked</option>
+                  <option value="rejected">Rejected</option>
                 </select>
                 <ChevronDown className="absolute right-2 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4 pointer-events-none" />
               </div>
@@ -230,13 +581,16 @@ export default function OrganizerManagement() {
               <motion.button
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
-                className="p-2.5 rounded-lg bg-gray-800/60 text-gray-400 hover:text-cyan-400 transition-colors border border-gray-700/50"
+                onClick={handleRefresh}
+                disabled={loading}
+                className="p-2.5 rounded-lg bg-gray-800/60 text-gray-400 hover:text-cyan-400 transition-colors border border-gray-700/50 disabled:opacity-50"
               >
-                <RefreshCw className="w-4 h-4" />
+                <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
               </motion.button>
               <motion.button
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
+                onClick={handleExport}
                 className="p-2.5 rounded-lg bg-gray-800/60 text-gray-400 hover:text-cyan-400 transition-colors border border-gray-700/50"
               >
                 <Download className="w-4 h-4" />
@@ -253,19 +607,20 @@ export default function OrganizerManagement() {
               <thead className="bg-gray-800/50 border-b border-gray-700/50">
                 <tr>
                   <th className="px-6 py-4 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Organizer</th>
-                  <th className="px-6 py-4 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Status</th>
                   <th className="px-6 py-4 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Contact</th>
-                  <th className="px-6 py-4 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Location</th>
+                  <th className="px-6 py-4 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Verified</th>
                   <th className="px-6 py-4 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Joined</th>
                   <th className="px-6 py-4 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-700/50">
-                {paginatedOrganizers.map((organizer, index) => {
+                {organizers.map((organizer, index) => {
                   const StatusIcon = getStatusIcon(organizer.status);
+                  const actionButtons = getActionButtons(organizer);
+
                   return (
                     <motion.tr
-                      key={organizer.id}
+                      key={organizer._id}
                       initial={{ opacity: 0, y: 10 }}
                       animate={{ opacity: 1, y: 0 }}
                       transition={{ delay: index * 0.05 }}
@@ -278,97 +633,35 @@ export default function OrganizerManagement() {
                           </div>
                           <div>
                             <div className="text-white font-medium">{organizer.name}</div>
-                            <div className="text-gray-400 text-sm">{organizer.description}</div>
+                            <div className="text-gray-400 text-sm">{organizer.company || organizer.organization || 'No company'}</div>
                           </div>
                         </div>
                       </td>
                       <td className="px-6 py-4">
-                        <div className={`inline-flex items-center space-x-2 px-3 py-1.5 rounded-full text-xs font-medium border ${getStatusColor(organizer.status)}`}>
-                          <StatusIcon className="w-3 h-3" />
-                          <span className="capitalize">{organizer.status}</span>
-                        </div>
+                        <div className="text-white">{organizer.email}</div>
+                        <div className="text-gray-400 text-sm">{organizer.phone || 'No phone'}</div>
                       </td>
                       <td className="px-6 py-4">
-                        <div className="text-white">{organizer.email}</div>
-                        <div className="text-gray-400 text-sm">{organizer.phone}</div>
+                        <span className={`inline-block px-3 py-1 rounded-full text-xs font-medium ${organizer.verified ? 'bg-green-500/20 text-green-400 border border-green-500/30' : 'bg-gray-700/40 text-gray-400 border border-gray-600/30'}`}>
+                          {organizer.verified ? 'Verified' : 'Not Verified'}
+                        </span>
                       </td>
-                      <td className="px-6 py-4 text-gray-400">{organizer.location}</td>
-                      <td className="px-6 py-4 text-gray-400">{organizer.joinDate}</td>
+                      <td className="px-6 py-4 text-gray-400">{formatDate(organizer.createdAt)}</td>
                       <td className="px-6 py-4">
                         <div className="flex items-center space-x-2">
-                          {organizer.status === 'pending' && (
-                            <>
-                              <motion.button
-                                whileHover={{ scale: 1.1 }}
-                                whileTap={{ scale: 0.9 }}
-                                onClick={() => handleAction(organizer, 'approve')}
-                                className="p-1.5 rounded-lg bg-green-500/20 text-green-400 hover:bg-green-500/30 transition-colors"
-                                title="Approve"
-                              >
-                                <CheckCircle className="w-4 h-4" />
-                              </motion.button>
-                              <motion.button
-                                whileHover={{ scale: 1.1 }}
-                                whileTap={{ scale: 0.9 }}
-                                onClick={() => handleAction(organizer, 'reject')}
-                                className="p-1.5 rounded-lg bg-red-500/20 text-red-400 hover:bg-red-500/30 transition-colors"
-                                title="Reject"
-                              >
-                                <XCircle className="w-4 h-4" />
-                              </motion.button>
-                            </>
-                          )}
-                          {organizer.status === 'approved' && (
+                          {actionButtons.map((button) => (
                             <motion.button
+                              key={button.action}
                               whileHover={{ scale: 1.1 }}
                               whileTap={{ scale: 0.9 }}
-                              onClick={() => handleAction(organizer, 'suspend')}
-                              className="p-1.5 rounded-lg bg-orange-500/20 text-orange-400 hover:bg-orange-500/30 transition-colors"
-                              title="Suspend"
+                              onClick={() => handleAction(organizer, button.action)}
+                              className={`p-1.5 rounded-lg transition-colors ${button.color}`}
+                              title={button.title}
+                              disabled={actionLoading}
                             >
-                              <AlertTriangle className="w-4 h-4" />
+                              <button.icon className="w-4 h-4" />
                             </motion.button>
-                          )}
-                          {organizer.status === 'suspended' && (
-                            <>
-                              <motion.button
-                                whileHover={{ scale: 1.1 }}
-                                whileTap={{ scale: 0.9 }}
-                                onClick={() => handleAction(organizer, 'approve')}
-                                className="p-1.5 rounded-lg bg-green-500/20 text-green-400 hover:bg-green-500/30 transition-colors"
-                                title="Reactivate"
-                              >
-                                <CheckCircle className="w-4 h-4" />
-                              </motion.button>
-                              <motion.button
-                                whileHover={{ scale: 1.1 }}
-                                whileTap={{ scale: 0.9 }}
-                                onClick={() => handleAction(organizer, 'block')}
-                                className="p-1.5 rounded-lg bg-red-500/20 text-red-400 hover:bg-red-500/30 transition-colors"
-                                title="Block"
-                              >
-                                <Ban className="w-4 h-4" />
-                              </motion.button>
-                            </>
-                          )}
-                          <motion.button
-                            whileHover={{ scale: 1.1 }}
-                            whileTap={{ scale: 0.9 }}
-                            onClick={() => handleAction(organizer, 'view')}
-                            className="p-1.5 rounded-lg bg-cyan-500/20 text-cyan-400 hover:bg-cyan-500/30 transition-colors"
-                            title="View Details"
-                          >
-                            <Eye className="w-4 h-4" />
-                          </motion.button>
-                          <motion.button
-                            whileHover={{ scale: 1.1 }}
-                            whileTap={{ scale: 0.9 }}
-                            onClick={() => handleAction(organizer, 'delete')}
-                            className="p-1.5 rounded-lg bg-red-500/20 text-red-400 hover:bg-red-500/30 transition-colors"
-                            title="Delete"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </motion.button>
+                          ))}
                         </div>
                       </td>
                     </motion.tr>
@@ -380,11 +673,13 @@ export default function OrganizerManagement() {
 
           {/* Mobile Cards */}
           <div className="lg:hidden p-4 space-y-4">
-            {paginatedOrganizers.map((organizer, index) => {
+            {organizers.map((organizer, index) => {
               const StatusIcon = getStatusIcon(organizer.status);
+              const actionButtons = getActionButtons(organizer);
+
               return (
                 <motion.div
-                  key={organizer.id}
+                  key={organizer._id}
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: index * 0.05 }}
@@ -397,7 +692,7 @@ export default function OrganizerManagement() {
                       </div>
                       <div>
                         <div className="text-white font-medium">{organizer.name}</div>
-                        <div className="text-gray-400 text-sm">{organizer.description}</div>
+                        <div className="text-gray-400 text-sm">{organizer.company || organizer.organization || 'No company'}</div>
                       </div>
                     </div>
                     <div className={`inline-flex items-center space-x-2 px-3 py-1.5 rounded-full text-xs font-medium border ${getStatusColor(organizer.status)}`}>
@@ -406,96 +701,42 @@ export default function OrganizerManagement() {
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-1 gap-3 mb-3">
+                  <div className="grid grid-cols-2 gap-3 mb-3">
                     <div>
                       <p className="text-gray-400 text-xs">Email</p>
-                      <p className="text-white text-sm">{organizer.email}</p>
+                      <p className="text-white text-sm truncate">{organizer.email}</p>
                     </div>
                     <div>
                       <p className="text-gray-400 text-xs">Phone</p>
-                      <p className="text-white text-sm">{organizer.phone}</p>
+                      <p className="text-white text-sm">{organizer.phone || 'No phone'}</p>
                     </div>
                     <div>
-                      <p className="text-gray-400 text-xs">Location</p>
-                      <p className="text-white text-sm">{organizer.location}</p>
+                      <p className="text-gray-400 text-xs">Verified</p>
+                      <span className={`inline-block px-3 py-1 rounded-full text-xs font-medium ${organizer.verified ? 'bg-green-500/20 text-green-400 border border-green-500/30' : 'bg-gray-700/40 text-gray-400 border border-gray-600/30'}`}>
+                        {organizer.verified ? 'Verified' : 'Not Verified'}
+                      </span>
                     </div>
                     <div>
                       <p className="text-gray-400 text-xs">Joined</p>
-                      <p className="text-white text-sm">{organizer.joinDate}</p>
+                      <p className="text-white text-sm">{formatDate(organizer.createdAt)}</p>
                     </div>
                   </div>
 
-                  <div className="flex items-center justify-between pt-3 border-t border-gray-700/50">
-                    <div className="flex items-center space-x-2">
-                      {organizer.status === 'pending' && (
-                        <>
-                          <motion.button
-                            whileHover={{ scale: 1.1 }}
-                            whileTap={{ scale: 0.9 }}
-                            onClick={() => handleAction(organizer, 'approve')}
-                            className="p-2 rounded-lg bg-green-500/20 text-green-400 hover:bg-green-500/30 transition-colors"
-                          >
-                            <CheckCircle className="w-4 h-4" />
-                          </motion.button>
-                          <motion.button
-                            whileHover={{ scale: 1.1 }}
-                            whileTap={{ scale: 0.9 }}
-                            onClick={() => handleAction(organizer, 'reject')}
-                            className="p-2 rounded-lg bg-red-500/20 text-red-400 hover:bg-red-500/30 transition-colors"
-                          >
-                            <XCircle className="w-4 h-4" />
-                          </motion.button>
-                        </>
-                      )}
-                      {organizer.status === 'approved' && (
+                  <div className="flex items-center justify-center pt-3 border-t border-gray-700/50">
+                    <div className="flex items-center space-x-2 flex-wrap justify-center gap-2">
+                      {actionButtons.map((button) => (
                         <motion.button
+                          key={button.action}
                           whileHover={{ scale: 1.1 }}
                           whileTap={{ scale: 0.9 }}
-                          onClick={() => handleAction(organizer, 'suspend')}
-                          className="p-2 rounded-lg bg-orange-500/20 text-orange-400 hover:bg-orange-500/30 transition-colors"
+                          onClick={() => handleAction(organizer, button.action)}
+                          className={`p-2 rounded-lg transition-colors ${button.color}`}
+                          title={button.title}
+                          disabled={actionLoading}
                         >
-                          <AlertTriangle className="w-4 h-4" />
+                          <button.icon className="w-4 h-4" />
                         </motion.button>
-                      )}
-                      {organizer.status === 'suspended' && (
-                        <>
-                          <motion.button
-                            whileHover={{ scale: 1.1 }}
-                            whileTap={{ scale: 0.9 }}
-                            onClick={() => handleAction(organizer, 'approve')}
-                            className="p-2 rounded-lg bg-green-500/20 text-green-400 hover:bg-green-500/30 transition-colors"
-                          >
-                            <CheckCircle className="w-4 h-4" />
-                          </motion.button>
-                          <motion.button
-                            whileHover={{ scale: 1.1 }}
-                            whileTap={{ scale: 0.9 }}
-                            onClick={() => handleAction(organizer, 'block')}
-                            className="p-2 rounded-lg bg-red-500/20 text-red-400 hover:bg-red-500/30 transition-colors"
-                          >
-                            <Ban className="w-4 h-4" />
-                          </motion.button>
-                        </>
-                      )}
-                    </div>
-
-                    <div className="flex items-center space-x-2">
-                      <motion.button
-                        whileHover={{ scale: 1.1 }}
-                        whileTap={{ scale: 0.9 }}
-                        onClick={() => handleAction(organizer, 'view')}
-                        className="p-2 rounded-lg bg-cyan-500/20 text-cyan-400 hover:bg-cyan-500/30 transition-colors"
-                      >
-                        <Eye className="w-4 h-4" />
-                      </motion.button>
-                      <motion.button
-                        whileHover={{ scale: 1.1 }}
-                        whileTap={{ scale: 0.9 }}
-                        onClick={() => handleAction(organizer, 'delete')}
-                        className="p-2 rounded-lg bg-red-500/20 text-red-400 hover:bg-red-500/30 transition-colors"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </motion.button>
+                      ))}
                     </div>
                   </div>
                 </motion.div>
@@ -504,40 +745,44 @@ export default function OrganizerManagement() {
           </div>
 
           {/* Pagination */}
-          {totalPages > 1 && (
-            <div className="px-6 py-4 border-t border-gray-700/50 flex items-center justify-between">
+          {pagination.totalPages > 1 && (
+            <div className="px-6 py-4 border-t border-gray-700/50 flex flex-col sm:flex-row items-center justify-between gap-4">
               <div className="text-gray-400 text-sm">
-                Showing {((currentPage - 1) * itemsPerPage) + 1} to {Math.min(currentPage * itemsPerPage, filteredOrganizers.length)} of {filteredOrganizers.length} organizers
+                Showing {((pagination.currentPage - 1) * pagination.itemsPerPage) + 1} to {Math.min(pagination.currentPage * pagination.itemsPerPage, pagination.totalItems)} of {pagination.totalItems} organizers
               </div>
               <div className="flex items-center space-x-2">
                 <motion.button
                   whileHover={{ scale: 1.05 }}
                   whileTap={{ scale: 0.95 }}
                   onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
-                  disabled={currentPage === 1}
+                  disabled={!pagination.hasPrevPage || loading}
                   className="px-3 py-2 rounded-lg bg-gray-800/60 text-gray-400 hover:text-white disabled:opacity-50 disabled:cursor-not-allowed transition-colors border border-gray-700/50"
                 >
                   Previous
                 </motion.button>
-                {Array.from({ length: totalPages }, (_, i) => i + 1).map(page => (
-                  <motion.button
-                    key={page}
-                    whileHover={{ scale: 1.05 }}
-                    whileTap={{ scale: 0.95 }}
-                    onClick={() => setCurrentPage(page)}
-                    className={`px-3 py-2 rounded-lg transition-colors border ${currentPage === page
-                      ? 'bg-cyan-500/20 text-cyan-400 border-cyan-500/30'
-                      : 'bg-gray-800/60 text-gray-400 hover:text-white border-gray-700/50'
-                      }`}
-                  >
-                    {page}
-                  </motion.button>
-                ))}
+                {Array.from({ length: Math.min(5, pagination.totalPages) }, (_, i) => {
+                  const page = i + 1;
+                  return (
+                    <motion.button
+                      key={page}
+                      whileHover={{ scale: 1.05 }}
+                      whileTap={{ scale: 0.95 }}
+                      onClick={() => setCurrentPage(page)}
+                      disabled={loading}
+                      className={`px-3 py-2 rounded-lg transition-colors border ${pagination.currentPage === page
+                        ? 'bg-cyan-500/20 text-cyan-400 border-cyan-500/30'
+                        : 'bg-gray-800/60 text-gray-400 hover:text-white border-gray-700/50'
+                        } disabled:opacity-50`}
+                    >
+                      {page}
+                    </motion.button>
+                  );
+                })}
                 <motion.button
                   whileHover={{ scale: 1.05 }}
                   whileTap={{ scale: 0.95 }}
-                  onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
-                  disabled={currentPage === totalPages}
+                  onClick={() => setCurrentPage(prev => Math.min(pagination.totalPages, prev + 1))}
+                  disabled={!pagination.hasNextPage || loading}
                   className="px-3 py-2 rounded-lg bg-gray-800/60 text-gray-400 hover:text-white disabled:opacity-50 disabled:cursor-not-allowed transition-colors border border-gray-700/50"
                 >
                   Next
@@ -561,17 +806,34 @@ export default function OrganizerManagement() {
               <h3 className="text-xl font-bold text-white mb-4 capitalize">
                 {actionType} Organizer
               </h3>
-              <p className="text-gray-400 mb-6">
+              <p className="text-gray-400 mb-4">
                 Are you sure you want to {actionType} "{selectedOrganizer.name}"?
                 {actionType === 'delete' && ' This action cannot be undone.'}
               </p>
+
+              {/* Reason input for certain actions */}
+              {(['reject', 'suspend', 'block'].includes(actionType)) && (
+                <div className="mb-4">
+                  <label className="block text-sm font-medium text-gray-300 mb-2">
+                    Reason (optional)
+                  </label>
+                  <textarea
+                    value={reason}
+                    onChange={(e) => setReason(e.target.value)}
+                    placeholder="Enter reason for this action..."
+                    className="w-full bg-gray-800/60 border border-gray-700/50 rounded-lg px-3 py-2 text-white placeholder-gray-400 focus:outline-none focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/20 transition-all resize-none"
+                    rows={3}
+                  />
+                </div>
+              )}
 
               <div className="flex gap-3">
                 <motion.button
                   whileHover={{ scale: 1.05 }}
                   whileTap={{ scale: 0.95 }}
                   onClick={() => setShowActionModal(false)}
-                  className="flex-1 px-4 py-2 rounded-lg bg-gray-800/60 text-gray-400 hover:text-white transition-colors border border-gray-700/50"
+                  disabled={actionLoading}
+                  className="flex-1 px-4 py-2 rounded-lg bg-gray-800/60 text-gray-400 hover:text-white transition-colors border border-gray-700/50 disabled:opacity-50"
                 >
                   Cancel
                 </motion.button>
@@ -579,14 +841,19 @@ export default function OrganizerManagement() {
                   whileHover={{ scale: 1.05 }}
                   whileTap={{ scale: 0.95 }}
                   onClick={confirmAction}
-                  className={`flex-1 px-4 py-2 rounded-lg font-medium transition-colors ${actionType === 'delete' || actionType === 'block'
+                  disabled={actionLoading}
+                  className={`flex-1 px-4 py-2 rounded-lg font-medium transition-colors disabled:opacity-50 flex items-center justify-center ${actionType === 'delete' || actionType === 'block'
                     ? 'bg-red-500/20 text-red-400 hover:bg-red-500/30 border border-red-500/30'
                     : actionType === 'approve'
                       ? 'bg-green-500/20 text-green-400 hover:bg-green-500/30 border border-green-500/30'
                       : 'bg-cyan-500/20 text-cyan-400 hover:bg-cyan-500/30 border border-cyan-500/30'
                     }`}
                 >
-                  Confirm
+                  {actionLoading ? (
+                    <Loader className="w-4 h-4 animate-spin" />
+                  ) : (
+                    'Confirm'
+                  )}
                 </motion.button>
               </div>
             </motion.div>

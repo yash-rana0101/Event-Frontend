@@ -446,7 +446,7 @@ export default function EventDetail() {
     registrationDeadline: event.registrationDeadline
       ? new Date(event.registrationDeadline).toLocaleDateString()
       : "Until seats last",
-    image: event.images?.[0] || "https://placehold.co/1200x600?text=No+Image+Available",
+    image: event.image,
     organizer: event.organizerName,
     organizerId: event.organizer?._id || event.organizer, // Ensure we get the ID properly
     organizerLogo: event.organizerLogo || "https://placehold.co/80x80?text=Organizer",
@@ -465,6 +465,7 @@ export default function EventDetail() {
     }
   };
 
+  console.log("Formatted Event:", formattedEvent);
   // console.log("Organizer ID:", formattedEvent.organizerId._id);
 
   return (
@@ -1206,7 +1207,7 @@ export default function EventDetail() {
                       onClick={() => navigate(`/event/${event._id}`)}
                     >
                       <img
-                        src={event.images?.[0] || "/api/placeholder/80/60"}
+                        src={event.image?.[0] || "/api/placeholder/80/60"}
                         alt={event.title}
                         className="w-20 h-16 object-cover rounded"
                       />

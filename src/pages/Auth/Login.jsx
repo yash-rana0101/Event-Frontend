@@ -5,8 +5,9 @@ import { useDispatch, useSelector } from 'react-redux';
 import { loginUser } from '../../redux/user/userSlice';
 import { motion } from 'framer-motion';
 import { toast } from 'react-toastify';
-import { FaEnvelope, FaLock, FaEye, FaEyeSlash } from 'react-icons/fa';
+import { FaEnvelope, FaLock, FaEye, FaEyeSlash, FaGoogle, FaTwitter } from 'react-icons/fa';
 import { fixPersistenceIssues } from '../../utils/persistFix';
+import { FaG } from 'react-icons/fa6';
 
 const Login = () => {
   const [formData, setFormData] = useState({
@@ -201,6 +202,8 @@ const Login = () => {
             </form>
 
             <div className="mt-6">
+              {/* Google and Twitter login buttons */}
+              
               <div className="relative">
                 <div className="absolute inset-0 flex items-center">
                   <div className="w-full border-t border-gray-700"></div>
@@ -210,6 +213,21 @@ const Login = () => {
                 </div>
               </div>
 
+              <div className="flex justify-center space-x-4 mt-4">
+                <Link
+                  to="/auth/google-login"
+                  className="flex justify-center py-4 px-4 border border-gray-700 rounded-full shadow-sm text-sm font-medium text-gray-400 bg-gray-800 hover:bg-gray-700"
+                >
+                  <FaGoogle size={18}/>
+                </Link>
+                <Link
+                  to="/auth/twitter-login"
+                  className="flex justify-center py-4 px-4 border border-gray-700 rounded-full shadow-sm text-sm font-medium text-gray-400 bg-gray-800 hover:bg-gray-700"
+                >
+                  <FaTwitter size={18} />
+                </Link>
+              </div>
+              
               <div className="mt-6">
                 <Link
                   to="/auth/organizer-login"

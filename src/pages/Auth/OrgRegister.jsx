@@ -2,15 +2,18 @@ import React, { useState, useEffect } from "react";
 import { useDispatch, useSelector } from 'react-redux';
 import axios from 'axios';
 import {
-  User,
-  Mail,
-  Lock,
-  Phone,
-  Zap,
-  Eye,
-  EyeOff,
-  Building
-} from 'lucide-react';
+  FaUser,
+  FaEnvelope,
+  FaLock,
+  FaPhone,
+  FaEye,
+  FaEyeSlash,
+  FaBuilding,
+  FaGoogle,
+  FaTwitter
+} from 'react-icons/fa';
+// eslint-disable-next-line no-unused-vars
+import { motion } from 'framer-motion';
 import { toast } from "react-toastify";
 import { Link, useNavigate } from "react-router-dom";
 import { useLoader } from '../../context/LoaderContext';
@@ -45,12 +48,28 @@ const Register = () => {
     e.preventDefault();
     setSubmitting(true);
 
-    console.log("Submitting registration data:", formData);
+    // Basic validation
+    if (password.length < 8) {
+      toast.error('Password must be at least 8 characters');
+      setSubmitting(false);
+      return;
+    }
+
+    // Prepare data - only include phone if it has a value
+    const submitData = {
+      name: formData.name,
+      email: formData.email,
+      password: formData.password,
+      organization: formData.organization,
+      ...(formData.phone && { phone: formData.phone }) // Only include phone if it has a value
+    };
+
+    console.log("Submitting registration data:", submitData);
 
     try {
       const apiUrl = import.meta.env.VITE_API_URL;
 
-      const response = await axios.post(`${apiUrl}/organizer/register`, formData);
+      const response = await axios.post(`${apiUrl}/organizer/register`, submitData);
 
       console.log("Registration successful:", response.data);
 
@@ -65,7 +84,7 @@ const Register = () => {
 
       dispatch({
         type: 'organizer/setUser',
-        payload: response.data.user || response.data
+        payload: response.data.organizer || response.data.user
       });
 
       toast.success("Registration successful! Please complete your profile details.");
@@ -76,7 +95,16 @@ const Register = () => {
       }, 1500);
     } catch (err) {
       console.error("Registration failed:", err);
-      toast.error(err.response?.data?.message || err.message || "Registration failed");
+
+      // Improved error handling
+      if (err.response) {
+        const errorMessage = err.response?.data?.message || 'Registration failed';
+        toast.error(errorMessage);
+      } else if (err.request) {
+        toast.error('Network error. Please try again.');
+      } else {
+        toast.error('Something went wrong. Please try again.');
+      }
     } finally {
       setSubmitting(false);
     }
@@ -88,17 +116,22 @@ const Register = () => {
 
   if (registered) {
     return (
-      <div className="min-h-screen bg-black flex items-center justify-center p-4 overflow-hidden relative">
-        <div className="w-full max-w-md z-10 relative">
-          <div className="bg-black border-2 border-cyan-500 rounded-2xl shadow-2xl shadow-cyan-500/20 overflow-hidden p-8">
+      <div className="min-h-screen bg-black flex items-center justify-center p-4">
+        <div className="max-w-md w-full">
+          <motion.div
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ duration: 0.5 }}
+            className="bg-gray-900 rounded-xl shadow-xl overflow-hidden p-8"
+          >
             <div className="text-center">
               <div className="flex justify-center mb-4">
                 <div className="h-20 w-20 rounded-full bg-cyan-500/20 flex items-center justify-center">
-                  <Zap className="h-10 w-10 text-cyan-500 animate-pulse" />
+                  <FaUser className="h-10 w-10 text-cyan-500 animate-pulse" />
                 </div>
               </div>
-              <h2 className="text-2xl font-bold text-cyan-500 tracking-tight mb-2">REGISTRATION SUCCESSFUL</h2>
-              <p className="text-cyan-300/70 mt-2 tracking-wider mb-6">
+              <h2 className="text-2xl font-bold text-cyan-400 mb-2">Registration Successful!</h2>
+              <p className="text-gray-400 mb-6">
                 Your account has been created. Please complete your profile details to continue.
               </p>
               <div className="mt-6">
@@ -108,157 +141,230 @@ const Register = () => {
                 </div>
               </div>
             </div>
-          </div>
+          </motion.div>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-black flex items-center justify-center p-4 overflow-hidden relative">
-      <div className="absolute inset-0 pointer-events-none">
-        <div className="absolute inset-0 bg-gradient-to-br from-transparent via-transparent to-cyan-500/10 opacity-20"></div>
-        <div className="absolute inset-0 opacity-5" style={{
-          backgroundImage: 'linear-gradient(0deg, transparent 24%, rgba(6, 255, 252, 0.04) 25%, rgba(6, 255, 252, 0.04) 26%, transparent 27%, transparent 74%, rgba(6, 255, 252, 0.04) 75%, rgba(6, 255, 252, 0.04) 76%, transparent 77%, transparent), linear-gradient(90deg, transparent 24%, rgba(6, 255, 252, 0.04) 25%, rgba(6, 255, 252, 0.04) 26%, transparent 27%, transparent 74%, rgba(6, 255, 252, 0.04) 75%, rgba(6, 255, 252, 0.04) 76%, transparent 77%, transparent)',
-          backgroundSize: '50px 50px'
-        }}></div>
-      </div>
+    <div className="min-h-screen bg-black flex flex-col justify-center items-center p-4">
+      <div className="max-w-md w-full space-y-8">
+        <motion.div
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5 }}
+          className="text-center"
+        >
+          <h1 className="text-3xl font-extrabold text-white">Organizer Registration</h1>
+          <p className="mt-2 text-gray-400">Create your organizer account</p>
+        </motion.div>
 
-      <div className="w-full max-w-md z-10 relative">
-        <div className="bg-black border-2 border-cyan-500 rounded-2xl shadow-2xl shadow-cyan-500/20 overflow-hidden">
-          <div className="p-8">
-            <div className="text-center mb-10">
-              <div className="flex justify-center mb-4">
-                <Zap className="h-12 w-12 text-cyan-500 animate-pulse" />
-              </div>
-              <h2 className="text-2xl font-bold text-cyan-500 tracking-tight">REGISTER AS ORGANIZER</h2>
-              <p className="text-cyan-300/70 mt-2 tracking-wider">CREATE NEW CREDENTIALS</p>
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ duration: 0.5, delay: 0.2 }}
+          className="bg-gray-900 rounded-xl shadow-xl overflow-hidden"
+        >
+          {error && (
+            <div className="bg-red-500/10 border-l-4 border-red-500 p-4">
+              <p className="text-red-400 text-sm">{error}</p>
             </div>
+          )}
 
-            <form onSubmit={onSubmit} className="space-y-6">
-              <div className="relative group">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <User className="h-5 w-5 text-cyan-500 group-focus-within:text-cyan-300 transition-colors" />
+          <div className="p-8">
+            <form className="space-y-6" onSubmit={onSubmit}>
+              <div>
+                <label htmlFor="name" className="block text-sm font-medium text-gray-400">
+                  Full Name
+                </label>
+                <div className="mt-1 relative">
+                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                    <FaUser className="h-5 w-5 text-gray-500" />
+                  </div>
+                  <input
+                    id="name"
+                    name="name"
+                    type="text"
+                    autoComplete="name"
+                    required
+                    value={name}
+                    onChange={onChange}
+                    className="appearance-none block w-full pl-10 pr-3 py-2 border border-gray-700 rounded-md bg-gray-800 placeholder-gray-500 text-white focus:outline-none focus:ring-cyan-500 focus:border-cyan-500 focus:z-10 sm:text-sm"
+                    placeholder="Enter your full name"
+                  />
                 </div>
-                <input
-                  type="text"
-                  name="name"
-                  value={name}
-                  onChange={onChange}
-                  placeholder="ENTER NAME"
-                  required
-                  className="w-full pl-10 pr-4 py-3 bg-black border border-cyan-500/30 text-cyan-300 rounded-lg focus:outline-none focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/50 transition-all duration-300 uppercase tracking-wider placeholder-cyan-500/50"
-                />
               </div>
 
-              <div className="relative group">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <Mail className="h-5 w-5 text-cyan-500 group-focus-within:text-cyan-300 transition-colors" />
+              <div>
+                <label htmlFor="email" className="block text-sm font-medium text-gray-400">
+                  Email Address
+                </label>
+                <div className="mt-1 relative">
+                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                    <FaEnvelope className="h-5 w-5 text-gray-500" />
+                  </div>
+                  <input
+                    id="email"
+                    name="email"
+                    type="email"
+                    autoComplete="email"
+                    required
+                    value={email}
+                    onChange={onChange}
+                    className="appearance-none block w-full pl-10 pr-3 py-2 border border-gray-700 rounded-md bg-gray-800 placeholder-gray-500 text-white focus:outline-none focus:ring-cyan-500 focus:border-cyan-500 focus:z-10 sm:text-sm"
+                    placeholder="name@example.com"
+                  />
                 </div>
-                <input
-                  type="email"
-                  name="email"
-                  value={email}
-                  onChange={onChange}
-                  placeholder="ENTER EMAIL"
-                  required
-                  className="w-full pl-10 pr-4 py-3 bg-black border border-cyan-500/30 text-cyan-300 rounded-lg focus:outline-none focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/50 transition-all duration-300  tracking-wider placeholder-cyan-500/50"
-                />
               </div>
 
-              <div className="relative group">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <Building className="h-5 w-5 text-cyan-500 group-focus-within:text-cyan-300 transition-colors" />
+              <div>
+                <label htmlFor="organization" className="block text-sm font-medium text-gray-400">
+                  Organization Name
+                </label>
+                <div className="mt-1 relative">
+                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                    <FaBuilding className="h-5 w-5 text-gray-500" />
+                  </div>
+                  <input
+                    id="organization"
+                    name="organization"
+                    type="text"
+                    autoComplete="organization"
+                    required
+                    value={formData.organization || ""}
+                    onChange={onChange}
+                    className="appearance-none block w-full pl-10 pr-3 py-2 border border-gray-700 rounded-md bg-gray-800 placeholder-gray-500 text-white focus:outline-none focus:ring-cyan-500 focus:border-cyan-500 focus:z-10 sm:text-sm"
+                    placeholder="Enter organization name"
+                  />
                 </div>
-                <input
-                  type="text"
-                  name="organization"
-                  value={formData.organization || ""}
-                  onChange={onChange}
-                  placeholder="ENTER ORGANIZATION NAME"
-                  required
-                  className="w-full pl-10 pr-4 py-3 bg-black border border-cyan-500/30 text-cyan-300 rounded-lg focus:outline-none focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/50 transition-all duration-300 uppercase tracking-wider placeholder-cyan-500/50"
-                />
               </div>
 
-              <div className="relative group">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <Lock className="h-5 w-5 text-cyan-500 group-focus-within:text-cyan-300 transition-colors" />
+              <div>
+                <label htmlFor="password" className="block text-sm font-medium text-gray-400">
+                  Password
+                </label>
+                <div className="mt-1 relative">
+                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                    <FaLock className="h-5 w-5 text-gray-500" />
+                  </div>
+                  <input
+                    id="password"
+                    name="password"
+                    type={showPassword ? "text" : "password"}
+                    autoComplete="new-password"
+                    required
+                    minLength="8"
+                    value={password}
+                    onChange={onChange}
+                    className="appearance-none block w-full pl-10 pr-10 py-2 border border-gray-700 rounded-md bg-gray-800 placeholder-gray-500 text-white focus:outline-none focus:ring-cyan-500 focus:border-cyan-500 focus:z-10 sm:text-sm"
+                    placeholder="••••••••"
+                  />
+                  <div className="absolute inset-y-0 right-0 pr-3 flex items-center">
+                    <button
+                      type="button"
+                      onClick={togglePasswordVisibility}
+                      className="text-gray-500 hover:text-gray-400 focus:outline-none"
+                    >
+                      {showPassword ? (
+                        <FaEyeSlash className="h-5 w-5" />
+                      ) : (
+                        <FaEye className="h-5 w-5" />
+                      )}
+                    </button>
+                  </div>
                 </div>
-                <input
-                  type={showPassword ? "text" : "password"}
-                  name="password"
-                  value={password}
-                  onChange={onChange}
-                  placeholder="ENTER PASSWORD"
-                  required
-                  minLength="8"
-                  className="w-full pl-10 pr-10 py-3 bg-black border border-cyan-500/30 text-cyan-300 rounded-lg focus:outline-none focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/50 transition-all duration-300  tracking-wider placeholder-cyan-500/50"
-                />
+              </div>
+
+              <div>
+                <label htmlFor="phone" className="block text-sm font-medium text-gray-400">
+                  Phone Number (Optional)
+                </label>
+                <div className="mt-1 relative">
+                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                    <FaPhone className="h-5 w-5 text-gray-500" />
+                  </div>
+                  <input
+                    id="phone"
+                    name="phone"
+                    type="tel"
+                    autoComplete="tel"
+                    value={phone}
+                    onChange={onChange}
+                    className="appearance-none block w-full pl-10 pr-3 py-2 border border-gray-700 rounded-md bg-gray-800 placeholder-gray-500 text-white focus:outline-none focus:ring-cyan-500 focus:border-cyan-500 focus:z-10 sm:text-sm"
+                    placeholder="Enter phone number"
+                  />
+                </div>
+              </div>
+
+              <div>
                 <button
-                  type="button"
-                  onClick={togglePasswordVisibility}
-                  className="absolute inset-y-0 right-0 pr-3 flex items-center"
+                  type="submit"
+                  disabled={submitting}
+                  className={`group relative w-full flex justify-center py-2 px-4 border border-transparent rounded-md text-black font-medium cursor-pointer ${submitting
+                    ? "bg-cyan-700 cursor-not-allowed"
+                    : "bg-cyan-600 hover:bg-black hover:border hover:border-cyan-500 hover:text-cyan-500 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-cyan-500"
+                    }`}
                 >
-                  {showPassword ? (
-                    <EyeOff className="h-5 w-5 text-cyan-500 hover:text-cyan-300 transition-colors" />
+                  {submitting ? (
+                    <span className="flex items-center">
+                      <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                      </svg>
+                      Registering...
+                    </span>
                   ) : (
-                    <Eye className="h-5 w-5 text-cyan-500 hover:text-cyan-300 transition-colors" />
+                    "Register as Organizer"
                   )}
                 </button>
               </div>
-
-              <div className="relative group">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <Phone className="h-5 w-5 text-cyan-500 group-focus-within:text-cyan-300 transition-colors" />
-                </div>
-                <input
-                  type="tel"
-                  name="phone"
-                  value={phone}
-                  onChange={onChange}
-                  placeholder="ENTER PHONE (OPTIONAL)"
-                  className="w-full pl-10 pr-4 py-3 bg-black border border-cyan-500/30 text-cyan-300 rounded-lg focus:outline-none focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/50 transition-all duration-300 uppercase tracking-wider placeholder-cyan-500/50"
-                />
-              </div>
-
-              {error && (
-                <div className="bg-red-500/10 border border-red-500/30 text-red-300 px-4 py-3 rounded-lg text-center uppercase tracking-wider">
-                  {error}
-                </div>
-              )}
-
-              <button
-                type="submit"
-                disabled={submitting}
-                className="w-full bg-cyan-500 text-black py-3 rounded-lg transition-all duration-300 flex items-center justify-center space-x-2 uppercase font-bold tracking-wider group hover:cursor-pointer hover:bg-black hover:text-cyan-500 hover:shadow-lg hover:border-cyan-500 hover:border"
-              >
-                {submitting ? (
-                  <>
-                    <span>REGISTERING...</span>
-                    <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-black"></div>
-                  </>
-                ) : (
-                  <>
-                    <span>REGISTER</span>
-                    <Zap className="h-5 w-5 group-hover:animate-pulse" />
-                  </>
-                )}
-              </button>
-
-              <div className="text-center mt-4">
-                <p className="text-sm text-cyan-300/70 uppercase tracking-wider">
-                  ALREADY HAVE CREDENTIALS? {' '}
-                  <Link
-                    to="/auth/organizer-login"
-                    className="text-cyan-500 hover:text-cyan-300 font-bold transition-colors"
-                  >
-                    LOGIN
-                  </Link>
-                </p>
-              </div>
             </form>
+
+            <div className="mt-6">
+              <div className="relative">
+                <div className="absolute inset-0 flex items-center">
+                  <div className="w-full border-t border-gray-700"></div>
+                </div>
+                <div className="relative flex justify-center text-sm">
+                  <span className="px-2 bg-gray-900 text-gray-400">Or continue with</span>
+                </div>
+              </div>
+
+              <div className="flex justify-center space-x-4 mt-4">
+                <Link
+                  to="/auth/google-signup"
+                  className="flex justify-center py-4 px-4 border border-gray-700 rounded-full shadow-sm text-sm font-medium text-gray-400 bg-gray-800 hover:bg-gray-700"
+                >
+                  <FaGoogle size={18} />
+                </Link>
+                <Link
+                  to="/auth/twitter-signup"
+                  className="flex justify-center py-4 px-4 border border-gray-700 rounded-full shadow-sm text-sm font-medium text-gray-400 bg-gray-800 hover:bg-gray-700"
+                >
+                  <FaTwitter size={18} />
+                </Link>
+              </div>
+
+              <div className="mt-6">
+                <Link
+                  to="/auth/register"
+                  className="w-full flex justify-center py-2 px-4 border border-cyan-700 rounded-md shadow-sm text-sm font-medium text-cyan-400 bg-gray-800 hover:bg-gray-700"
+                >
+                  Register as a regular user
+                </Link>
+              </div>
+            </div>
           </div>
+        </motion.div>
+
+        <div className="text-center mt-4">
+          <p className="text-gray-400">
+            Already have an organizer account?{" "}
+            <Link to="/auth/organizer-login" className="font-medium text-cyan-400 hover:text-cyan-300">
+              Sign in
+            </Link>
+          </p>
         </div>
       </div>
     </div>

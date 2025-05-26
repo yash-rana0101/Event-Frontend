@@ -5,7 +5,7 @@ import { useDispatch, useSelector } from 'react-redux';
 import { loginOrganizer } from '../../redux/user/organizer';
 import { motion } from 'framer-motion';
 import { toast } from 'react-toastify';
-import { FaEnvelope, FaLock, FaEye, FaEyeSlash } from 'react-icons/fa';
+import { FaEnvelope, FaLock, FaEye, FaEyeSlash, FaGoogle, FaTwitter } from 'react-icons/fa';
 import { fixPersistenceIssues } from '../../utils/persistFix';
 
 const OrgLogin = () => {
@@ -18,18 +18,18 @@ const OrgLogin = () => {
   const dispatch = useDispatch();
   const navigate = useNavigate();
   const location = useLocation();
-  
+
   // Get auth state from Redux
   const { loading, error, token } = useSelector(state => state.organizer);
   const { token: userToken } = useSelector(state => state.auth);
-  
+
   // Check for redirection after login
   const redirectTo = location.state?.from || '/organizer/dashboard';
 
   useEffect(() => {
     // Fix persistence issues
     fixPersistenceIssues();
-    
+
     // If already logged in, redirect
     if (token) {
       toast.info("You're already logged in as an organizer");
@@ -49,16 +49,16 @@ const OrgLogin = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    
+
     // Quick validation
     if (!formData.email || !formData.password) {
       toast.error("Please fill in all fields");
       return;
     }
-    
+
     try {
       const resultAction = await dispatch(loginOrganizer(formData));
-      
+
       // Check if login was successful
       if (loginOrganizer.fulfilled.match(resultAction)) {
         toast.success('Welcome back, organizer!');
@@ -74,7 +74,7 @@ const OrgLogin = () => {
   return (
     <div className="min-h-screen bg-black flex flex-col justify-center items-center p-4">
       <div className="max-w-md w-full space-y-8">
-        <motion.div 
+        <motion.div
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5 }}
@@ -179,11 +179,10 @@ const OrgLogin = () => {
                 <button
                   type="submit"
                   disabled={loading}
-                  className={`group relative w-full flex justify-center py-2 px-4 border border-transparent rounded-md text-black font-medium cursor-pointer ${
-                    loading
+                  className={`group relative w-full flex justify-center py-2 px-4 border border-transparent rounded-md text-black font-medium cursor-pointer ${loading
                       ? "bg-cyan-700 cursor-not-allowed"
                       : "bg-cyan-600 hover:bg-black hover:border hover:border-cyan-500 hover:text-cyan-500 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-cyan-500"
-                  }`}
+                    }`}
                 >
                   {loading ? (
                     <span className="flex items-center">
@@ -208,6 +207,21 @@ const OrgLogin = () => {
                 <div className="relative flex justify-center text-sm">
                   <span className="px-2 bg-gray-900 text-gray-400">Or continue with</span>
                 </div>
+              </div>
+
+              <div className="flex justify-center space-x-4 mt-4">
+                <Link
+                  to="/auth/google-login"
+                  className="flex justify-center py-4 px-4 border border-gray-700 rounded-full shadow-sm text-sm font-medium text-gray-400 bg-gray-800 hover:bg-gray-700"
+                >
+                  <FaGoogle size={18} />
+                </Link>
+                <Link
+                  to="/auth/twitter-login"
+                  className="flex justify-center py-4 px-4 border border-gray-700 rounded-full shadow-sm text-sm font-medium text-gray-400 bg-gray-800 hover:bg-gray-700"
+                >
+                  <FaTwitter size={18} />
+                </Link>
               </div>
 
               <div className="mt-6">

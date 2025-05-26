@@ -34,7 +34,7 @@ export default function CreateEvent() {
 
   useEffect(() => {
     // Get the raw token from state or localStorage
-    let rawToken = organizerToken || localStorage.getItem('organizer_token');
+    let rawToken = organizerToken;
 
     // Safely parse the token to handle JSON string format
     const token = safelyParseToken(rawToken);
@@ -66,11 +66,8 @@ export default function CreateEvent() {
       setSubmitting(true);
       setError(null);
 
-      // Fix persistence issues first
-      fixPersistenceIssues();
-
       // Get token - simplified token handling
-      let rawToken = organizerToken || localStorage.getItem('organizer_token');
+      let rawToken = organizerToken;
       const token = safelyParseToken(rawToken);
 
       if (!token) {
@@ -111,10 +108,12 @@ export default function CreateEvent() {
       }
       formData.append("organizer", organizerId);
 
+      // return console.log("formData prepared:", eventData);
+
       const apiUrl = import.meta.env.VITE_API_URL;
       const response = await axios.post(
         `${apiUrl}/events`,
-        formData,
+        eventData,
         {
           headers: {
             'Content-Type': 'multipart/form-data',

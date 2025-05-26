@@ -187,20 +187,55 @@ const OrganizerDetails = () => {
         return;
       }
 
+      // Try multiple possible endpoint patterns
+      const possibleEndpoints = [
+        `${apiUrl}/organizer/${organizerId}/details`,
+        `${apiUrl}/organizer/details/${organizerId}`,
+        `${apiUrl}/organizer/details`,
+        `${apiUrl}/organizers/${organizerId}/details`
+      ];
+
       console.log("Submitting organizer details:", {
-        url: `${apiUrl}/organizer/${organizerId}/details`,
-        data: formData
+        organizerId,
+        data: formData,
+        endpoints: possibleEndpoints
       });
 
-      const response = await axios({
-        method: 'post',
-        url: `${apiUrl}/organizer/${organizerId}/details`,
-        data: formData,
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${parsedToken}`
+      let response;
+      let lastError;
+
+      // Try each endpoint until one works
+      for (const endpoint of possibleEndpoints) {
+        try {
+          console.log(`Trying endpoint: ${endpoint}`);
+
+          response = await axios({
+            method: 'post',
+            url: endpoint,
+            data: formData,
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${parsedToken}`
+            }
+          });
+
+          console.log(`Success with endpoint: ${endpoint}`);
+          break; // If successful, break out of the loop
+        } catch (error) {
+          console.log(`Failed with endpoint ${endpoint}:`, error.response?.status);
+          lastError = error;
+
+          // If it's not a 404, don't try other endpoints
+          if (error.response?.status !== 404) {
+            throw error;
+          }
         }
-      });
+      }
+
+      // If no endpoint worked, throw the last error
+      if (!response) {
+        throw lastError || new Error('All endpoints failed');
+      }
 
       console.log('Profile data saved:', response.data);
       toast.success('Profile details saved successfully');
@@ -226,7 +261,14 @@ const OrganizerDetails = () => {
 
     } catch (error) {
       console.error('Error saving profile details:', error);
-      toast.error(error.response?.data?.message || 'Failed to save profile details');
+
+      if (error.response?.status === 404) {
+        toast.error('API endpoint not found. Please contact support.');
+      } else if (error.response?.status === 403) {
+        toast.error('Access denied. Please login again.');
+      } else {
+        toast.error(error.response?.data?.message || 'Failed to save profile details');
+      }
     } finally {
       setSubmitting(false);
     }
@@ -569,20 +611,6 @@ const OrganizerDetails = () => {
             >
               + Add Testimonial
             </button>
-          </div>
-
-          <div className="mb-6 flex items-center">
-            <input
-              type="checkbox"
-              name="isPrivate"
-              id="isPrivate"
-              checked={formData.isPrivate}
-              onChange={handleChange}
-              className="w-4 h-4 bg-gray-800 border-gray-700 rounded focus:ring-cyan-500 focus:ring-2"
-            />
-            <label htmlFor="isPrivate" className="ml-2 text-sm text-gray-300">
-              Make my profile private (only visible to event attendees)
-            </label>
           </div>
 
           <div className="flex justify-end">

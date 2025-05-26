@@ -59,7 +59,7 @@ export default function EventAttendees() {
     
     try {
       // Get the clean token
-      const token = safelyParseToken(organizerToken || localStorage.getItem('organizer_token'));
+      const token = safelyParseToken(organizerToken);
       
       if (!token) {
         toast.error('Authentication required. Please log in again.');
@@ -67,7 +67,7 @@ export default function EventAttendees() {
         return;
       }
 
-      const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000/api/v1';
+      const apiUrl = import.meta.env.VITE_API_URL;
       
       // Get event details
       const eventResponse = await axios.get(`${apiUrl}/events/${eventId}`, {
@@ -99,10 +99,10 @@ export default function EventAttendees() {
         navigate('/organizer/login');
       } else if (error.response?.status === 403) {
         toast.error('You do not have permission to access this event\'s attendees.');
-        navigate('/organizer/events/list');
+        navigate(-1);
       } else if (error.response?.status === 404) {
         toast.error('Event not found or has been deleted.');
-        navigate('/organizer/events/list');
+        navigate(-1);
       } else {
         setError(error.response?.data?.message || error.message || 'Failed to load attendee data');
         toast.error('Failed to load attendee data. Using sample data instead.');

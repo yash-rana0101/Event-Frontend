@@ -63,9 +63,19 @@ const OrgLogin = () => {
       if (loginOrganizer.fulfilled.match(resultAction)) {
         toast.success('Welcome back, organizer!');
         navigate(redirectTo);
+      } else if (loginOrganizer.rejected.match(resultAction)) {
+        const error = resultAction.payload;
+
+        // Handle verification-specific errors
+        if (error.includes("pending approval") || error.includes("verification")) {
+          toast.error("Your account is pending approval. Please wait for admin verification.");
+        } else {
+          toast.error(error || 'Login failed');
+        }
       }
     } catch (err) {
-      console.error("Login error:", err);
+      console.error('Login error:', err);
+      toast.error('An unexpected error occurred. Please try again.');
     }
   };
 
@@ -180,8 +190,8 @@ const OrgLogin = () => {
                   type="submit"
                   disabled={loading}
                   className={`group relative w-full flex justify-center py-2 px-4 border border-transparent rounded-md text-black font-medium cursor-pointer ${loading
-                      ? "bg-cyan-700 cursor-not-allowed"
-                      : "bg-cyan-600 hover:bg-black hover:border hover:border-cyan-500 hover:text-cyan-500 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-cyan-500"
+                    ? "bg-cyan-700 cursor-not-allowed"
+                    : "bg-cyan-600 hover:bg-black hover:border hover:border-cyan-500 hover:text-cyan-500 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-cyan-500"
                     }`}
                 >
                   {loading ? (

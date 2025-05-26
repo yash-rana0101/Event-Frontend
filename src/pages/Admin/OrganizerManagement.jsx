@@ -13,6 +13,7 @@ import { useLoader } from '../../context/LoaderContext';
 import { useAuth } from '../../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { useSelector } from 'react-redux';
+import axios from 'axios';
 
 export default function OrganizerManagement() {
   // Authentication and navigation
@@ -110,10 +111,18 @@ export default function OrganizerManagement() {
   // State management
   const [organizers, setOrganizers] = useState([]);
   const [stats, setStats] = useState({
-    total: 0,
-    pending: 0,
-    approved: 0,
-    suspendedBlocked: 0
+    totalOrganizers: 0,
+    pendingOrganizers: 0,
+    approvedOrganizers: 0,
+    activeOrganizers: 0,
+    rejectedOrganizers: 0,
+    suspendedOrganizers: 0,
+    blockedOrganizers: 0,
+    verifiedOrganizers: 0,
+    unverifiedOrganizers: 0,
+    inactiveOrganizers: 0,
+    verificationRate: 0,
+    approvalRate: 0
   });
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
@@ -204,13 +213,21 @@ export default function OrganizerManagement() {
       }
 
       const response = await organizerService.getOrganizerStats();
-      // Map backend keys to frontend keys
+      // Use the exact response structure from your API
       const statsData = response.data;
       setStats({
-        total: statsData.totalOrganizers || 0,
-        pending: statsData.pendingOrganizers || 0,
-        approved: statsData.activeOrganizers || 0,
-        suspendedBlocked: (statsData.suspendedOrganizers || 0) + (statsData.blockedOrganizers || 0) // if you have these fields
+        totalOrganizers: statsData.totalOrganizers || 0,
+        pendingOrganizers: statsData.pendingOrganizers || 0,
+        approvedOrganizers: statsData.approvedOrganizers || 0,
+        activeOrganizers: statsData.activeOrganizers || 0,
+        rejectedOrganizers: statsData.rejectedOrganizers || 0,
+        suspendedOrganizers: statsData.suspendedOrganizers || 0,
+        blockedOrganizers: statsData.blockedOrganizers || 0,
+        verifiedOrganizers: statsData.verifiedOrganizers || 0,
+        unverifiedOrganizers: statsData.unverifiedOrganizers || 0,
+        inactiveOrganizers: statsData.inactiveOrganizers || 0,
+        verificationRate: statsData.verificationRate || 0,
+        approvalRate: statsData.approvalRate || 0
       });
     } catch (error) {
       console.error('Error fetching stats:', error);
@@ -258,8 +275,8 @@ export default function OrganizerManagement() {
       case 'pending': return 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30';
       case 'approved': return 'bg-green-500/20 text-green-400 border-green-500/30';
       case 'suspended': return 'bg-orange-500/20 text-orange-400 border-orange-500/30';
-      case 'blocked': return 'bg-red-500/20 text-red-400 border-red-500/30';
-      case 'rejected': return 'bg-gray-500/20 text-gray-400 border-gray-500/30';
+      case 'blocked':
+      case 'rejected': return 'bg-red-500/20 text-red-400 border-red-500/30';
       default: return 'bg-gray-500/20 text-gray-400 border-gray-500/30';
     }
   };
@@ -291,46 +308,54 @@ export default function OrganizerManagement() {
       // Check authentication before making request
       if (!token) {
         toast.error('Authentication token missing. Please login again.');
-        if (logout) logout();
-        navigate('/admin/login');
         return;
       }
 
-      if (actionType === 'delete') {
-        await organizerService.deleteOrganizer(selectedOrganizer._id);
-        toast.success('Organizer deleted successfully');
-      } else if (actionType === 'view') {
-        // Handle view action - could open a detailed modal or navigate to detail page
-        const response = await organizerService.getOrganizerById(selectedOrganizer._id);
-        console.log('Organizer details:', response.data);
-        toast.info('Organizer details loaded');
-      } else {
-        // Status update actions (approve, reject, suspend, block)
-        await organizerService.updateOrganizerStatus(selectedOrganizer._id, actionType, reason);
+      const apiUrl = import.meta.env.VITE_API_URL;
+      let endpoint = '';
+      let payload = {};
+
+      switch (actionType) {
+        case 'approve':
+          endpoint = `${apiUrl}/admin/organizers/${selectedOrganizer._id}/approve`;
+          payload = { approved: true, reason };
+          break;
+        case 'reject':
+          endpoint = `${apiUrl}/admin/organizers/${selectedOrganizer._id}/approve`;
+          payload = { approved: false, reason };
+          break;
+        case 'suspend':
+          endpoint = `${apiUrl}/admin/organizers/${selectedOrganizer._id}/status`;
+          payload = { status: false, reason };
+          break;
+        case 'block':
+          endpoint = `${apiUrl}/admin/organizers/${selectedOrganizer._id}/status`;
+          payload = { status: actionType === 'suspend' ? 'suspended' : 'blocked', reason };
+          break;
+        default:
+          throw new Error('Invalid action type');
+      }
+
+      const response = await axios.put(endpoint, payload, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (response.data.success) {
         toast.success(`Organizer ${actionType}d successfully`);
+        // Refresh the organizers list
+        fetchOrganizers();
+        setShowActionModal(false);
+      } else {
+        throw new Error(response.data.message || 'Action failed');
       }
-
-      // Refresh data
-      await fetchOrganizers();
-      await fetchStats();
     } catch (error) {
-      console.error('Error performing action:', error);
-
-      // Handle authentication errors
-      if (error.response?.status === 401) {
-        toast.error('Session expired. Please login again.');
-        if (logout) logout();
-        navigate('/admin/login');
-        return;
-      }
-
-      toast.error(error.response?.data?.message || `Failed to ${actionType} organizer`);
+      console.error('Action error:', error);
+      toast.error(error.response?.data?.message || error.message || 'Action failed');
     } finally {
       setActionLoading(false);
-      setShowActionModal(false);
-      setSelectedOrganizer(null);
-      setActionType('');
-      setReason('');
     }
   };
 
@@ -469,10 +494,60 @@ export default function OrganizerManagement() {
   };
 
   const statsCards = [
-    { label: 'Total Organizers', value: stats.total, icon: Users, color: 'from-cyan-500 to-blue-600' },
-    { label: 'Pending Approval', value: stats.pending, icon: Clock, color: 'from-yellow-500 to-orange-600' },
-    { label: 'Active Organizers', value: stats.approved, icon: UserCheck, color: 'from-green-500 to-emerald-600' },
-    { label: 'Suspended/Blocked', value: stats.suspendedBlocked, icon: UserX, color: 'from-red-500 to-pink-600' }
+    {
+      label: 'Total Organizers',
+      value: stats.totalOrganizers,
+      icon: Users,
+      color: 'from-cyan-500 to-blue-600',
+      subtext: `${stats.verificationRate}% verified`
+    },
+    {
+      label: 'Pending Approval',
+      value: stats.pendingOrganizers,
+      icon: Clock,
+      color: 'from-yellow-500 to-orange-600',
+      subtext: 'Awaiting review'
+    },
+    {
+      label: 'unverified Organizers',
+        value: stats.unverifiedOrganizers,
+      icon: UserX,
+      color: 'from-yellow-500 to-orange-600',
+      subtext: 'Awaiting review'
+    },
+    {
+      label: 'Active Organizers',
+      value: stats.activeOrganizers,
+      icon: UserCheck,
+      color: 'from-green-500 to-emerald-600',
+      subtext: `${stats.approvalRate}% approval rate`
+    },
+    {
+      label: 'Inactive Organizers',
+      value: stats.inactiveOrganizers,
+      icon: UserX,
+      color: 'from-red-500 to-pink-600',
+      subtext: `${stats.rejectedOrganizers} rejected, ${stats.suspendedOrganizers} suspended`
+    },
+    {
+      label: 'Suspended Organizers',
+      value: stats.suspendedOrganizers,
+      icon: AlertTriangle,
+      color: 'from-red-500 to-pink-600',
+      subtext: `${stats.rejectedOrganizers} rejected, ${stats.suspendedOrganizers} suspended`
+    },{
+      label: 'Blocked Organizers',
+      value: stats.blockedOrganizers,
+      icon: Ban,
+      color: 'from-red-500 to-pink-600',
+      subtext: `${stats.rejectedOrganizers} rejected, ${stats.suspendedOrganizers} suspended`
+    },{
+      label: 'Rejected Organizers',
+      value: stats.rejectedOrganizers,
+      icon: UserMinus,
+      color: 'from-red-500 to-orange-600',
+      subtext: `${stats.rejectedOrganizers} rejected, ${stats.suspendedOrganizers} suspended`
+    }
   ];
 
   // Don't render anything if not authenticated
@@ -530,14 +605,19 @@ export default function OrganizerManagement() {
               transition={{ delay: index * 0.1 }}
               className="bg-gradient-to-br from-gray-900/80 to-gray-800/60 backdrop-blur-xl rounded-xl sm:rounded-2xl p-4 sm:p-6 border border-gray-700/50 hover:border-cyan-500/30 transition-all duration-300"
             >
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-gray-400 text-xs sm:text-sm mb-1">{stat.label}</p>
-                  <p className="text-xl sm:text-2xl font-bold text-white">{stat.value}</p>
-                </div>
+              <div className="flex items-center justify-between mb-2">
                 <div className={`p-2 sm:p-3 rounded-xl bg-gradient-to-r ${stat.color} bg-opacity-20`}>
                   <stat.icon className="w-5 h-5 sm:w-6 sm:h-6 text-white" />
                 </div>
+                <div className="text-right">
+                  <p className="text-xl sm:text-2xl font-bold text-white">{stat.value}</p>
+                </div>
+              </div>
+              <div>
+                <p className="text-gray-400 text-xs sm:text-sm mb-1">{stat.label}</p>
+                {stat.subtext && (
+                  <p className="text-gray-500 text-xs">{stat.subtext}</p>
+                )}
               </div>
             </motion.div>
           ))}

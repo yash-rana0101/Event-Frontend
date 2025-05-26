@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { useDispatch, useSelector } from 'react-redux';
+import { useSelector } from 'react-redux';
 import axios from 'axios';
 import {
   FaUser,
@@ -19,7 +19,6 @@ import { Link, useNavigate } from "react-router-dom";
 import { useLoader } from '../../context/LoaderContext';
 
 const Register = () => {
-  const dispatch = useDispatch();
   const navigate = useNavigate();
   const { loading = false, error = null } = useSelector((state) => state.organizer || {});
   const { setIsLoading } = useLoader();
@@ -73,26 +72,13 @@ const Register = () => {
 
       console.log("Registration successful:", response.data);
 
-      if (response.data.token) {
-        localStorage.setItem('organizer_token', response.data.token);
-      }
-
-      dispatch({
-        type: 'organizer/setToken',
-        payload: response.data.token
-      });
-
-      dispatch({
-        type: 'organizer/setUser',
-        payload: response.data.organizer || response.data.user
-      });
-
-      toast.success("Registration successful! Please complete your profile details.");
+      // Don't store token or redirect automatically since account needs approval
+      toast.success("Registration successful! Your account is pending approval. You will be notified once verified.");
       setRegistered(true);
 
       setTimeout(() => {
-        navigate('/organizer/details');
-      }, 1500);
+        navigate('/organizer/login'); // Redirect to login instead of details
+      }, 2000);
     } catch (err) {
       console.error("Registration failed:", err);
 
@@ -103,7 +89,7 @@ const Register = () => {
       } else if (err.request) {
         toast.error('Network error. Please try again.');
       } else {
-        toast.error('Something went wrong. Please try again.');
+        toast.error('Registration failed. Please try again.');
       }
     } finally {
       setSubmitting(false);

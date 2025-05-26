@@ -35,15 +35,28 @@ export const loginOrganizer = createAsyncThunk(
         credentials
       );
 
-      // Set expiry time for token (1 day from now)
-      const expiryTime = new Date().getTime() + 24 * 60 * 60 * 1000;
+      // Only proceed if login was successful and user is verified
+      if (response.data.success && response.data.token) {
+        // Set expiry time for token (1 day from now)
+        const expiryTime = new Date().getTime() + 24 * 60 * 60 * 1000;
 
-      return {
-        token: response.data.token,
-        user: response.data.organizer || response.data.user,
-        tokenExpiry: expiryTime,
-      };
+        return {
+          token: response.data.token,
+          user: response.data.user,
+          tokenExpiry: expiryTime,
+        };
+      } else {
+        return rejectWithValue("Login failed. Please try again.");
+      }
     } catch (error) {
+      // Handle verification-specific errors
+      if (error.response?.status === 403) {
+        return rejectWithValue(
+          error.response?.data?.message ||
+            "Account pending approval. Please wait for admin verification."
+        );
+      }
+
       return rejectWithValue(
         error.response?.data?.message || "Login failed. Please try again."
       );

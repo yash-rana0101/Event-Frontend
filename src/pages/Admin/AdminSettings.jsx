@@ -77,7 +77,7 @@ export default function AdminSettings() {
   });
 
   const [apiSettings, setApiSettings] = useState({
-    apiKey: 'api_key_placeholder_replace_with_actual_key',
+    Key: 'api_key_placeholder_replace_with_actual_key',
     webhookUrl: 'https://api.eventsystem.com/webhooks',
     rateLimit: 1000,
     apiVersion: 'v1',

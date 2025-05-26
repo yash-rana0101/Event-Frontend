@@ -64,14 +64,6 @@ export default function AdminSettings() {
     cacheEnabled: false
   });
 
-  const [apiSettings, setApiSettings] = useState({
-    apiKey: '',
-    webhookUrl: '',
-    rateLimit: 1000,
-    apiVersion: 'v1',
-    enableCors: true,
-    enableLogging: true
-  });
 
   const [backupSettings, setBackupSettings] = useState({
     autoBackup: false,
@@ -111,7 +103,6 @@ export default function AdminSettings() {
       setProfileData(profileRes.data);
       setSystemSettings(systemRes.data);
       setNotificationSettings(notificationRes.data);
-      setApiSettings(apiRes.data);
       setBackupSettings(backupRes.data);
 
       toast.success('Settings loaded successfully');
@@ -156,9 +147,7 @@ export default function AdminSettings() {
         case 'system':
           updatePromise = adminApi.updateSystemSettings(systemSettings);
           break;
-        case 'api':
-          updatePromise = adminApi.updateApiSettings(apiSettings);
-          break;
+        
         case 'backup':
           updatePromise = adminApi.updateBackupSettings(backupSettings);
           break;
@@ -189,16 +178,6 @@ export default function AdminSettings() {
     }
   };
 
-  const generateApiKey = async () => {
-    try {
-      const response = await adminApi.generateApiKey();
-      setApiSettings(prev => ({ ...prev, apiKey: response.data.apiKey }));
-      toast.success('New API key generated');
-    } catch (error) {
-      console.error('Error generating API key:', error);
-      toast.error('Failed to generate API key');
-    }
-  };
 
   const handleAvatarUpload = async (event) => {
     const file = event.target.files[0];
@@ -293,14 +272,6 @@ export default function AdminSettings() {
           <SystemSettings
             systemSettings={systemSettings}
             setSystemSettings={setSystemSettings}
-          />
-        );
-      case 'api':
-        return (
-          <ApiSettings
-            apiSettings={apiSettings}
-            setApiSettings={setApiSettings}
-            generateApiKey={generateApiKey}
           />
         );
       case 'backup':

@@ -17,11 +17,6 @@ export const adminApi = {
       .get("/settings")
       .then((res) => ({ data: res.data.data.notifications }))
       .catch(handleApiError),
-  getAppearanceSettings: () =>
-    api
-      .get("/settings")
-      .then((res) => ({ data: res.data.data.appearance }))
-      .catch(handleApiError),
   getApiSettings: () =>
     api.get("/settings").then((res) => ({ data: res.data.data.api })),
   getBackupSettings: () =>
@@ -29,17 +24,11 @@ export const adminApi = {
 
   // Update specific settings sections with optimistic updates
   updateProfile: (data) => updateSettingsSection("profile", data),
-  updateSecuritySettings: (data) => updateSettingsSection("security", data),
   updateSystemSettings: (data) => updateSettingsSection("system", data),
   updateNotificationSettings: (data) =>
     updateSettingsSection("notifications", data),
-  updateAppearanceSettings: (data) => updateSettingsSection("appearance", data),
   updateApiSettings: (data) => updateSettingsSection("api", data),
   updateBackupSettings: (data) => updateSettingsSection("backup", data),
-
-  // Security APIs
-  changePassword: (data) =>
-    api.put("/settings/change-password", data).catch(handleApiError),
 
   // File upload APIs with progress tracking
   uploadAvatar: (file, onProgress) => {
@@ -59,8 +48,7 @@ export const adminApi = {
     retryApiCall(() => api.post("/settings/generate-api-key")),
 
   // Backup APIs with proper error handling
-  createBackup: () =>
-    api.post("/settings/create-backup").catch(handleApiError),
+  createBackup: () => api.post("/settings/create-backup").catch(handleApiError),
   downloadBackup: (backupId) =>
     api
       .get(`/settings/download-backup/${backupId}`, { responseType: "blob" })

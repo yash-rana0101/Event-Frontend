@@ -8,7 +8,6 @@ const SettingsNavigation = ({ activeTab, setActiveTab }) => {
     { id: 'profile', label: 'Profile', icon: User, color: 'from-cyan-400 to-blue-500' },
     { id: 'notifications', label: 'Notifications', icon: Bell, color: 'from-yellow-400 to-orange-500' },
     { id: 'system', label: 'System', icon: Server, color: 'from-green-400 to-green-600' },
-    { id: 'api', label: 'API Settings', icon: Key, color: 'from-indigo-400 to-indigo-600' },
     { id: 'backup', label: 'Backup', icon: Database, color: 'from-pink-400 to-pink-600' }
   ];
 

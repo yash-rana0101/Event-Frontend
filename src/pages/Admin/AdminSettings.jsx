@@ -1,7 +1,7 @@
 /* eslint-disable no-unused-vars */
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { adminApi } from '../../services/adminApi';
+import { admin } from '../../services/admin';
 import { toast } from 'react-toastify';
 import { RefreshCw, Save, Check } from 'lucide-react';
 
@@ -91,12 +91,12 @@ export default function AdminSettings() {
         
         backupRes
       ] = await Promise.all([
-        adminApi.getProfile(),
-        adminApi.getSystemSettings(),
-        adminApi.getNotificationSettings(),
-        adminApi.getAppearanceSettings(),
-        adminApi.getApiSettings(),
-        adminApi.getBackupSettings()
+        admin.getProfile(),
+        admin.getSystemSettings(),
+        admin.getNotificationSettings(),
+        admin.getAppearanceSettings(),
+        admin.getApiSettings(),
+        admin.getBackupSettings()
       ]);
 
       setProfileData(profileRes.data);
@@ -121,7 +121,7 @@ export default function AdminSettings() {
 
       switch (activeTab) {
         case 'profile':
-          updatePromise = adminApi.updateProfile(profileData);
+          updatePromise = admin.updateProfile(profileData);
           break;
         case 'security':
           if (securitySettings.newPassword) {
@@ -129,26 +129,26 @@ export default function AdminSettings() {
               toast.error('New passwords do not match');
               return;
             }
-            await adminApi.changePassword({
+            await admin.changePassword({
               currentPassword: securitySettings.currentPassword,
               newPassword: securitySettings.newPassword
             });
           }
-          updatePromise = adminApi.updateSecuritySettings({
+          updatePromise = admin.updateSecuritySettings({
             twoFactorEnabled: securitySettings.twoFactorEnabled,
             loginAlerts: securitySettings.loginAlerts,
             sessionTimeout: securitySettings.sessionTimeout
           });
           break;
         case 'notifications':
-          updatePromise = adminApi.updateNotificationSettings(notificationSettings);
+          updatePromise = admin.updateNotificationSettings(notificationSettings);
           break;
         case 'system':
-          updatePromise = adminApi.updateSystemSettings(systemSettings);
+          updatePromise = admin.updateSystemSettings(systemSettings);
           break;
         
         case 'backup':
-          updatePromise = adminApi.updateBackupSettings(backupSettings);
+          updatePromise = admin.updateBackupSettings(backupSettings);
           break;
         default:
           updatePromise = Promise.resolve();
@@ -188,7 +188,7 @@ export default function AdminSettings() {
     }
 
     try {
-      const response = await adminApi.uploadAvatar(file);
+      const response = await admin.uploadAvatar(file);
       setProfileData(prev => ({ ...prev, avatar: response.data.avatarUrl }));
       toast.success('Avatar uploaded successfully');
     } catch (error) {
@@ -200,10 +200,10 @@ export default function AdminSettings() {
   const handleCreateBackup = async () => {
     try {
       setIsLoading(true);
-      await adminApi.createBackup();
+      await admin.createBackup();
       toast.success('Backup created successfully');
       // Reload backup settings to get updated info
-      const backupRes = await adminApi.getBackupSettings();
+      const backupRes = await admin.getBackupSettings();
       setBackupSettings(backupRes.data);
     } catch (error) {
       console.error('Error creating backup:', error);
@@ -215,7 +215,7 @@ export default function AdminSettings() {
 
   const handleDownloadBackup = async (backupId) => {
     try {
-      const response = await adminApi.downloadBackup(backupId);
+      const response = await admin.downloadBackup(backupId);
       const url = window.URL.createObjectURL(new Blob([response.data]));
       const link = document.createElement('a');
       link.href = url;
@@ -237,7 +237,7 @@ export default function AdminSettings() {
 
     try {
       setIsLoading(true);
-      await adminApi.restoreBackup(file);
+      await admin.restoreBackup(file);
       toast.success('Backup restored successfully');
       // Reload all settings after restore
       await loadInitialData();

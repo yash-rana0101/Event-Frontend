@@ -19,47 +19,52 @@ const Guard = ({ type, children }) => {
   const authState = useSelector(state => state.auth);
   const organizerState = useSelector(state => state.organizer);
 
-  // Parse user data if it's stored as a string
   const getUser = (userData) => {
-    if (!userData) return null;
-    
-    if (typeof userData === 'string') {
-      try {
-        return JSON.parse(userData);
-      } catch (e) {
-        console.error('Error parsing user data:', e);
-        return null;
-      }
-    }
-    
     return userData;
   };
-  
+
   const user = getUser(authState?.user);
   const userToken = authState?.token;
-  
+
   const organizer = getUser(organizerState?.user);
   const organizerToken = organizerState?.token;
-  
+
   // Parse token if needed
   const parseToken = (token) => {
     if (!token) return null;
-    
+
     if (typeof token === 'string') {
       // Remove quotes if the token is stored with them
       return token.replace(/^"(.*)"$/, '$1');
     }
-    
+
     return token;
   };
-  
+
   const cleanUserToken = parseToken(userToken);
   const cleanOrganizerToken = parseToken(organizerToken);
+
+  // Check for admin access (only for regular users, not organizers)
+  const isAdmin = user?.role === 'admin' || user?.isAdmin === true;
+
+  // Define authentication status based on route type
+  const isAuthenticated = (() => {
+    switch (type) {
+      case 'admin':
+        return Boolean(user && cleanUserToken && isAdmin);
+      case 'organizer':
+        return Boolean(organizer && cleanOrganizerToken);
+      case 'user':
+        return Boolean(user && cleanUserToken);
+      default:
+        return Boolean((user && cleanUserToken) || (organizer && cleanOrganizerToken));
+    }
+  })();
 
   // Set up loading state
   useEffect(() => {
     setIsLoading(isCheckingAuth);
-    
+
     // Debugging - log authentication state
     // console.log('Guard Authentication Check:', {
     //   type,
@@ -67,33 +72,33 @@ const Guard = ({ type, children }) => {
     //   userToken: Boolean(cleanUserToken),
     //   organizer: Boolean(organizer),
     //   organizerToken: Boolean(cleanOrganizerToken),
-    //   isCheckingAuth
+    //   isAdmin,
+    //   isAuthenticated,
     // });
-    
     const timer = setTimeout(() => setIsCheckingAuth(false), 500);
     return () => {
       clearTimeout(timer);
       setIsLoading(false);
     };
-  }, [isCheckingAuth, setIsLoading, type, user, organizer]);
+  }, [isCheckingAuth, setIsLoading, type, user, organizer, isAdmin, isAuthenticated]);
 
-  // Check if authenticated based on type
-  const isAuthenticated = () => {
-    if (type === GUARD_TYPES.USER) {
-      return Boolean(user && cleanUserToken);
+  // Route protection logic
+  if (type === 'admin') {
+    // Admin routes - only for regular users with admin role
+    if (!user || !cleanUserToken || !isAdmin) {
+      return <Navigate to="/login" replace />;
     }
-    if (type === GUARD_TYPES.ORGANIZER) {
-      return Boolean(organizer && cleanOrganizerToken);
+  } else if (type === 'organizer') {
+    // Organizer routes - only check organizer authentication
+    if (!organizer || !cleanOrganizerToken) {
+      return <Navigate to="/organizer/login" replace />;
     }
-    return false;
-  };
-
-  // Remove loading state after checking auth
-  useEffect(() => {
-    if (isCheckingAuth) {
-      setIsCheckingAuth(false);
+  } else if (type === 'user') {
+    // Regular user routes
+    if (!user || !cleanUserToken) {
+      return <Navigate to="/login" replace />;
     }
-  }, []);
+  }
 
   // While checking authentication status, return null or loading component
   if (isCheckingAuth) {
@@ -101,13 +106,13 @@ const Guard = ({ type, children }) => {
   }
 
   // If authenticated, render children or outlet
-  if (isAuthenticated()) {
+  if (isAuthenticated) {
     return children || <Outlet />;
   }
 
   // If not authenticated, navigate to login page
   const loginRoute = type === GUARD_TYPES.ORGANIZER ? '/auth/organizer-login' : '/auth/login';
-  
+
   // Remember the location the user was trying to access
   return <Navigate to={loginRoute} state={{ from: location.pathname }} replace />;
 };

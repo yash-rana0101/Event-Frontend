@@ -1,11 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { toast } from 'react-toastify';
+import { useSelector } from 'react-redux';
 
 const UserManagement = () => {
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+
+  // Get token from Redux store
+  const token = useSelector(state => state.auth?.token);
 
   useEffect(() => {
     fetchUsers();
@@ -14,11 +18,18 @@ const UserManagement = () => {
   const fetchUsers = async () => {
     try {
       setLoading(true);
+
+      const headers = {
+        'Content-Type': 'application/json',
+      };
+
+      // Add authorization header if token exists
+      if (token) {
+        headers.Authorization = `Bearer ${token}`;
+      }
+
       const response = await axios.get(`${import.meta.env.VITE_API_URL}/users`, {
-        withCredentials: true,
-        headers: {
-          'Content-Type': 'application/json',
-        }
+        headers
       });
       setUsers(response.data);
       setError(null);
@@ -34,11 +45,16 @@ const UserManagement = () => {
   const handleDeleteUser = async (userId) => {
     if (window.confirm('Are you sure you want to delete this user?')) {
       try {
+        const headers = {
+          'Content-Type': 'application/json',
+        };
+
+        if (token) {
+          headers.Authorization = `Bearer ${token}`;
+        }
+
         await axios.delete(`${import.meta.env.VITE_API_URL}/users/${userId}`, {
-          withCredentials: true,
-          headers: {
-            'Content-Type': 'application/json',
-          }
+          headers
         });
         toast.success('User deleted successfully');
         fetchUsers(); // Refresh the list

@@ -60,40 +60,53 @@ export const isTokenExpired = (expiryTimestamp, bufferMinutes = 5) => {
  * @param {string} userType - 'user' or 'organizer' to specify which type to logout
  */
 export const thoroughAuthCleanup = (userType = "all") => {
-  console.log(`Performing thorough cleanup for: ${userType}`);
+  const authKeys = [
+    "token",
+    "token_expiry",
+    "user",
+    "auth",
+    "organizer_token",
+    "organizer_token_expiry",
+    "organizer",
+    "organizer_auth",
+  ];
 
-  // Clear specific user type data
-  if (userType === "user" || userType === "all") {
-    localStorage.removeItem("token");
-    localStorage.removeItem("token_expiry");
-    localStorage.removeItem("user");
+  let remainingKeys = [];
 
-    // Find and remove any user-related items
-    Object.keys(localStorage).forEach((key) => {
-      if (key.startsWith("user_") || key.includes("auth_")) {
+  if (userType === "all") {
+    // Clear all auth-related keys
+    authKeys.forEach((key) => {
+      if (localStorage.getItem(key)) {
+        localStorage.removeItem(key);
+      }
+    });
+  } else if (userType === "user") {
+    // Clear only user-related keys
+    ["token", "token_expiry", "user", "auth"].forEach((key) => {
+      if (localStorage.getItem(key)) {
+        localStorage.removeItem(key);
+      }
+    });
+  } else if (userType === "organizer") {
+    // Clear only organizer-related keys
+    [
+      "organizer_token",
+      "organizer_token_expiry",
+      "organizer",
+      "organizer_auth",
+    ].forEach((key) => {
+      if (localStorage.getItem(key)) {
         localStorage.removeItem(key);
       }
     });
   }
 
-  // Clear organizer data
-  if (userType === "organizer" || userType === "all") {
-    localStorage.removeItem("organizer_token");
-    localStorage.removeItem("organizer_token_expiry");
-    localStorage.removeItem("organizer_user");
-    localStorage.removeItem("organizer_profile_complete");
-
-    // Find and remove any organizer-related items
-    Object.keys(localStorage).forEach((key) => {
-      if (key.startsWith("organizer_")) {
-        localStorage.removeItem(key);
-      }
-    });
-  }
-
-  // Verify cleanup was successful
-  const remainingKeys = Object.keys(localStorage);
-  console.log("Remaining localStorage items after cleanup:", remainingKeys);
+  // Check for any remaining auth keys
+  authKeys.forEach((key) => {
+    if (localStorage.getItem(key)) {
+      remainingKeys.push(key);
+    }
+  });
 
   return {
     success: true,

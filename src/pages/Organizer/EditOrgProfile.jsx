@@ -14,6 +14,23 @@ import { toast } from 'react-toastify';
 import { useLoader } from '../../context/LoaderContext';
 import Error from '../common/Error';
 
+// Helper function to determine social media icon
+const getSocialIcon = (socialUrl) => {
+  const url = socialUrl.toLowerCase();
+  
+  if (url.includes('twitter') || url.includes('x.com')) {
+    return <Twitter size={16} className="text-gray-400" />;
+  } else if (url.includes('facebook')) {
+    return <Facebook size={16} className="text-gray-400" />;
+  } else if (url.includes('instagram')) {
+    return <Instagram size={16} className="text-gray-400" />;
+  } else if (url.includes('linkedin')) {
+    return <Linkedin size={16} className="text-gray-400" />;
+  } else {
+    return <Globe size={16} className="text-gray-400" />;
+  }
+};
+
 const EditOrgProfile = () => {
   const navigate = useNavigate();
   const [activeSection, setActiveSection] = useState('about');
@@ -80,20 +97,20 @@ const EditOrgProfile = () => {
     if (typeof loggedInUser === 'string') {
       try {
         const parsed = JSON.parse(loggedInUser);
-        
+
         // Check various possible locations of the ID
         if (typeof parsed === 'string' && /^[0-9a-fA-F]{24}$/.test(parsed)) {
           return parsed;
         }
-        
+
         if (parsed?._id && typeof parsed._id === 'string') {
           return parsed._id;
         }
-        
+
         if (parsed?.id && typeof parsed.id === 'string') {
           return parsed.id;
         }
-        
+
         if (parsed?._doc?._id && typeof parsed._doc._id === 'string') {
           return parsed._doc._id;
         }
@@ -105,16 +122,16 @@ const EditOrgProfile = () => {
         return null;
       }
     }
-    
+
     // If it's an object, try to extract ID directly
     if (loggedInUser?._id && typeof loggedInUser._id === 'string') {
       return loggedInUser._id;
     }
-    
+
     if (loggedInUser?.id && typeof loggedInUser.id === 'string') {
       return loggedInUser.id;
     }
-    
+
     if (loggedInUser?._doc?._id && typeof loggedInUser._doc._id === 'string') {
       return loggedInUser._doc._id;
     }
@@ -150,31 +167,37 @@ const EditOrgProfile = () => {
         const token = organizerData?.token || localStorage.getItem('organizer_token');
         const cleanToken = safelyParseToken(token);
 
-        const config = cleanToken ? {
+        if (!cleanToken) {
+          setError("Authentication failed. Please log in again.");
+          setLoading(false);
+          return;
+        }
+
+        const config = {
           headers: { Authorization: `Bearer ${cleanToken}` }
-        } : {};
+        };
 
         // First try to get detailed profile if available - use string ID
         try {
-          const detailsResponse = await axios.get(`${apiUrl}/organizer/${loggedInUserId}/details`, config);
+          const response = await axios.get(`${apiUrl}/organizer/${loggedInUserId}/details`, config);
 
-          if (detailsResponse.data) {
+          if (response.data) {
             // If basic user info is not included in details, fetch it separately
-            if (!detailsResponse.data.name || !detailsResponse.data.email) {
+            if (!response.data.name || !response.data.email) {
               const basicResponse = await axios.get(`${apiUrl}/organizer/profile/${loggedInUserId}`, config);
               const mergedData = {
                 ...basicResponse.data,
-                ...detailsResponse.data
+                ...response.data
               };
               setOriginalProfile(mergedData);
               setProfile(mergedData);
             } else {
-              setOriginalProfile(detailsResponse.data);
-              setProfile(detailsResponse.data);
+              setOriginalProfile(response.data);
+              setProfile(response.data);
             }
           }
         } catch (detailsErr) {
-          console.log("Error fetching organizer details:", detailsErr);
+          console.error("Error fetching organizer details:", detailsErr);
           // If detailed profile not found, fall back to basic profile
           const basicResponse = await axios.get(`${apiUrl}/organizer/profile/${loggedInUserId}`, config);
           setOriginalProfile(basicResponse.data);
@@ -184,8 +207,9 @@ const EditOrgProfile = () => {
         setIsLoaded(true);
         setLoading(false);
       } catch (err) {
-        console.error("Error fetching organizer profile:", err);
-        setError("Failed to load organizer profile: " + (err.response?.data?.message || err.message));
+        console.error("Error in fetchOrganizerProfile:", err);
+        setError("Failed to load profile data. Please try again.");
+      } finally {
         setLoading(false);
       }
     };
@@ -731,8 +755,8 @@ const EditOrgProfile = () => {
                 </div>
               </div>
             </section>
-      
-              
+
+
             {/* Testimonials Section */}
             <section
               className={`transition-all duration-700 transform ${activeSection === 'testimonials' ? 'translate-x-0 opacity-100' : 'translate-x-8 opacity-0 absolute pointer-events-none'}`}

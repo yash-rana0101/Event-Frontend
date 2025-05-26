@@ -14,8 +14,15 @@ import { IoIosAlert } from 'react-icons/io';
 import { MdMiscellaneousServices } from 'react-icons/md';
 import { PiRankingFill } from 'react-icons/pi';
 import { FaPhoneAlt } from 'react-icons/fa';
-import { NavLink, useNavigate } from 'react-router-dom';
+import { NavLink, useNavigate, Link } from 'react-router-dom';
 import { thoroughAuthCleanup } from '../../utils/persistFix';
+import {
+  LayoutDashboard,
+  Users,
+  Calendar,
+  FileText,
+  Settings
+} from 'lucide-react';
 
 export default function Header() {
   const [isScrolled, setIsScrolled] = React.useState(false);
@@ -66,60 +73,60 @@ export default function Header() {
       if (typeof currentOrganizer === 'string' && /^[0-9a-fA-F]{24}$/.test(currentOrganizer)) {
         return currentOrganizer;
       }
-      
+
       // If it's a JSON string
       if (typeof currentOrganizer === 'string') {
         try {
           const parsed = JSON.parse(currentOrganizer);
-          
+
           // Try different possible ID locations
           if (typeof parsed === 'string' && /^[0-9a-fA-F]{24}$/.test(parsed)) {
             return parsed;
           }
-          
+
           if (parsed?._id) return parsed._id;
           if (parsed?.id) return parsed.id;
           if (parsed?._doc?._id) return parsed._doc._id;
-          
+
           return null;
         } catch (e) {
           console.error('Error parsing organizer data:', e);
           return null;
         }
       }
-      
+
       // If it's an object
       return currentOrganizer._id || currentOrganizer.id || currentOrganizer?._doc?._id;
-    } 
-    
+    }
+
     // For regular user - same pattern
     else if (currentUser) {
       // If it's a string ID already
       if (typeof currentUser === 'string' && /^[0-9a-fA-F]{24}$/.test(currentUser)) {
         return currentUser;
       }
-      
+
       // If it's a JSON string
       if (typeof currentUser === 'string') {
         try {
           const parsed = JSON.parse(currentUser);
-          
+
           // Try different possible ID locations
           if (typeof parsed === 'string' && /^[0-9a-fA-F]{24}$/.test(parsed)) {
             return parsed;
           }
-          
+
           if (parsed?._id) return parsed._id;
           if (parsed?.id) return parsed.id;
           if (parsed?._doc?._id) return parsed._doc._id;
-          
+
           return null;
         } catch (e) {
           console.error('Error parsing user data:', e);
           return null;
         }
       }
-      
+
       // If it's an object
       return currentUser._id || currentUser.id || currentUser?._doc?._id;
     }
@@ -275,6 +282,248 @@ export default function Header() {
     );
   };
 
+  // Get user data from Redux store
+  const user = useSelector(state => state.auth?.user);
+  const organizer = useSelector(state => state.organizer?.user);
+
+  // Check if current user is admin
+  const isAdmin = user?.role === 'admin' || user?.isAdmin === true;
+
+  // Admin navigation items with icons
+  const adminNavItems = [
+    { name: 'Dashboard', href: '/admin/dashboard', icon: LayoutDashboard },
+    { name: 'organizer', href: '/admin/organizer', icon: Users },
+    { name: 'Events', href: '/admin/events', icon: Calendar },
+    { name: 'Settings', href: '/admin/settings', icon: Settings },
+  ];
+
+  // In your navigation rendering logic, add admin navigation check
+  const renderNavigation = () => {
+    // If user is admin, show admin navigation
+    if (isAdmin) {
+      return (
+        <nav className="hidden md:flex space-x-8">
+          {adminNavItems.map((item) => {
+            const IconComponent = item.icon;
+            return (
+              <Link
+                key={item.name}
+                to={item.href}
+                className="flex items-center space-x-2 text-gray-300 hover:text-cyan-400 transition-colors duration-200"
+              >
+                <IconComponent size={18} />
+                <span>{item.name}</span>
+              </Link>
+            );
+          })}
+        </nav>
+      );
+    }
+
+    // If organizer is logged in, show organizer navigation
+    if (organizer) {
+      return (
+        <nav className="hidden md:flex items-center space-x-1">
+          {profileLink ? (
+            <NavLink
+              to={profileLink}
+              className={({ isActive }) =>
+                `group relative px-4 py-2 rounded-lg transition-all duration-300 hover:cursor-pointer ${isActive
+                  ? "text-[#00D8FF]"
+                  : "text-gray-400 hover:text-white"
+                }`
+              }
+            >
+              <div className="flex items-center space-x-3">
+                <BsPersonCircle size={24} />
+                <span className="relative">
+                  Profile
+                  <span className="absolute -bottom-1 left-0 w-0 h-[2px] bg-[#00D8FF] group-hover:w-full transition-all duration-300" />
+                </span>
+              </div>
+              <div className="absolute inset-0 bg-[#00D8FF]/0 group-hover:bg-[#00D8FF]/10 rounded-lg transition-all duration-300" />
+            </NavLink>
+          ) : (
+            <button
+              onClick={() => navigate("/auth/login")}
+              className="group relative px-4 py-2 rounded-lg transition-all duration-300 hover:cursor-pointer text-gray-400 hover:text-white"
+            >
+              <div className="flex items-center space-x-3">
+                <BsPersonCircle size={24} />
+                <span className="relative">
+                  Profile
+                  <span className="absolute -bottom-1 left-0 w-0 h-[2px] bg-[#00D8FF] group-hover:w-full transition-all duration-300" />
+                </span>
+              </div>
+              <div className="absolute inset-0 bg-[#00D8FF]/0 group-hover:bg-[#00D8FF]/10 rounded-lg transition-all duration-300" />
+            </button>
+          )}
+
+          <NavLink
+            to={currentOrganizer ? "/organizer/dashboard" : "/user/dashboard"}
+            end
+            className={({ isActive }) =>
+              `group relative px-4 py-2 rounded-lg transition-all duration-300 ${isActive
+                ? "text-[#00D8FF]"
+                : "text-gray-400 hover:text-white"
+              }`
+            }
+          >
+            <div className="flex items-center space-x-3">
+              <BsGrid3X3Gap size={24} />
+              <span className="relative ">
+                {currentOrganizer ? "Dashboard" : "Dashboard"}
+                <span className="absolute -bottom-1 left-0 w-0 h-[2px] bg-[#00D8FF] group-hover:w-full transition-all duration-300" />
+              </span>
+            </div>
+            <div className="absolute inset-0 bg-[#00D8FF]/0 group-hover:bg-[#00D8FF]/10 rounded-lg transition-all duration-300" />
+          </NavLink>
+
+
+          {nav
+            .filter((item) => !item.guestOnly)
+            .map((item) => (
+              <NavLink
+                key={item.name}
+                to={item.link}
+                className={({ isActive }) =>
+                  `group relative px-4 py-2 rounded-lg transition-all duration-300 ${isActive
+                    ? "text-[#00D8FF]"
+                    : "text-gray-400 hover:text-white"
+                  }`
+                }
+              >
+                <div className="flex items-center space-x-3">
+                  <span className="flex items-center justify-center">
+                    {React.cloneElement(item.icon, { size: 24 })}
+                  </span>
+                  <span className="relative">
+                    {item.name}
+                    <span className="absolute -bottom-1 left-0 w-0 h-[2px] bg-[#00D8FF] group-hover:w-full transition-all duration-300" />
+                  </span>
+                </div>
+                <div className="absolute inset-0 bg-[#00D8FF]/0 group-hover:bg-[#00D8FF]/10 rounded-lg transition-all duration-300" />
+              </NavLink>
+            ))}
+        </nav>
+      );
+    }
+
+    // Default user navigation
+    return (
+      <nav className="hidden md:flex items-center space-x-1">
+        {activeUser ? (
+          <>
+            {/* Replace this NavLink */}
+            {profileLink ? (
+              <NavLink
+                to={profileLink}
+                className={({ isActive }) =>
+                  `group relative px-4 py-2 rounded-lg transition-all duration-300 hover:cursor-pointer ${isActive
+                    ? "text-[#00D8FF]"
+                    : "text-gray-400 hover:text-white"
+                  }`
+                }
+              >
+                <div className="flex items-center space-x-3">
+                  <BsPersonCircle size={24} />
+                  <span className="relative">
+                    Profile
+                    <span className="absolute -bottom-1 left-0 w-0 h-[2px] bg-[#00D8FF] group-hover:w-full transition-all duration-300" />
+                  </span>
+                </div>
+                <div className="absolute inset-0 bg-[#00D8FF]/0 group-hover:bg-[#00D8FF]/10 rounded-lg transition-all duration-300" />
+              </NavLink>
+            ) : (
+              <button
+                onClick={() => navigate("/auth/login")}
+                className="group relative px-4 py-2 rounded-lg transition-all duration-300 hover:cursor-pointer text-gray-400 hover:text-white"
+              >
+                <div className="flex items-center space-x-3">
+                  <BsPersonCircle size={24} />
+                  <span className="relative">
+                    Profile
+                    <span className="absolute -bottom-1 left-0 w-0 h-[2px] bg-[#00D8FF] group-hover:w-full transition-all duration-300" />
+                  </span>
+                </div>
+                <div className="absolute inset-0 bg-[#00D8FF]/0 group-hover:bg-[#00D8FF]/10 rounded-lg transition-all duration-300" />
+              </button>
+            )}
+
+            <NavLink
+              to={currentOrganizer ? "/organizer/dashboard" : "/user/dashboard"}
+              end
+              className={({ isActive }) =>
+                `group relative px-4 py-2 rounded-lg transition-all duration-300 ${isActive
+                  ? "text-[#00D8FF]"
+                  : "text-gray-400 hover:text-white"
+                }`
+              }
+            >
+              <div className="flex items-center space-x-3">
+                <BsGrid3X3Gap size={24} />
+                <span className="relative ">
+                  {currentOrganizer ? "Dashboard" : "Dashboard"}
+                  <span className="absolute -bottom-1 left-0 w-0 h-[2px] bg-[#00D8FF] group-hover:w-full transition-all duration-300" />
+                </span>
+              </div>
+              <div className="absolute inset-0 bg-[#00D8FF]/0 group-hover:bg-[#00D8FF]/10 rounded-lg transition-all duration-300" />
+            </NavLink>
+
+
+            {nav
+              .filter((item) => !item.guestOnly)
+              .map((item) => (
+                <NavLink
+                  key={item.name}
+                  to={item.link}
+                  className={({ isActive }) =>
+                    `group relative px-4 py-2 rounded-lg transition-all duration-300 ${isActive
+                      ? "text-[#00D8FF]"
+                      : "text-gray-400 hover:text-white"
+                    }`
+                  }
+                >
+                  <div className="flex items-center space-x-3">
+                    <span className="flex items-center justify-center">
+                      {React.cloneElement(item.icon, { size: 24 })}
+                    </span>
+                    <span className="relative">
+                      {item.name}
+                      <span className="absolute -bottom-1 left-0 w-0 h-[2px] bg-[#00D8FF] group-hover:w-full transition-all duration-300" />
+                    </span>
+                  </div>
+                  <div className="absolute inset-0 bg-[#00D8FF]/0 group-hover:bg-[#00D8FF]/10 rounded-lg transition-all duration-300" />
+                </NavLink>
+              ))}
+          </>
+        ) : (
+          nav.map((item) => (
+            <NavLink
+              key={item.name}
+              to={item.link}
+              className={({ isActive }) =>
+                `group relative px-4 py-2 rounded-lg transition-all duration-300 ${isActive
+                  ? "text-[#00D8FF]"
+                  : "text-gray-400 hover:text-white"
+                }`
+              }
+            >
+              <div className="flex items-center space-x-2">
+                {item.icon}
+                <span className="relative">
+                  {item.name}
+                  <span className="absolute -bottom-1 left-0 w-0 h-[2px] bg-[#00D8FF] group-hover:w-full transition-all duration-300" />
+                </span>
+              </div>
+              <div className="absolute inset-0 bg-[#00D8FF]/0 group-hover:bg-[#00D8FF]/5 rounded-lg transition-all duration-300" />
+            </NavLink>
+          ))
+        )}
+      </nav>
+    );
+  };
+
   return (
     <motion.div
       className={`sticky z-40 top-0 w-full h-20 md:px-10 px-4 ${isScrolled ? "bg-black" : "bg-transparent"}`}
@@ -305,116 +554,8 @@ export default function Header() {
           <div className="h-40 w-40 bg-[#00D8FF] overflow-hidden absolute top-0 -translate-y-1/2 right-0 translate-x-1/4 rounded-full opacity-45 blur-2xl"></div>
         </div>
 
-        <nav className="hidden md:flex items-center space-x-1">
-          {activeUser ? (
-            <>
-              {/* Replace this NavLink */}
-              {profileLink ? (
-                <NavLink
-                  to={profileLink}
-                  className={({ isActive }) =>
-                    `group relative px-4 py-2 rounded-lg transition-all duration-300 hover:cursor-pointer ${isActive
-                      ? "text-[#00D8FF]"
-                      : "text-gray-400 hover:text-white"
-                    }`
-                  }
-                >
-                  <div className="flex items-center space-x-3">
-                    <BsPersonCircle size={24} />
-                    <span className="relative">
-                      Profile
-                      <span className="absolute -bottom-1 left-0 w-0 h-[2px] bg-[#00D8FF] group-hover:w-full transition-all duration-300" />
-                    </span>
-                  </div>
-                  <div className="absolute inset-0 bg-[#00D8FF]/0 group-hover:bg-[#00D8FF]/10 rounded-lg transition-all duration-300" />
-                </NavLink>
-              ) : (
-                <button
-                  onClick={() => navigate("/auth/login")}
-                  className="group relative px-4 py-2 rounded-lg transition-all duration-300 hover:cursor-pointer text-gray-400 hover:text-white"
-                >
-                  <div className="flex items-center space-x-3">
-                    <BsPersonCircle size={24} />
-                    <span className="relative">
-                      Profile
-                      <span className="absolute -bottom-1 left-0 w-0 h-[2px] bg-[#00D8FF] group-hover:w-full transition-all duration-300" />
-                    </span>
-                  </div>
-                  <div className="absolute inset-0 bg-[#00D8FF]/0 group-hover:bg-[#00D8FF]/10 rounded-lg transition-all duration-300" />
-                </button>
-              )}
-
-              <NavLink
-                to={currentOrganizer ? "/organizer/dashboard" : "/user/dashboard"}
-                end
-                className={({ isActive }) =>
-                  `group relative px-4 py-2 rounded-lg transition-all duration-300 ${isActive
-                    ? "text-[#00D8FF]"
-                    : "text-gray-400 hover:text-white"
-                  }`
-                }
-              >
-                <div className="flex items-center space-x-3">
-                  <BsGrid3X3Gap size={24} />
-                  <span className="relative ">
-                    {currentOrganizer ? "Dashboard" : "Dashboard"}
-                    <span className="absolute -bottom-1 left-0 w-0 h-[2px] bg-[#00D8FF] group-hover:w-full transition-all duration-300" />
-                  </span>
-                </div>
-                <div className="absolute inset-0 bg-[#00D8FF]/0 group-hover:bg-[#00D8FF]/10 rounded-lg transition-all duration-300" />
-              </NavLink>
-
-
-              {nav
-                .filter((item) => !item.guestOnly)
-                .map((item) => (
-                  <NavLink
-                    key={item.name}
-                    to={item.link}
-                    className={({ isActive }) =>
-                      `group relative px-4 py-2 rounded-lg transition-all duration-300 ${isActive
-                        ? "text-[#00D8FF]"
-                        : "text-gray-400 hover:text-white"
-                      }`
-                    }
-                  >
-                    <div className="flex items-center space-x-3">
-                      <span className="flex items-center justify-center">
-                        {React.cloneElement(item.icon, { size: 24 })}
-                      </span>
-                      <span className="relative">
-                        {item.name}
-                        <span className="absolute -bottom-1 left-0 w-0 h-[2px] bg-[#00D8FF] group-hover:w-full transition-all duration-300" />
-                      </span>
-                    </div>
-                    <div className="absolute inset-0 bg-[#00D8FF]/0 group-hover:bg-[#00D8FF]/10 rounded-lg transition-all duration-300" />
-                  </NavLink>
-                ))}
-            </>
-          ) : (
-            nav.map((item) => (
-              <NavLink
-                key={item.name}
-                to={item.link}
-                className={({ isActive }) =>
-                  `group relative px-4 py-2 rounded-lg transition-all duration-300 ${isActive
-                    ? "text-[#00D8FF]"
-                    : "text-gray-400 hover:text-white"
-                  }`
-                }
-              >
-                <div className="flex items-center space-x-2">
-                  {item.icon}
-                  <span className="relative">
-                    {item.name}
-                    <span className="absolute -bottom-1 left-0 w-0 h-[2px] bg-[#00D8FF] group-hover:w-full transition-all duration-300" />
-                  </span>
-                </div>
-                <div className="absolute inset-0 bg-[#00D8FF]/0 group-hover:bg-[#00D8FF]/5 rounded-lg transition-all duration-300" />
-              </NavLink>
-            ))
-          )}
-        </nav>
+        {/* Navigation - Render based on user role */}
+        {renderNavigation()}
 
         <div className="flex items-center relative">
           {activeUser || hasValidAuthentication() ? (

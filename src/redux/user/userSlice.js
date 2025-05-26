@@ -1,7 +1,7 @@
 /* eslint-disable no-unused-vars */
 import { createSlice, createAsyncThunk } from "@reduxjs/toolkit";
 import axios from "axios";
-import  {safelyParseToken}  from "../../utils/persistFix";
+import { safelyParseToken } from "../../utils/persistFix";
 
 // Get API URL from environment or use default
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:3000/api/v1";
@@ -122,6 +122,12 @@ const authSlice = createSlice({
       if (state.user === "null") state.user = null;
       if (state.token === "null") state.token = null;
     },
+    setAdminStatus: (state, action) => {
+      if (state.user) {
+        state.user.isAdmin = action.payload;
+        state.user.role = action.payload ? "admin" : "user";
+      }
+    },
   },
   extraReducers: (builder) => {
     // Handle login actions
@@ -161,5 +167,5 @@ const authSlice = createSlice({
 });
 
 // Export actions and reducer
-export const { logout, fixNullValues } = authSlice.actions;
+export const { logout, fixNullValues, setAdminStatus } = authSlice.actions;
 export default authSlice.reducer;

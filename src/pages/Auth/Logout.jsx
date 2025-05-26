@@ -9,7 +9,7 @@ import { toast } from 'react-toastify';
 const Logout = () => {
   const navigate = useNavigate();
   const dispatch = useDispatch();
-  
+
   // Check what type of user is logged in
   const userToken = useSelector(state => state.auth?.token);
   const organizerToken = useSelector(state => state.organizer?.token);
@@ -17,25 +17,27 @@ const Logout = () => {
   useEffect(() => {
     const performLogout = () => {
       try {
-        // Use fullLogout utility to clean localStorage thoroughly
-        fullLogout();
-        
-        // Dispatch appropriate logout actions
-        if (userToken) {
-          dispatch(userLogout());
-          toast.success('You have been logged out from your user account');
-        }
-        
+        // Determine which type of logout to perform
+        let logoutMessage = '';
+
         if (organizerToken) {
+          // Organizer logout
+          fullLogout("organizer");
           dispatch(organizerLogout());
-          toast.success('You have been logged out from your organizer account');
+          logoutMessage = 'You have been logged out from your organizer account';
+        } else if (userToken) {
+          // User logout (including admin)
+          fullLogout("user");
+          dispatch(userLogout());
+          logoutMessage = 'You have been logged out from your account';
+        } else {
+          // No tokens found
+          fullLogout("all");
+          logoutMessage = 'You were already logged out';
         }
-        
-        // If no tokens found, show generic message
-        if (!userToken && !organizerToken) {
-          toast.info('You were already logged out');
-        }
-        
+
+        toast.success(logoutMessage);
+
         // Redirect to home page
         navigate('/', { replace: true });
       } catch (error) {

@@ -1,6 +1,7 @@
-import { Routes, Route, Navigate } from 'react-router-dom';
+import { Routes, Route, Navigate, Outlet } from 'react-router-dom';
 import Layout from '../layout/Layout';
 import AdminLayout from '../layout/AdminLayout';
+import OrganizerLayout from '../layout/OrganizerLayout'; // Import OrganizerLayout
 import Guard, { GUARD_TYPES } from '../routes/Guard';  // Fix import
 
 // Public Pages
@@ -15,6 +16,11 @@ import OrgRegister from '../pages/Auth/OrgRegister';
 import ForgotPassword from '../pages/Auth/ForgotPassword';
 import ResetPassword from '../pages/Auth/ResetPassword';
 import Logout from '../pages/Auth/Logout';
+
+// Admin Pages
+import AdminDashboard from '../pages/Admin/AdminDashboard';
+import OrganizerManagement from '../pages/Admin/OrganizerManagement';
+import EventManagement from '../pages/Admin/EventManagement';
 
 // Event Pages
 import Events from '../pages/Events/Events';
@@ -40,6 +46,7 @@ import UserProfile from '../pages/User/UserProfile';
 import EditUserProfile from '../pages/User/EditUserProfile';
 import CreateUserProfile from '../pages/User/CreateUserProfile';
 import OrganizerPublicProfile from '../pages/Organizer/organizerPublicProfile';
+import AdminSettings from '../pages/Admin/AdminSettings';
 
 function AppRoutes() {
   return (
@@ -70,7 +77,11 @@ function AppRoutes() {
         {/* User Protected Routes */}
         <Route path="user" element={
           <Guard type={GUARD_TYPES.USER}>
-            <AdminLayout />
+            <div className="min-h-screen bg-black">
+              <main className="w-full">
+                <Outlet />
+              </main>
+            </div>
           </Guard>
         }>
           <Route path="dashboard" element={<UserDashboard />} />
@@ -79,29 +90,39 @@ function AppRoutes() {
           <Route path="profile/create" element={<CreateUserProfile />} />
         </Route>
 
-        {/* Organizer Protected Routes */}
-        <Route path="organizer" element={
-          <Guard type={GUARD_TYPES.ORGANIZER}>
+        {/* Admin Protected Routes */}
+        <Route path="admin" element={
+          <Guard type="admin">
             <AdminLayout />
           </Guard>
         }>
-          <Route path="dashboard" element={<OrganizerDashboard />} />
-          <Route path="profile" element={<OrganizerProfile />} />
-          <Route path="profile/edit" element={<EditOrgProfile />} />
-          <Route path="details" element={<OrganizerDetails />} />
-          <Route path="events/list" element={<EventListPage />} />
-          <Route path="events/attendance/list" element={<Attendance />} />
-          <Route path="events/attendees/:eventId" element={<EventAttendees />} />
-          <Route path="events/report/:eventId" element={<ViewEventReport />} />
-          <Route path="events/report/list" element={<EventReport />} />
-          <Route path="event/edit/:eventId" element={<EditEvent />} />
-
-          {/* Legacy path support */}
-          <Route path="create" element={<CreateEvent />} />
+          <Route path="dashboard" element={<AdminDashboard />} />
+          <Route path="organizer" element={<OrganizerManagement />} />
+          <Route path="events" element={<EventManagement />} />
+          <Route path="settings" element={<AdminSettings />} />
         </Route>
 
         {/* Catch-all route */}
         <Route path="*" element={<Navigate to="/" replace />} />
+      </Route>
+
+      {/* Organizer Protected Routes - Outside of main Layout */}
+      <Route path="organizer" element={
+        <Guard type="organizer">
+          <OrganizerLayout />
+        </Guard>
+      }>
+        <Route path="dashboard" element={<OrganizerDashboard />} />
+        <Route path="profile" element={<OrganizerProfile />} />
+        <Route path="profile/edit" element={<EditOrgProfile />} />
+        <Route path="details" element={<OrganizerDetails />} />
+        <Route path="events/list" element={<EventListPage />} />
+        <Route path="events/attendance/list" element={<Attendance />} />
+        <Route path="events/attendees/:eventId" element={<EventAttendees />} />
+        <Route path="events/report/:eventId" element={<ViewEventReport />} />
+        <Route path="events/report/list" element={<EventReport />} />
+        <Route path="event/edit/:eventId" element={<EditEvent />} />
+        <Route path="create" element={<CreateEvent />} />
       </Route>
     </Routes>
   );

@@ -1,15 +1,49 @@
-  import axios from "axios";
+import axios from "axios";
 
-const API_URL = import.meta.env.VITE_API_URL;
-console.log("API_URL:", API_URL); // Add this line to verify the URL
+// Create axios instance
+export const api = axios.create({
+  baseURL: import.meta.env.VITE_API_URL || "http://localhost:5000/api",
+  timeout: 10000,
+  headers: {
+    "Content-Type": "application/json",
+  },
+});
 
-export const registerUser = (userData) =>
-  axios.post(`${API_URL}/users/register`, userData);
-export const loginUser = (userData) =>
-  axios.post(`${API_URL}/users/login`, userData);
+// Request interceptor to add auth token
+api.interceptors.request.use(
+  (config) => {
+    const token =
+      localStorage.getItem("token") || sessionStorage.getItem("token");
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
+    return config;
+  },
+  (error) => {
+    return Promise.reject(error);
+  }
+);
+
+// Response interceptor for error handling
+api.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (error.response?.status === 401) {
+      localStorage.removeItem("token");
+      sessionStorage.removeItem("token");
+      window.location.href = "/login";
+    }
+    return Promise.reject(error);
+  }
+);
+
+export const registerUser = (userData) => api.post(`/users/register`, userData);
+export const loginUser = (userData) => api.post(`/users/login`, userData);
 export const getUserProfile = (token) =>
-  axios.get(`${API_URL}/users/profile`, {
+  api.get(`/users/profile`, {
     headers: {
       Authorization: `Bearer ${token}`,
     },
   });
+
+export default api;

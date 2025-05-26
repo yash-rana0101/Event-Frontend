@@ -1,9 +1,9 @@
 import axios from "axios";
 
-// Create axios instance
-export const api = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || "http://localhost:5000/api",
-  timeout: 10000,
+const API_BASE_URL = import.meta.env.VITE_API_URL;
+
+const api = axios.create({
+  baseURL: API_BASE_URL,
   headers: {
     "Content-Type": "application/json",
   },
@@ -12,8 +12,7 @@ export const api = axios.create({
 // Request interceptor to add auth token
 api.interceptors.request.use(
   (config) => {
-    const token =
-      localStorage.getItem("token") || sessionStorage.getItem("token");
+    const token = localStorage.getItem("token");
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
@@ -45,5 +44,10 @@ export const getUserProfile = (token) =>
       Authorization: `Bearer ${token}`,
     },
   });
+// Add event details function for public and admin access
+// export const getEventDetails = (eventId, isAdmin = false) => {
+//   const endpoint = isAdmin ? `/admin/events/${eventId}` : `/events/${eventId}`;
+//   return api.get(endpoint);
+// };
 
 export default api;

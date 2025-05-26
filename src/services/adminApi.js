@@ -1,4 +1,4 @@
-import { api } from "./api";
+import api from "./api";
 
 export const admin = {
   // Get all settings (returns combined data) with better error handling

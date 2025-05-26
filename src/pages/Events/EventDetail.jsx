@@ -42,6 +42,11 @@ export default function EventDetail() {
   const organizer = useSelector(state => state.organizer?.user);
   const userToken = useSelector(state => state.auth?.token);
 
+  // Check if current user is admin or organizer
+  const isAdmin = user?.role === 'admin';
+  const isOrganizer = organizer?._id;
+  const currentUserId = user?._id || organizer?._id;
+
   const { setIsLoading } = useLoader();
 
   useEffect(() => {
@@ -60,11 +65,28 @@ export default function EventDetail() {
       }
 
       const apiUrl = import.meta.env.VITE_API_URL || "http://localhost:3000/api/v1";
-      const response = await axios.get(`${apiUrl}/events/${eventId}`);
-      setEvent(response.data);
+
+      // Choose appropriate endpoint based on user permissions
+      let eventEndpoint = `${apiUrl}/events/${eventId}`;
+      const headers = {};
+
+      // If user is admin or organizer, use admin endpoint to access unpublished events
+      if ((isAdmin || isOrganizer) && userToken) {
+        eventEndpoint = `${apiUrl}/admin/events/${eventId}`;
+        headers.Authorization = `Bearer ${userToken}`;
+      }
+
+      const response = await axios.get(eventEndpoint, { headers });
+      const eventData = response.data.data || response.data;
+
+      // Check if current user has permission to view unpublished event
+      if (!eventData.isPublished && !isAdmin && eventData.organizer !== currentUserId && eventData.organizerId !== currentUserId) {
+        throw new Error("This event is not published and you don't have permission to view it.");
+      }
+
+      setEvent(eventData);
 
       // Initialize social stats from backend or defaults
-      const eventData = response.data;
       setSocialStats({
         likes: eventData.socialStats?.likes || 0,
         comments: eventData.socialStats?.comments || 0,
@@ -95,8 +117,8 @@ export default function EventDetail() {
         setSimilarEvents([]);
       }
 
-      // Check if user has saved this event
-      if (user && userToken) {
+      // Check if user has saved this event (only for published events or authorized users)
+      if ((user || organizer) && userToken && (eventData.isPublished || isAdmin || eventData.organizer === currentUserId)) {
         try {
           const savedResponse = await axios.get(
             `${apiUrl}/profiles/me/saved-events`,
@@ -123,8 +145,8 @@ export default function EventDetail() {
         }
       }
 
-      // Check if user is registered for this event
-      if (user && userToken) {
+      // Check if user is registered for this event (only for published events or authorized users)
+      if ((user || organizer) && userToken && (eventData.isPublished || isAdmin || eventData.organizer === currentUserId)) {
         try {
           const registrationResponse = await axios.get(
             `${apiUrl}/registrations/check/${eventId}`,
@@ -428,11 +450,33 @@ export default function EventDetail() {
   };
 
   // Show error state
-  if (error || !event) {
+  if (error) {
+    return (
+      <div className="min-h-screen bg-gray-900 text-white flex items-center justify-center">
+        <div className="text-center">
+          <h1 className="text-2xl font-bold mb-4">Event Not Available</h1>
+          <p className="text-gray-400 mb-6">{error}</p>
+          <Link
+            to="/event"
+            className="bg-cyan-500 hover:bg-cyan-600 text-black px-6 py-2 rounded-lg font-medium transition-colors"
+          >
+            Browse Other Events
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
+  if (!event) {
     return (
       <Skeleton type="event-detail" />
     );
   }
+
+  // Check if event is unpublished and show admin/organizer notice
+  const isEventOwner = event.organizer === currentUserId || event.organizerId === currentUserId;
+  const canViewUnpublished = isAdmin || isEventOwner;
+  const showUnpublishedNotice = !event.isPublished && canViewUnpublished;
 
   // Format data for display, ensuring we have default values for missing properties
   const formattedEvent = {
@@ -448,7 +492,7 @@ export default function EventDetail() {
       : "Until seats last",
     image: event.image,
     organizer: event.organizerName,
-    organizerId: event.organizer?._id || event.organizer, // Ensure we get the ID properly
+    organizerId: event.organizer?._id || event.organizer,
     organizerLogo: event.organizerLogo || "https://placehold.co/80x80?text=Organizer",
     featured: event.featured || false,
     description: event.description || "No description provided for this event.",
@@ -470,13 +514,32 @@ export default function EventDetail() {
 
   return (
     <div className="min-h-screen text-white">
+      {/* Unpublished Event Notice */}
+      {showUnpublishedNotice && (
+        <div className="bg-yellow-500/10 border-l-4 border-yellow-500 p-4">
+          <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div className="flex items-center">
+              <AlertCircle className="text-yellow-500 mr-3" size={20} />
+              <div>
+                <p className="text-yellow-400 font-medium">
+                  {isAdmin ? "Admin Preview" : "Organizer Preview"} - This event is not published
+                </p>
+                <p className="text-yellow-300 text-sm">
+                  Only you can view this event. {isEventOwner ? "Publish it to make it visible to others." : ""}
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Hero Section */}
       <div className="relative">
         <div className="h-64 sm:h-80 md:h-96 lg:h-[400px] overflow-hidden">
           <img
             src={formattedEvent.image}
             alt={formattedEvent.title}
-            className="w-full h-full object-cover  transition-all duration-500"
+            className="w-full h-full object-cover transition-all duration-500"
           />
           <div className="absolute inset-0 bg-gradient-to-b from-black/10 via-black/10 to-black" />
         </div>
@@ -490,6 +553,11 @@ export default function EventDetail() {
                   {formattedEvent.featured && (
                     <span className="inline-block bg-cyan-400 text-gray-900 text-xs font-bold px-3 py-1 rounded-full mb-3">
                       FEATURED EVENT
+                    </span>
+                  )}
+                  {showUnpublishedNotice && (
+                    <span className="inline-block bg-yellow-500/20 text-yellow-400 text-xs font-bold px-3 py-1 rounded-full mb-3 ml-2">
+                      UNPUBLISHED
                     </span>
                   )}
                   <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-white">{formattedEvent.title}</h1>
@@ -512,7 +580,7 @@ export default function EventDetail() {
                     <FaArrowLeft size={14} className="text-cyan-500" />
                     <span className="relative">
                       <Link
-                        to={`/event`}
+                        to={isAdmin ? "/admin/events" : "/event"}
                         className="text-cyan-400 hover:text-cyan-300 transition-all duration-300 group"
                       >
                         Back
@@ -521,55 +589,8 @@ export default function EventDetail() {
                     </span>
                   </div>
 
-                  {showCancelWarning ? (
-                    <div className="mb-4 p-3 bg-red-900/30 border border-red-500/50 rounded-lg">
-                      <div className="flex items-start">
-                        <AlertCircle className="text-red-400 mr-2 shrink-0 mt-1" size={18} />
-                        <p className="text-sm text-red-100">
-                          Warning: Are you sure you want to cancel your registration for this event?
-                        </p>
-                      </div>
-
-                      <div className="flex gap-3 mt-3">
-                        <button
-                          onClick={() => setShowCancelWarning(false)}
-                          className="flex-1 py-2 px-4 bg-gray-700 text-gray-300 rounded-md text-sm transition-colors hover:bg-gray-600"
-                        >
-                          Keep Registration
-                        </button>
-                        <button
-                          onClick={handleRegister}
-                          className="flex-1 py-2 px-4 bg-red-500 text-white rounded-md text-sm transition-colors hover:bg-red-600"
-                        >
-                          Yes, Cancel
-                        </button>
-                      </div>
-                    </div>
-                  ) : showReregisterConfirm ? (
-                    <div className="mb-4 p-3 bg-cyan-900/30 border border-cyan-500/50 rounded-lg">
-                      <div className="flex items-start">
-                        <AlertCircle className="text-cyan-400 mr-2 shrink-0 mt-1" size={18} />
-                        <p className="text-sm text-cyan-100">
-                          You previously cancelled your registration. Would you like to register for this event again?
-                        </p>
-                      </div>
-
-                      <div className="flex gap-3 mt-3">
-                        <button
-                          onClick={() => setShowReregisterConfirm(false)}
-                          className="flex-1 py-2 px-4 bg-gray-700 text-gray-300 rounded-md text-sm transition-colors hover:bg-gray-600"
-                        >
-                          No, Cancel
-                        </button>
-                        <button
-                          onClick={handleRegister}
-                          className="flex-1 py-2 px-4 bg-cyan-500 text-white rounded-md text-sm transition-colors hover:bg-cyan-600"
-                        >
-                          Yes, Register Again
-                        </button>
-                      </div>
-                    </div>
-                  ) : (
+                  {/* Show registration button only for published events or disable for unpublished */}
+                  {!showUnpublishedNotice ? (
                     <button
                       onClick={handleRegister}
                       className={`
@@ -587,8 +608,11 @@ export default function EventDetail() {
                           ? "Register Again"
                           : "Register Now"}
                     </button>
+                  ) : (
+                    <div className="w-full px-6 py-3 rounded-lg font-semibold text-center bg-gray-600 text-gray-400 cursor-not-allowed">
+                      Registration Unavailable (Unpublished)
+                    </div>
                   )}
-
                 </div>
               </div>
             </div>
@@ -840,7 +864,7 @@ export default function EventDetail() {
 
             {activeTab === "sponsors" && (
               <div className="bg-gray-800 rounded-lg p-6 border border-gray-700">
-
+                <h2 className="text-xl font-semibold mb-6">Event Sponsors</h2>
                 {formattedEvent.sponsors.length > 0 ? (
                   <>
                     {/* Platinum Sponsors */}
@@ -943,88 +967,114 @@ export default function EventDetail() {
 
           {/* Sidebar */}
           <div className="lg:w-1/3 space-y-6">
-            {/* Registration Call to Action */}
+            {/* Registration Call to Action - Modified for unpublished events */}
             <div className="bg-gray-800 rounded-lg p-6 border border-gray-700">
-              <h2 className="text-xl font-semibold mb-4">Join the Event</h2>
-              <div className="bg-gray-700/50 rounded-lg p-4 border border-gray-600 mb-6">
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-gray-300">Registration Deadline:</span>
-                  <span className="text-cyan-400 font-medium">{formattedEvent.registrationDeadline}</span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-gray-300">Registration Fee:</span>
-                  <span className={`${event.isPaid ? "text-yellow-400" : "text-green-400"} font-medium`}>
-                    {event.isPaid ? `${event.price} ${event.currency || 'USD'}` : "Free"}
-                  </span>
-                </div>
-              </div>
+              <h2 className="text-xl font-semibold mb-4">
+                {showUnpublishedNotice ? "Event Status" : "Join the Event"}
+              </h2>
 
-              {showCancelWarning ? (
-                <div className="mb-4 p-3 bg-red-900/30 border border-red-500/50 rounded-lg">
-                  <div className="flex items-start">
-                    <AlertCircle className="text-red-400 mr-2 shrink-0 mt-1" size={18} />
-                    <p className="text-sm text-red-100">
-                      Warning: Are you sure you want to cancel your registration for this event?
-                    </p>
+              {showUnpublishedNotice ? (
+                <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-lg p-4 mb-4">
+                  <div className="flex items-center mb-2">
+                    <AlertCircle className="text-yellow-500 mr-2" size={16} />
+                    <span className="text-yellow-400 font-medium">Event Not Published</span>
                   </div>
-
-                  <div className="flex gap-3 mt-3">
-                    <button
-                      onClick={() => setShowCancelWarning(false)}
-                      className="flex-1 py-2 px-4 bg-gray-700 text-gray-300 rounded-md text-sm transition-colors hover:bg-gray-600"
+                  <p className="text-yellow-300 text-sm">
+                    This event is currently in draft mode and not visible to the public.
+                    {isEventOwner && " You can manage this event from your organizer dashboard."}
+                  </p>
+                  {isEventOwner && (
+                    <Link
+                      to="/organizer/events"
+                      className="inline-block mt-3 bg-yellow-500 hover:bg-yellow-600 text-black px-4 py-2 rounded-md text-sm font-medium transition-colors"
                     >
-                      Keep Registration
-                    </button>
-                    <button
-                      onClick={handleRegister}
-                      className="flex-1 py-2 px-4 bg-red-500 text-white rounded-md text-sm transition-colors hover:bg-red-600"
-                    >
-                      Yes, Cancel
-                    </button>
-                  </div>
-                </div>
-              ) : showReregisterConfirm ? (
-                <div className="mb-4 p-3 bg-cyan-900/30 border border-cyan-500/50 rounded-lg">
-                  <div className="flex items-start">
-                    <AlertCircle className="text-cyan-400 mr-2 shrink-0 mt-1" size={18} />
-                    <p className="text-sm text-cyan-100">
-                      You previously cancelled your registration. Would you like to register for this event again?
-                    </p>
-                  </div>
-
-                  <div className="flex gap-3 mt-3">
-                    <button
-                      onClick={() => setShowReregisterConfirm(false)}
-                      className="flex-1 py-2 px-4 bg-gray-700 text-gray-300 rounded-md text-sm transition-colors hover:bg-gray-600"
-                    >
-                      No, Cancel
-                    </button>
-                    <button
-                      onClick={handleRegister}
-                      className="flex-1 py-2 px-4 bg-cyan-500 text-white rounded-md text-sm transition-colors hover:bg-cyan-600"
-                    >
-                      Yes, Register Again
-                    </button>
-                  </div>
+                      Manage Event
+                    </Link>
+                  )}
                 </div>
               ) : (
-                <button
-                  onClick={handleRegister}
-                  className={`
-                    w-full px-6 py-3 rounded-lg font-semibold text-center transition-all duration-300 cursor-pointer 
-                    ${isRegistered
-                      ? "bg-red-500/80 hover:bg-red-600 text-white border border-red-400/50"
-                      : wasRegistered
-                        ? "bg-cyan-500/80 hover:bg-cyan-600 text-white border border-cyan-400/50"
-                        : "bg-cyan-400 hover:bg-black hover:text-cyan-500 text-gray-900 hover:border"}
+                <>
+                  <div className="bg-gray-700/50 rounded-lg p-4 border border-gray-600 mb-6">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-gray-300">Registration Deadline:</span>
+                      <span className="text-cyan-400 font-medium">{formattedEvent.registrationDeadline}</span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-gray-300">Registration Fee:</span>
+                      <span className={`${event.isPaid ? "text-yellow-400" : "text-green-400"} font-medium`}>
+                        {event.isPaid ? `${event.price} ${event.currency || 'USD'}` : "Free"}
+                      </span>
+                    </div>
+                  </div>
+
+                  {showCancelWarning ? (
+                    <div className="mb-4 p-3 bg-red-900/30 border border-red-500/50 rounded-lg">
+                      <div className="flex items-start">
+                        <AlertCircle className="text-red-400 mr-2 shrink-0 mt-1" size={18} />
+                        <p className="text-sm text-red-100">
+                          Warning: Are you sure you want to cancel your registration for this event?
+                        </p>
+                      </div>
+
+                      <div className="flex gap-3 mt-3">
+                        <button
+                          onClick={() => setShowCancelWarning(false)}
+                          className="flex-1 py-2 px-4 bg-gray-700 text-gray-300 rounded-md text-sm transition-colors hover:bg-gray-600"
+                        >
+                          Keep Registration
+                        </button>
+                        <button
+                          onClick={handleRegister}
+                          className="flex-1 py-2 px-4 bg-red-500 text-white rounded-md text-sm transition-colors hover:bg-red-600"
+                        >
+                          Yes, Cancel
+                        </button>
+                      </div>
+                    </div>
+                  ) : showReregisterConfirm ? (
+                    <div className="mb-4 p-3 bg-cyan-900/30 border border-cyan-500/50 rounded-lg">
+                      <div className="flex items-start">
+                        <AlertCircle className="text-cyan-400 mr-2 shrink-0 mt-1" size={18} />
+                        <p className="text-sm text-cyan-100">
+                          You previously cancelled your registration. Would you like to register for this event again?
+                        </p>
+                      </div>
+
+                      <div className="flex gap-3 mt-3">
+                        <button
+                          onClick={() => setShowReregisterConfirm(false)}
+                          className="flex-1 py-2 px-4 bg-gray-700 text-gray-300 rounded-md text-sm transition-colors hover:bg-gray-600"
+                        >
+                          No, Cancel
+                        </button>
+                        <button
+                          onClick={handleRegister}
+                          className="flex-1 py-2 px-4 bg-cyan-500 text-white rounded-md text-sm transition-colors hover:bg-cyan-600"
+                        >
+                          Yes, Register Again
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <button
+                      onClick={handleRegister}
+                      className={`
+                        w-full px-6 py-3 rounded-lg font-semibold text-center transition-all duration-300 cursor-pointer 
+                        ${isRegistered
+                          ? "bg-red-500/80 hover:bg-red-600 text-white border border-red-400/50"
+                          : wasRegistered
+                            ? "bg-cyan-500/80 hover:bg-cyan-600 text-white border border-cyan-400/50"
+                            : "bg-cyan-400 hover:bg-black hover:text-cyan-500 text-gray-900 hover:border"}
                   `}
-                >
-                  {isRegistered
-                    ? "Cancel Registration"
-                    : wasRegistered
-                      ? "Register Again"
-                      : "Register Now"}
-                </button>
+                    >
+                      {isRegistered
+                        ? "Cancel Registration"
+                        : wasRegistered
+                          ? "Register Again"
+                          : "Register Now"}
+                    </button>
+                  )}
+                </>
               )}
 
               {isRegistered && !showCancelWarning && (

@@ -8,6 +8,9 @@ import {
   CheckCircle, XCircle, Settings, Share2, BarChart3, Heart,
   MessageSquare, Flag, Award, TrendingUp, Image as ImageIcon
 } from 'lucide-react';
+import adminService from '../../services/adminService';
+import { toast } from 'react-toastify';
+import { useNavigate } from 'react-router-dom';
 
 export default function EventManagement() {
   const [searchQuery, setSearchQuery] = useState('');
@@ -18,136 +21,63 @@ export default function EventManagement() {
   const [actionType, setActionType] = useState('');
   const [selectedEvent, setSelectedEvent] = useState(null);
   const [currentPage, setCurrentPage] = useState(1);
-  const [viewMode, setViewMode] = useState('grid'); // 'grid' or 'list'
+  const [viewMode, setViewMode] = useState('grid');
+  const [loading, setLoading] = useState(false);
+  const [events, setEvents] = useState([]);
+  const [pagination, setPagination] = useState({});
+  const [stats, setStats] = useState({
+    totalEvents: 0,
+    publishedEvents: 0,
+    draftEvents: 0,
+    totalRevenue: 0,
+  });
   const itemsPerPage = 12;
+  const navigate = useNavigate();
 
-  // Mock data - replace with actual API calls
-  const [events, setEvents] = useState([
-    {
-      id: 1,
-      title: 'AI Tech Summit 2024',
-      description: 'The biggest AI technology conference of the year featuring industry leaders and cutting-edge innovations.',
-      organizer: 'TechCorp Inc.',
-      organizerId: 1,
-      category: 'Technology',
-      status: 'draft',
-      publishStatus: 'unpublished',
-      startDate: '2024-03-15',
-      endDate: '2024-03-17',
-      startTime: '09:00',
-      endTime: '18:00',
-      location: 'San Francisco Convention Center',
-      city: 'San Francisco',
-      country: 'USA',
-      ticketPrice: 299,
-      capacity: 2500,
-      registeredCount: 0,
-      revenue: '$0',
-      rating: 0,
-      reviewsCount: 0,
-      likesCount: 0,
-      sharesCount: 0,
-      image: '/api/placeholder/400/250',
-      tags: ['AI', 'Technology', 'Conference', 'Innovation'],
-      createdAt: '2024-01-10',
-      lastModified: '2024-01-15',
-      featured: false,
-      trending: false
-    },
-    {
-      id: 2,
-      title: 'Global Music Festival',
-      description: 'A three-day music extravaganza featuring top artists from around the world.',
-      organizer: 'SoundWave Entertainment',
-      organizerId: 2,
-      category: 'Music',
-      status: 'published',
-      publishStatus: 'published',
-      startDate: '2024-04-20',
-      endDate: '2024-04-22',
-      startTime: '14:00',
-      endTime: '23:00',
-      location: 'Central Park',
-      city: 'New York',
-      country: 'USA',
-      ticketPrice: 150,
-      capacity: 50000,
-      registeredCount: 32500,
-      revenue: '$4,875,000',
-      rating: 4.8,
-      reviewsCount: 1250,
-      likesCount: 8900,
-      sharesCount: 2300,
-      image: '/api/placeholder/400/250',
-      tags: ['Music', 'Festival', 'Entertainment', 'Live'],
-      createdAt: '2024-01-05',
-      lastModified: '2024-02-10',
-      featured: true,
-      trending: true
-    },
-    {
-      id: 3,
-      title: 'Business Leadership Conference',
-      description: 'Annual conference for business leaders and entrepreneurs to network and learn.',
-      organizer: 'Business Leaders Inc.',
-      organizerId: 3,
-      category: 'Business',
-      status: 'published',
-      publishStatus: 'published',
-      startDate: '2024-05-10',
-      endDate: '2024-05-12',
-      startTime: '08:00',
-      endTime: '17:00',
-      location: 'Grand Hotel Convention Center',
-      city: 'Chicago',
-      country: 'USA',
-      ticketPrice: 450,
-      capacity: 1000,
-      registeredCount: 890,
-      revenue: '$400,500',
-      rating: 4.6,
-      reviewsCount: 340,
-      likesCount: 1200,
-      sharesCount: 450,
-      image: '/api/placeholder/400/250',
-      tags: ['Business', 'Leadership', 'Networking', 'Conference'],
-      createdAt: '2024-02-01',
-      lastModified: '2024-02-20',
-      featured: false,
-      trending: false
-    },
-    {
-      id: 4,
-      title: 'Gaming Championship 2024',
-      description: 'The ultimate esports tournament with the biggest prizes in gaming history.',
-      organizer: 'GameMasters Pro',
-      organizerId: 4,
-      category: 'Gaming',
-      status: 'suspended',
-      publishStatus: 'suspended',
-      startDate: '2024-06-01',
-      endDate: '2024-06-03',
-      startTime: '10:00',
-      endTime: '22:00',
-      location: 'Gaming Arena',
-      city: 'Los Angeles',
-      country: 'USA',
-      ticketPrice: 75,
-      capacity: 15000,
-      registeredCount: 8500,
-      revenue: '$637,500',
-      rating: 4.2,
-      reviewsCount: 680,
-      likesCount: 5600,
-      sharesCount: 1800,
-      image: '/api/placeholder/400/250',
-      tags: ['Gaming', 'Esports', 'Tournament', 'Competition'],
-      createdAt: '2024-01-20',
-      lastModified: '2024-02-25',
-      featured: true,
-      trending: false
+  // Fetch events data
+  const fetchEvents = async () => {
+    try {
+      setLoading(true);
+      const params = {
+        page: currentPage,
+        limit: itemsPerPage,
+        search: searchQuery,
+        status: filterStatus,
+        category: filterCategory,
+      };
+
+      const response = await adminService.getAllEvents(params);
+
+      if (response.success) {
+        setEvents(response.data.events);
+        setPagination(response.data.pagination);
+        setStats(response.data.stats);
+      }
+    } catch (error) {
+      console.error('Error fetching events:', error);
+      toast.error('Failed to fetch events');
+    } finally {
+      setLoading(false);
     }
-  ]);
+  };
+
+  // Fetch events on component mount and when filters change
+  useEffect(() => {
+    fetchEvents();
+  }, [currentPage, searchQuery, filterStatus, filterCategory]);
+
+  // Debounce search
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (currentPage !== 1) {
+        setCurrentPage(1);
+      } else {
+        fetchEvents();
+      }
+    }, 500);
+
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
 
   const getStatusColor = (status) => {
     switch (status) {
@@ -177,89 +107,81 @@ export default function EventManagement() {
     setShowActionModal(true);
   };
 
-  const confirmAction = () => {
-    if (selectedEvent && actionType) {
-      switch (actionType) {
-        case 'publish':
-          setEvents(prev => prev.map(event =>
-            event.id === selectedEvent.id
-              ? { ...event, status: 'published', publishStatus: 'published' }
-              : event
-          ));
-          break;
-        case 'unpublish':
-          setEvents(prev => prev.map(event =>
-            event.id === selectedEvent.id
-              ? { ...event, status: 'draft', publishStatus: 'unpublished' }
-              : event
-          ));
-          break;
-        case 'suspend':
-          setEvents(prev => prev.map(event =>
-            event.id === selectedEvent.id
-              ? { ...event, status: 'suspended', publishStatus: 'suspended' }
-              : event
-          ));
-          break;
-        case 'feature':
-          setEvents(prev => prev.map(event =>
-            event.id === selectedEvent.id
-              ? { ...event, featured: !event.featured }
-              : event
-          ));
-          break;
-        case 'delete':
-          setEvents(prev => prev.filter(event => event.id !== selectedEvent.id));
-          break;
-        default:
-          break;
+  const confirmAction = async () => {
+    if (!selectedEvent || !actionType) return;
+
+    try {
+      setLoading(true);
+
+      if (actionType === 'delete') {
+        await adminService.deleteEvent(selectedEvent.id);
+        toast.success('Event deleted successfully');
+      } else {
+        await adminService.updateEventStatus(selectedEvent.id, actionType);
+        toast.success(`Event ${actionType}ed successfully`);
       }
+
+      // Refresh the events list
+      await fetchEvents();
+
+    } catch (error) {
+      console.error(`Error ${actionType}ing event:`, error);
+      toast.error(`Failed to ${actionType} event`);
+    } finally {
+      setLoading(false);
+      setShowActionModal(false);
+      setSelectedEvent(null);
+      setActionType('');
     }
-    setShowActionModal(false);
-    setSelectedEvent(null);
-    setActionType('');
   };
 
-  const filteredEvents = events.filter(event => {
-    const matchesSearch = event.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      event.organizer.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      event.category.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesStatus = filterStatus === 'all' || event.status === filterStatus;
-    const matchesCategory = filterCategory === 'all' || event.category.toLowerCase() === filterCategory.toLowerCase();
-    return matchesSearch && matchesStatus && matchesCategory;
-  });
+  const handleViewEvent = async (event) => {
+    try {
+      const response = await adminService.getEventDetails(event.id);
+      if (response.success) {
+        // You can open a modal or navigate to a detailed view
+        console.log('Event details:', response.data);
+        toast.success('Event details loaded');
+        // navigate(`event/${event.id}`);
+      }
+    } catch (error) {
+      console.error('Error fetching event details:', error);
+      toast.error('Failed to load event details');
+    }
+  };
 
-  const totalPages = Math.ceil(filteredEvents.length / itemsPerPage);
-  const paginatedEvents = filteredEvents.slice(
-    (currentPage - 1) * itemsPerPage,
-    currentPage * itemsPerPage
-  );
+  
 
-  const stats = [
+  const handleRefresh = () => {
+    fetchEvents();
+    toast.success('Events refreshed');
+  };
+
+  const statsData = [
     {
       label: 'Total Events',
-      value: events.length,
+      value: stats.totalEvents,
       icon: Calendar,
       color: 'from-cyan-500 to-blue-600',
       change: '+12%'
     },
     {
       label: 'Published Events',
-      value: events.filter(e => e.status === 'published').length,
+      value: stats.publishedEvents,
       icon: Globe,
       color: 'from-green-500 to-emerald-600',
       change: '+8%'
     },
     {
       label: 'Draft Events',
-      value: events.filter(e => e.status === 'draft').length,
+      value: stats.draftEvents,
       icon: Clock,
       color: 'from-yellow-500 to-orange-600',
       change: '+15%'
     },
     {
       label: 'Total Revenue',
-      value: '$5.9M',
+      value: `$${(stats.totalRevenue / 1000000).toFixed(1)}M`,
       icon: DollarSign,
       color: 'from-purple-500 to-pink-600',
       change: '+23%'
@@ -293,7 +215,7 @@ export default function EventManagement() {
 
         {/* Stats Cards */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 mb-8">
-          {stats.map((stat, index) => (
+          {statsData.map((stat, index) => (
             <motion.div
               key={stat.label}
               initial={{ opacity: 0, y: 20 }}
@@ -374,8 +296,8 @@ export default function EventManagement() {
                   whileTap={{ scale: 0.95 }}
                   onClick={() => setViewMode('grid')}
                   className={`p-2.5 rounded-lg transition-colors ${viewMode === 'grid'
-                      ? 'bg-cyan-500/20 text-cyan-400'
-                      : 'text-gray-400 hover:text-white'
+                    ? 'bg-cyan-500/20 text-cyan-400'
+                    : 'text-gray-400 hover:text-white'
                     }`}
                 >
                   <BarChart3 className="w-4 h-4" />
@@ -385,8 +307,8 @@ export default function EventManagement() {
                   whileTap={{ scale: 0.95 }}
                   onClick={() => setViewMode('list')}
                   className={`p-2.5 rounded-lg transition-colors ${viewMode === 'list'
-                      ? 'bg-cyan-500/20 text-cyan-400'
-                      : 'text-gray-400 hover:text-white'
+                    ? 'bg-cyan-500/20 text-cyan-400'
+                    : 'text-gray-400 hover:text-white'
                     }`}
                 >
                   <Filter className="w-4 h-4" />
@@ -396,9 +318,11 @@ export default function EventManagement() {
               <motion.button
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
-                className="p-2.5 rounded-lg bg-gray-800/60 text-gray-400 hover:text-cyan-400 transition-colors border border-gray-700/50"
+                onClick={handleRefresh}
+                disabled={loading}
+                className="p-2.5 rounded-lg bg-gray-800/60 text-gray-400 hover:text-cyan-400 transition-colors border border-gray-700/50 disabled:opacity-50"
               >
-                <RefreshCw className="w-4 h-4" />
+                <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
               </motion.button>
               <motion.button
                 whileHover={{ scale: 1.05 }}
@@ -411,296 +335,305 @@ export default function EventManagement() {
           </div>
         </div>
 
+        {/* Loading State */}
+        {loading && (
+          <div className="flex justify-center items-center py-12">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-cyan-400"></div>
+          </div>
+        )}
+
         {/* Events Grid/List */}
-        <div className="bg-gradient-to-br from-gray-900/80 to-gray-800/60 backdrop-blur-xl rounded-xl sm:rounded-2xl border border-gray-700/50 overflow-hidden">
-          {viewMode === 'grid' ? (
-            /* Grid View */
-            <div className="p-4 sm:p-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 sm:gap-6">
-                {paginatedEvents.map((event, index) => {
-                  const StatusIcon = getStatusIcon(event.status);
-                  return (
-                    <motion.div
-                      key={event.id}
-                      initial={{ opacity: 0, y: 20 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ delay: index * 0.1 }}
-                      className="bg-gray-800/50 rounded-xl border border-gray-700/50 overflow-hidden hover:border-cyan-500/30 transition-all duration-300 group"
-                    >
-                      {/* Event Image */}
-                      <div className="relative h-48 bg-gradient-to-br from-cyan-500/20 to-blue-500/20 flex items-center justify-center">
-                        <ImageIcon className="w-16 h-16 text-gray-600" />
-                        {event.featured && (
-                          <div className="absolute top-3 left-3 px-2 py-1 bg-yellow-500/20 text-yellow-400 rounded-full text-xs font-medium border border-yellow-500/30">
-                            Featured
-                          </div>
-                        )}
-                        {event.trending && (
-                          <div className="absolute top-3 right-3 px-2 py-1 bg-red-500/20 text-red-400 rounded-full text-xs font-medium border border-red-500/30">
-                            Trending
-                          </div>
-                        )}
-                        <div className={`absolute bottom-3 left-3 inline-flex items-center space-x-2 px-3 py-1.5 rounded-full text-xs font-medium border ${getStatusColor(event.status)}`}>
-                          <StatusIcon className="w-3 h-3" />
-                          <span className="capitalize">{event.status}</span>
-                        </div>
-                      </div>
-
-                      {/* Event Content */}
-                      <div className="p-4">
-                        <div className="flex items-start justify-between mb-3">
-                          <div className="flex-1 min-w-0">
-                            <h3 className="text-white font-bold text-lg truncate mb-1">{event.title}</h3>
-                            <p className="text-gray-400 text-sm truncate">{event.organizer}</p>
-                          </div>
-                          <div className="flex items-center space-x-1 ml-2">
-                            <Star className="w-4 h-4 text-yellow-400 fill-current" />
-                            <span className="text-white text-sm">{event.rating || 'N/A'}</span>
-                          </div>
-                        </div>
-
-                        <p className="text-gray-400 text-sm mb-3 line-clamp-2">{event.description}</p>
-
-                        <div className="space-y-2 mb-4">
-                          <div className="flex items-center space-x-2 text-sm">
-                            <Calendar className="w-4 h-4 text-cyan-400" />
-                            <span className="text-gray-300">{event.startDate} - {event.endDate}</span>
-                          </div>
-                          <div className="flex items-center space-x-2 text-sm">
-                            <MapPin className="w-4 h-4 text-cyan-400" />
-                            <span className="text-gray-300 truncate">{event.location}</span>
-                          </div>
-                          <div className="flex items-center space-x-2 text-sm">
-                            <Users className="w-4 h-4 text-cyan-400" />
-                            <span className="text-gray-300">{event.registeredCount}/{event.capacity}</span>
-                          </div>
-                        </div>
-
-                        <div className="flex items-center justify-between pt-3 border-t border-gray-700/50">
-                          <div className="flex items-center space-x-3">
-                            <div className="flex items-center space-x-1">
-                              <Heart className="w-4 h-4 text-gray-400" />
-                              <span className="text-gray-400 text-xs">{event.likesCount}</span>
-                            </div>
-                            <div className="flex items-center space-x-1">
-                              <MessageSquare className="w-4 h-4 text-gray-400" />
-                              <span className="text-gray-400 text-xs">{event.reviewsCount}</span>
-                            </div>
-                          </div>
-
-                          <div className="flex items-center space-x-1">
-                            <motion.button
-                              whileHover={{ scale: 1.1 }}
-                              whileTap={{ scale: 0.9 }}
-                              onClick={() => handleAction(event, 'view')}
-                              className="p-1.5 rounded-lg bg-cyan-500/20 text-cyan-400 hover:bg-cyan-500/30 transition-colors"
-                              title="View Details"
-                            >
-                              <Eye className="w-4 h-4" />
-                            </motion.button>
-
-                            {event.status === 'draft' && (
-                              <motion.button
-                                whileHover={{ scale: 1.1 }}
-                                whileTap={{ scale: 0.9 }}
-                                onClick={() => handleAction(event, 'publish')}
-                                className="p-1.5 rounded-lg bg-green-500/20 text-green-400 hover:bg-green-500/30 transition-colors"
-                                title="Publish Event"
-                              >
-                                <Globe className="w-4 h-4" />
-                              </motion.button>
-                            )}
-
-                            {event.status === 'published' && (
-                              <motion.button
-                                whileHover={{ scale: 1.1 }}
-                                whileTap={{ scale: 0.9 }}
-                                onClick={() => handleAction(event, 'suspend')}
-                                className="p-1.5 rounded-lg bg-orange-500/20 text-orange-400 hover:bg-orange-500/30 transition-colors"
-                                title="Suspend Event"
-                              >
-                                <Pause className="w-4 h-4" />
-                              </motion.button>
-                            )}
-
-                            <motion.button
-                              whileHover={{ scale: 1.1 }}
-                              whileTap={{ scale: 0.9 }}
-                              onClick={() => handleAction(event, 'feature')}
-                              className={`p-1.5 rounded-lg transition-colors ${event.featured
-                                  ? 'bg-yellow-500/20 text-yellow-400 hover:bg-yellow-500/30'
-                                  : 'bg-gray-500/20 text-gray-400 hover:bg-gray-500/30'
-                                }`}
-                              title={event.featured ? 'Remove from Featured' : 'Add to Featured'}
-                            >
-                              <Award className="w-4 h-4" />
-                            </motion.button>
-
-                            <motion.button
-                              whileHover={{ scale: 1.1 }}
-                              whileTap={{ scale: 0.9 }}
-                              onClick={() => handleAction(event, 'delete')}
-                              className="p-1.5 rounded-lg bg-red-500/20 text-red-400 hover:bg-red-500/30 transition-colors"
-                              title="Delete Event"
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </motion.button>
-                          </div>
-                        </div>
-                      </div>
-                    </motion.div>
-                  );
-                })}
-              </div>
-            </div>
-          ) : (
-            /* List View */
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead className="bg-gray-800/50 border-b border-gray-700/50">
-                  <tr>
-                    <th className="px-6 py-4 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Event</th>
-                    <th className="px-6 py-4 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Status</th>
-                    <th className="px-6 py-4 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Date</th>
-                    <th className="px-6 py-4 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Location</th>
-                    <th className="px-6 py-4 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Attendees</th>
-                    <th className="px-6 py-4 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Revenue</th>
-                    <th className="px-6 py-4 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-700/50">
-                  {paginatedEvents.map((event, index) => {
+        {!loading && (
+          <div className="bg-gradient-to-br from-gray-900/80 to-gray-800/60 backdrop-blur-xl rounded-xl sm:rounded-2xl border border-gray-700/50 overflow-hidden">
+            {viewMode === 'grid' ? (
+              /* Grid View */
+              <div className="p-4 sm:p-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 sm:gap-6">
+                  {events.map((event, index) => {
                     const StatusIcon = getStatusIcon(event.status);
                     return (
-                      <motion.tr
+                      <motion.div
                         key={event.id}
-                        initial={{ opacity: 0, y: 10 }}
+                        initial={{ opacity: 0, y: 20 }}
                         animate={{ opacity: 1, y: 0 }}
-                        transition={{ delay: index * 0.05 }}
-                        className="hover:bg-gray-800/30 transition-colors"
+                        transition={{ delay: index * 0.1 }}
+                        className="bg-gray-800/50 rounded-xl border border-gray-700/50 overflow-hidden hover:border-cyan-500/30 transition-all duration-300 group"
                       >
-                        <td className="px-6 py-4">
-                          <div className="flex items-center space-x-3">
-                            <div className="w-12 h-12 bg-gradient-to-br from-cyan-500/20 to-blue-500/20 rounded-lg flex items-center justify-center">
-                              <Calendar className="w-6 h-6 text-cyan-400" />
+                        {/* Event Image */}
+                        <div className="relative h-48 bg-gradient-to-br from-cyan-500/20 to-blue-500/20 flex items-center justify-center">
+                          <ImageIcon className="w-16 h-16 text-gray-600" />
+                          {event.featured && (
+                            <div className="absolute top-3 left-3 px-2 py-1 bg-yellow-500/20 text-yellow-400 rounded-full text-xs font-medium border border-yellow-500/30">
+                              Featured
                             </div>
-                            <div>
-                              <div className="text-white font-medium">{event.title}</div>
-                              <div className="text-gray-400 text-sm">{event.organizer}</div>
+                          )}
+                          {event.trending && (
+                            <div className="absolute top-3 right-3 px-2 py-1 bg-red-500/20 text-red-400 rounded-full text-xs font-medium border border-red-500/30">
+                              Trending
                             </div>
-                          </div>
-                        </td>
-                        <td className="px-6 py-4">
-                          <div className={`inline-flex items-center space-x-2 px-3 py-1.5 rounded-full text-xs font-medium border ${getStatusColor(event.status)}`}>
+                          )}
+                          <div className={`absolute bottom-3 left-3 inline-flex items-center space-x-2 px-3 py-1.5 rounded-full text-xs font-medium border ${getStatusColor(event.status)}`}>
                             <StatusIcon className="w-3 h-3" />
                             <span className="capitalize">{event.status}</span>
                           </div>
-                        </td>
-                        <td className="px-6 py-4 text-gray-300">{event.startDate}</td>
-                        <td className="px-6 py-4 text-gray-300">{event.city}</td>
-                        <td className="px-6 py-4 text-white font-medium">{event.registeredCount}/{event.capacity}</td>
-                        <td className="px-6 py-4 text-cyan-400 font-medium">{event.revenue}</td>
-                        <td className="px-6 py-4">
-                          <div className="flex items-center space-x-2">
-                            <motion.button
-                              whileHover={{ scale: 1.1 }}
-                              whileTap={{ scale: 0.9 }}
-                              onClick={() => handleAction(event, 'view')}
-                              className="p-1.5 rounded-lg bg-cyan-500/20 text-cyan-400 hover:bg-cyan-500/30 transition-colors"
-                              title="View Details"
-                            >
-                              <Eye className="w-4 h-4" />
-                            </motion.button>
+                        </div>
 
-                            {event.status === 'draft' && (
-                              <motion.button
-                                whileHover={{ scale: 1.1 }}
-                                whileTap={{ scale: 0.9 }}
-                                onClick={() => handleAction(event, 'publish')}
-                                className="p-1.5 rounded-lg bg-green-500/20 text-green-400 hover:bg-green-500/30 transition-colors"
-                                title="Publish Event"
-                              >
-                                <Globe className="w-4 h-4" />
-                              </motion.button>
-                            )}
-
-                            {event.status === 'published' && (
-                              <motion.button
-                                whileHover={{ scale: 1.1 }}
-                                whileTap={{ scale: 0.9 }}
-                                onClick={() => handleAction(event, 'suspend')}
-                                className="p-1.5 rounded-lg bg-orange-500/20 text-orange-400 hover:bg-orange-500/30 transition-colors"
-                                title="Suspend Event"
-                              >
-                                <Pause className="w-4 h-4" />
-                              </motion.button>
-                            )}
-
-                            <motion.button
-                              whileHover={{ scale: 1.1 }}
-                              whileTap={{ scale: 0.9 }}
-                              onClick={() => handleAction(event, 'delete')}
-                              className="p-1.5 rounded-lg bg-red-500/20 text-red-400 hover:bg-red-500/30 transition-colors"
-                              title="Delete Event"
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </motion.button>
+                        {/* Event Content */}
+                        <div className="p-4">
+                          <div className="flex items-start justify-between mb-3">
+                            <div className="flex-1 min-w-0">
+                              <h3 className="text-white font-bold text-lg truncate mb-1">{event.title}</h3>
+                              <p className="text-gray-400 text-sm truncate">{event.organizer}</p>
+                            </div>
+                            <div className="flex items-center space-x-1 ml-2">
+                              <Star className="w-4 h-4 text-yellow-400 fill-current" />
+                              <span className="text-white text-sm">{event.rating || 'N/A'}</span>
+                            </div>
                           </div>
-                        </td>
-                      </motion.tr>
+
+                          <p className="text-gray-400 text-sm mb-3 line-clamp-2">{event.description}</p>
+
+                          <div className="space-y-2 mb-4">
+                            <div className="flex items-center space-x-2 text-sm">
+                              <Calendar className="w-4 h-4 text-cyan-400" />
+                              <span className="text-gray-300">{event.startDate} - {event.endDate}</span>
+                            </div>
+                            <div className="flex items-center space-x-2 text-sm">
+                              <MapPin className="w-4 h-4 text-cyan-400" />
+                              <span className="text-gray-300 truncate">{event.location}</span>
+                            </div>
+                            <div className="flex items-center space-x-2 text-sm">
+                              <Users className="w-4 h-4 text-cyan-400" />
+                              <span className="text-gray-300">{event.registeredCount}/{event.capacity}</span>
+                            </div>
+                          </div>
+
+                          <div className="flex items-center justify-between pt-3 border-t border-gray-700/50">
+                            <div className="flex items-center space-x-3">
+                              <div className="flex items-center space-x-1">
+                                <Heart className="w-4 h-4 text-gray-400" />
+                                <span className="text-gray-400 text-xs">{event.likesCount}</span>
+                              </div>
+                              <div className="flex items-center space-x-1">
+                                <MessageSquare className="w-4 h-4 text-gray-400" />
+                                <span className="text-gray-400 text-xs">{event.reviewsCount}</span>
+                              </div>
+                            </div>
+
+                            <div className="flex items-center space-x-1">
+                              <motion.button
+                                whileHover={{ scale: 1.1 }}
+                                whileTap={{ scale: 0.9 }}
+                                onClick={() => navigate(`/event/${event.id}`)}
+                                className="p-1.5 rounded-lg bg-cyan-500/20 text-cyan-400 hover:bg-cyan-500/30 transition-colors"
+                                title="View Details"
+                              >
+                                <Eye className="w-4 h-4" />
+                              </motion.button>
+
+                              {event.status === 'draft' && (
+                                <motion.button
+                                  whileHover={{ scale: 1.1 }}
+                                  whileTap={{ scale: 0.9 }}
+                                  onClick={() => handleAction(event, 'publish')}
+                                  className="p-1.5 rounded-lg bg-green-500/20 text-green-400 hover:bg-green-500/30 transition-colors"
+                                  title="Publish Event"
+                                >
+                                  <Globe className="w-4 h-4" />
+                                </motion.button>
+                              )}
+
+                              {event.status === 'published' && (
+                                <motion.button
+                                  whileHover={{ scale: 1.1 }}
+                                  whileTap={{ scale: 0.9 }}
+                                  onClick={() => handleAction(event, 'suspend')}
+                                  className="p-1.5 rounded-lg bg-orange-500/20 text-orange-400 hover:bg-orange-500/30 transition-colors"
+                                  title="Suspend Event"
+                                >
+                                  <Pause className="w-4 h-4" />
+                                </motion.button>
+                              )}
+
+                              <motion.button
+                                whileHover={{ scale: 1.1 }}
+                                whileTap={{ scale: 0.9 }}
+                                onClick={() => handleAction(event, 'feature')}
+                                className={`p-1.5 rounded-lg transition-colors ${event.featured
+                                  ? 'bg-yellow-500/20 text-yellow-400 hover:bg-yellow-500/30'
+                                  : 'bg-gray-500/20 text-gray-400 hover:bg-gray-500/30'
+                                  }`}
+                                title={event.featured ? 'Remove from Featured' : 'Add to Featured'}
+                              >
+                                <Award className="w-4 h-4" />
+                              </motion.button>
+
+                              <motion.button
+                                whileHover={{ scale: 1.1 }}
+                                whileTap={{ scale: 0.9 }}
+                                onClick={() => handleAction(event, 'delete')}
+                                className="p-1.5 rounded-lg bg-red-500/20 text-red-400 hover:bg-red-500/30 transition-colors"
+                                title="Delete Event"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </motion.button>
+                            </div>
+                          </div>
+                        </div>
+                      </motion.div>
                     );
                   })}
-                </tbody>
-              </table>
-            </div>
-          )}
-
-          {/* Pagination */}
-          {totalPages > 1 && (
-            <div className="px-6 py-4 border-t border-gray-700/50 flex flex-col sm:flex-row items-center justify-between gap-4">
-              <div className="text-gray-400 text-sm">
-                Showing {((currentPage - 1) * itemsPerPage) + 1} to {Math.min(currentPage * itemsPerPage, filteredEvents.length)} of {filteredEvents.length} events
+                </div>
               </div>
-              <div className="flex items-center space-x-2">
-                <motion.button
-                  whileHover={{ scale: 1.05 }}
-                  whileTap={{ scale: 0.95 }}
-                  onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
-                  disabled={currentPage === 1}
-                  className="px-3 py-2 rounded-lg bg-gray-800/60 text-gray-400 hover:text-white disabled:opacity-50 disabled:cursor-not-allowed transition-colors border border-gray-700/50"
-                >
-                  Previous
-                </motion.button>
-                {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
-                  const page = i + 1;
-                  return (
-                    <motion.button
-                      key={page}
-                      whileHover={{ scale: 1.05 }}
-                      whileTap={{ scale: 0.95 }}
-                      onClick={() => setCurrentPage(page)}
-                      className={`px-3 py-2 rounded-lg transition-colors border ${currentPage === page
+            ) : (
+              /* List View */
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead className="bg-gray-800/50 border-b border-gray-700/50">
+                    <tr>
+                      <th className="px-6 py-4 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Event</th>
+                      <th className="px-6 py-4 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Status</th>
+                      <th className="px-6 py-4 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Date</th>
+                      <th className="px-6 py-4 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Location</th>
+                      <th className="px-6 py-4 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Attendees</th>
+                      <th className="px-6 py-4 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Revenue</th>
+                      <th className="px-6 py-4 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-700/50">
+                    {events.map((event, index) => {
+                      const StatusIcon = getStatusIcon(event.status);
+                      return (
+                        <motion.tr
+                          key={event.id}
+                          initial={{ opacity: 0, y: 10 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          transition={{ delay: index * 0.05 }}
+                          className="hover:bg-gray-800/30 transition-colors"
+                        >
+                          <td className="px-6 py-4">
+                            <div className="flex items-center space-x-3">
+                              <div className="w-12 h-12 bg-gradient-to-br from-cyan-500/20 to-blue-500/20 rounded-lg flex items-center justify-center">
+                                <Calendar className="w-6 h-6 text-cyan-400" />
+                              </div>
+                              <div>
+                                <div className="text-white font-medium">{event.title}</div>
+                                <div className="text-gray-400 text-sm">{event.organizer}</div>
+                              </div>
+                            </div>
+                          </td>
+                          <td className="px-6 py-4">
+                            <div className={`inline-flex items-center space-x-2 px-3 py-1.5 rounded-full text-xs font-medium border ${getStatusColor(event.status)}`}>
+                              <StatusIcon className="w-3 h-3" />
+                              <span className="capitalize">{event.status}</span>
+                            </div>
+                          </td>
+                          <td className="px-6 py-4 text-gray-300">{event.startDate}</td>
+                          <td className="px-6 py-4 text-gray-300">{event.city}</td>
+                          <td className="px-6 py-4 text-white font-medium">{event.registeredCount}/{event.capacity}</td>
+                          <td className="px-6 py-4 text-cyan-400 font-medium">{event.revenue}</td>
+                          <td className="px-6 py-4">
+                            <div className="flex items-center space-x-2">
+                              <motion.button
+                                whileHover={{ scale: 1.1 }}
+                                whileTap={{ scale: 0.9 }}
+                                onClick={() => handleViewEvent(event)}
+                                className="p-1.5 rounded-lg bg-cyan-500/20 text-cyan-400 hover:bg-cyan-500/30 transition-colors"
+                                title="View Details"
+                              >
+                                <Eye className="w-4 h-4" />
+                              </motion.button>
+
+                              {event.status === 'draft' && (
+                                <motion.button
+                                  whileHover={{ scale: 1.1 }}
+                                  whileTap={{ scale: 0.9 }}
+                                  onClick={() => handleAction(event, 'publish')}
+                                  className="p-1.5 rounded-lg bg-green-500/20 text-green-400 hover:bg-green-500/30 transition-colors"
+                                  title="Publish Event"
+                                >
+                                  <Globe className="w-4 h-4" />
+                                </motion.button>
+                              )}
+
+                              {event.status === 'published' && (
+                                <motion.button
+                                  whileHover={{ scale: 1.1 }}
+                                  whileTap={{ scale: 0.9 }}
+                                  onClick={() => handleAction(event, 'suspend')}
+                                  className="p-1.5 rounded-lg bg-orange-500/20 text-orange-400 hover:bg-orange-500/30 transition-colors"
+                                  title="Suspend Event"
+                                >
+                                  <Pause className="w-4 h-4" />
+                                </motion.button>
+                              )}
+
+                              <motion.button
+                                whileHover={{ scale: 1.1 }}
+                                whileTap={{ scale: 0.9 }}
+                                onClick={() => handleAction(event, 'delete')}
+                                className="p-1.5 rounded-lg bg-red-500/20 text-red-400 hover:bg-red-500/30 transition-colors"
+                                title="Delete Event"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </motion.button>
+                            </div>
+                          </td>
+                        </motion.tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+
+            {/* Pagination */}
+            {pagination.pages > 1 && (
+              <div className="px-6 py-4 border-t border-gray-700/50 flex flex-col sm:flex-row items-center justify-between gap-4">
+                <div className="text-gray-400 text-sm">
+                  Showing {((pagination.page - 1) * pagination.limit) + 1} to {Math.min(pagination.page * pagination.limit, pagination.total)} of {pagination.total} events
+                </div>
+                <div className="flex items-center space-x-2">
+                  <motion.button
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
+                    onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                    disabled={pagination.page === 1}
+                    className="px-3 py-2 rounded-lg bg-gray-800/60 text-gray-400 hover:text-white disabled:opacity-50 disabled:cursor-not-allowed transition-colors border border-gray-700/50"
+                  >
+                    Previous
+                  </motion.button>
+                  {Array.from({ length: Math.min(5, pagination.pages) }, (_, i) => {
+                    const page = i + 1;
+                    return (
+                      <motion.button
+                        key={page}
+                        whileHover={{ scale: 1.05 }}
+                        whileTap={{ scale: 0.95 }}
+                        onClick={() => setCurrentPage(page)}
+                        className={`px-3 py-2 rounded-lg transition-colors border ${pagination.page === page
                           ? 'bg-cyan-500/20 text-cyan-400 border-cyan-500/30'
                           : 'bg-gray-800/60 text-gray-400 hover:text-white border-gray-700/50'
-                        }`}
-                    >
-                      {page}
-                    </motion.button>
-                  );
-                })}
-                <motion.button
-                  whileHover={{ scale: 1.05 }}
-                  whileTap={{ scale: 0.95 }}
-                  onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
-                  disabled={currentPage === totalPages}
-                  className="px-3 py-2 rounded-lg bg-gray-800/60 text-gray-400 hover:text-white disabled:opacity-50 disabled:cursor-not-allowed transition-colors border border-gray-700/50"
-                >
-                  Next
-                </motion.button>
+                          }`}
+                      >
+                        {page}
+                      </motion.button>
+                    );
+                  })}
+                  <motion.button
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
+                    onClick={() => setCurrentPage(prev => Math.min(pagination.pages, prev + 1))}
+                    disabled={pagination.page === pagination.pages}
+                    className="px-3 py-2 rounded-lg bg-gray-800/60 text-gray-400 hover:text-white disabled:opacity-50 disabled:cursor-not-allowed transition-colors border border-gray-700/50"
+                  >
+                    Next
+                  </motion.button>
+                </div>
               </div>
-            </div>
-          )}
-        </div>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Action Modal */}
@@ -734,14 +667,15 @@ export default function EventManagement() {
                   whileHover={{ scale: 1.05 }}
                   whileTap={{ scale: 0.95 }}
                   onClick={confirmAction}
-                  className={`flex-1 px-4 py-2 rounded-lg font-medium transition-colors ${actionType === 'delete'
-                      ? 'bg-red-500/20 text-red-400 hover:bg-red-500/30 border border-red-500/30'
-                      : actionType === 'publish'
-                        ? 'bg-green-500/20 text-green-400 hover:bg-green-500/30 border border-green-500/30'
-                        : 'bg-cyan-500/20 text-cyan-400 hover:bg-cyan-500/30 border border-cyan-500/30'
+                  disabled={loading}
+                  className={`flex-1 px-4 py-2 rounded-lg font-medium transition-colors disabled:opacity-50 ${actionType === 'delete'
+                    ? 'bg-red-500/20 text-red-400 hover:bg-red-500/30 border border-red-500/30'
+                    : actionType === 'publish'
+                      ? 'bg-green-500/20 text-green-400 hover:bg-green-500/30 border border-green-500/30'
+                      : 'bg-cyan-500/20 text-cyan-400 hover:bg-cyan-500/30 border border-cyan-500/30'
                     }`}
                 >
-                  Confirm
+                  {loading ? 'Processing...' : 'Confirm'}
                 </motion.button>
               </div>
             </motion.div>

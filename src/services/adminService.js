@@ -1,12 +1,11 @@
 import axios from "axios";
 import { safelyParseToken } from "../utils/persistFix";
 
-const API_URL = import.meta.env.VITE_API_URL || "http://localhost:3000/api/v1";
+const API_URL = import.meta.env.VITE_API_URL;
 
 // Get auth headers
 const getAuthHeaders = () => {
-  const token =
-    localStorage.getItem("token");
+  const token = localStorage.getItem("token");
   const cleanToken = safelyParseToken(token);
 
   return {
@@ -64,6 +63,91 @@ export const organizerService = {
   },
 };
 
-export default {
-  organizer: organizerService,
+// Event Management Services
+export const eventService = {
+  // Get all events with filtering and pagination
+  getAllEvents: async (params = {}) => {
+    const queryParams = new URLSearchParams();
+
+    Object.keys(params).forEach((key) => {
+      if (
+        params[key] !== undefined &&
+        params[key] !== null &&
+        params[key] !== ""
+      ) {
+        queryParams.append(key, params[key]);
+      }
+    });
+
+    const response = await axios.get(
+      `${API_URL}/admin/events?${queryParams.toString()}`,
+      {
+        headers: getAuthHeaders(),
+      }
+    );
+    return response.data;
+  },
+
+  // Get event details - updated to return proper format
+  getEventDetails: async (eventId) => {
+    const response = await axios.get(`${API_URL}/admin/events/${eventId}`, {
+      headers: getAuthHeaders(),
+    });
+    return response.data;
+  },
+
+  // Update event status
+  updateEventStatus: async (eventId, action, reason = "") => {
+    const response = await axios.put(
+      `${API_URL}/admin/events/${eventId}/status`,
+      {
+        action,
+        reason,
+      },
+      {
+        headers: getAuthHeaders(),
+      }
+    );
+    return response.data;
+  },
+
+  // Delete event
+  deleteEvent: async (eventId, reason = "") => {
+    const response = await axios.delete(`${API_URL}/admin/events/${eventId}`, {
+      data: { reason },
+      headers: getAuthHeaders(),
+    });
+    return response.data;
+  },
+
+  // Dashboard data
+  getDashboardData: async () => {
+    const response = await axios.get(`${API_URL}/admin/dashboard`, {
+      headers: getAuthHeaders(),
+    });
+    return response.data;
+  },
 };
+
+// Create a unified admin service object
+const adminService = {
+  // Organizer methods
+  getAllOrganizers: organizerService.getAllOrganizers,
+  getOrganizerStats: organizerService.getOrganizerStats,
+  getOrganizerById: organizerService.getOrganizerById,
+  updateOrganizerStatus: organizerService.updateOrganizerStatus,
+  deleteOrganizer: organizerService.deleteOrganizer,
+
+  // Event methods
+  getAllEvents: eventService.getAllEvents,
+  getEventDetails: eventService.getEventDetails,
+  updateEventStatus: eventService.updateEventStatus,
+  deleteEvent: eventService.deleteEvent,
+  getDashboardData: eventService.getDashboardData,
+
+  // Keep the nested structure for backwards compatibility
+  organizer: organizerService,
+  event: eventService,
+};
+
+export default adminService;

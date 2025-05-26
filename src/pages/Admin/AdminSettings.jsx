@@ -88,8 +88,7 @@ export default function AdminSettings() {
         profileRes,
         systemRes,
         notificationRes,
-        appearanceRes,
-        apiRes,
+        
         backupRes
       ] = await Promise.all([
         adminApi.getProfile(),

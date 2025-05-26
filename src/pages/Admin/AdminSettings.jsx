@@ -77,7 +77,7 @@ export default function AdminSettings() {
   });
 
   const [apiSettings, setApiSettings] = useState({
-    apiKey: 'sk_live_xxxxxxxxxxxxxxxxxxxxxxxx',
+    apiKey: 'api_key_placeholder_replace_with_actual_key',
     webhookUrl: 'https://api.eventsystem.com/webhooks',
     rateLimit: 1000,
     apiVersion: 'v1',
@@ -114,7 +114,7 @@ export default function AdminSettings() {
   };
 
   const generateApiKey = () => {
-    const newKey = 'sk_live_' + Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+    const newKey = 'api_key_' + Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
     setApiSettings(prev => ({ ...prev, apiKey: newKey }));
   };
 
@@ -994,8 +994,8 @@ export default function AdminSettings() {
                     key={tab.id}
                     onClick={() => setActiveTab(tab.id)}
                     className={`w-full flex items-center space-x-3 px-4 py-3 rounded-xl transition-all duration-300 text-left ${activeTab === tab.id
-                        ? 'bg-cyan-500/20 text-cyan-400 border border-cyan-500/30'
-                        : 'text-gray-400 hover:text-white hover:bg-gray-700/30'
+                      ? 'bg-cyan-500/20 text-cyan-400 border border-cyan-500/30'
+                      : 'text-gray-400 hover:text-white hover:bg-gray-700/30'
                       }`}
                     whileHover={{ x: activeTab === tab.id ? 0 : 4 }}
                     whileTap={{ scale: 0.98 }}
@@ -1030,10 +1030,10 @@ export default function AdminSettings() {
                 onClick={handleSave}
                 disabled={isLoading}
                 className={`px-8 py-3 rounded-xl font-medium transition-all duration-300 ${isLoading
-                    ? 'bg-gray-700/50 text-gray-400 cursor-not-allowed'
-                    : saveSuccess
-                      ? 'bg-green-500/20 text-green-400 border border-green-500/30'
-                      : 'bg-cyan-500/20 text-cyan-400 hover:bg-cyan-500/30 border border-cyan-500/30'
+                  ? 'bg-gray-700/50 text-gray-400 cursor-not-allowed'
+                  : saveSuccess
+                    ? 'bg-green-500/20 text-green-400 border border-green-500/30'
+                    : 'bg-cyan-500/20 text-cyan-400 hover:bg-cyan-500/30 border border-cyan-500/30'
                   }`}
                 whileHover={!isLoading ? { scale: 1.05 } : {}}
                 whileTap={!isLoading ? { scale: 0.95 } : {}}

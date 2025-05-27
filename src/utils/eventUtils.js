@@ -39,20 +39,6 @@ export const getEventStatus = (startDate, endDate) => {
 };
 
 /**
- * Get random placeholder image for events
- * @returns {string} URL of a random placeholder image
- */
-export const getRandomEventImage = () => {
-  const images = [
-    "https://images.unsplash.com/photo-1540575467063-178a50c2df87?q=80&w=2070&auto=format&fit=crop&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D",
-    "https://images.unsplash.com/photo-1523580494863-6f3031224c94?q=80&w=2070&auto=format&fit=crop&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D",
-    "https://images.unsplash.com/photo-1464047736614-af63643285bf?q=80&w=1974&auto=format&fit=crop&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D",
-    "https://images.unsplash.com/photo-1505373877841-8d25f7d46678?q=80&w=2012&auto=format&fit=crop&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D",
-  ];
-  return images[Math.floor(Math.random() * images.length)];
-};
-
-/**
  * Get status badge color based on event status
  * @param {string} status - Event status: 'upcoming', 'ongoing', or 'past'
  * @returns {string} CSS classes for the badge
@@ -60,12 +46,12 @@ export const getRandomEventImage = () => {
 export const getStatusColor = (status) => {
   switch (status) {
     case "upcoming":
-      return "bg-cyan-900/30 text-cyan-400 border-cyan-600/30";
+      return "bg-gray-900 text-cyan-400 border-cyan-600/30";
     case "ongoing":
-      return "bg-green-900/30 text-green-400 border-green-600/30";
+      return "bg-green-900 text-green-400 border-green-600/30";
     case "past":
-      return "bg-gray-800/50 text-gray-400 border-gray-600/30";
+      return "bg-gray-800 text-gray-400 border-gray-600/30";
     default:
-      return "bg-gray-800/50 text-gray-400 border-gray-600/30";
+      return "bg-gray-800 text-gray-400 border-gray-600/30";
   }
 };

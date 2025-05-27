@@ -20,7 +20,7 @@ const EventCard = ({ event, handleViewAttendees }) => {
           className="w-full h-full object-cover transition-transform duration-700 hover:scale-110"
         />
         <div className="absolute top-3 right-3 z-20">
-          <span className={`px-3 py-1 rounded-full text-xs font-medium border ${getStatusColor(event.status)}`}>
+          <span className={`px-3 py-1 rounded-full  text-xs font-medium border border- ${getStatusColor(event.status)}`}>
             {event.status.charAt(0).toUpperCase() + event.status.slice(1)}
           </span>
         </div>

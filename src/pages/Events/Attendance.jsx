@@ -82,7 +82,7 @@ export default function Attendance() {
         return;
       }
 
-      const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000/api/v1';
+      const apiUrl = import.meta.env.VITE_API_URL;
 
       // Try to get events organized by this organizer
       const organizerId = getUserIdFromToken(token);
@@ -116,7 +116,7 @@ export default function Attendance() {
         attendees: event.attendeesCount || 0,
         capacity: event.capacity || 'Unlimited',
         status: getEventStatus(event.startDate || event.date, event.endDate),
-        image: event.images?.[0] || getRandomEventImage()
+        image: event.image
       }));
 
       setEvents(formattedEvents);

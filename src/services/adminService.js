@@ -3,9 +3,18 @@ import { safelyParseToken } from "../utils/persistFix";
 
 const API_URL = import.meta.env.VITE_API_URL;
 
-// Get auth headers
+// Add request caching
+let dashboardCache = null;
+let dashboardCacheTime = null;
+const CACHE_DURATION = 30000; // 30 seconds
+
+// Get auth headers with better token handling
 const getAuthHeaders = () => {
-  const token = localStorage.getItem("token");
+  const token =
+    localStorage.getItem("token") ||
+    localStorage.getItem("persist:auth")?.replace(/"/g, "") ||
+    safelyParseToken(localStorage.getItem("token"));
+
   const cleanToken = safelyParseToken(token);
 
   return {
@@ -131,6 +140,44 @@ export const eventService = {
 
 // Create a unified admin service object
 const adminService = {
+  // Dashboard methods with caching
+  getDashboardStats: async () => {
+    // Check cache first
+    if (
+      dashboardCache &&
+      dashboardCacheTime &&
+      Date.now() - dashboardCacheTime < CACHE_DURATION
+    ) {
+      return dashboardCache;
+    }
+
+    const response = await axios.get(`${API_URL}/admin/dashboard`, {
+      headers: getAuthHeaders(),
+    });
+
+    // Update cache
+    dashboardCache = response.data;
+    dashboardCacheTime = Date.now();
+
+    return response.data;
+  },
+
+  getAnalytics: async (timeRange = "30d") => {
+    const response = await axios.get(
+      `${API_URL}/admin/analytics?timeRange=${timeRange}`,
+      {
+        headers: getAuthHeaders(),
+      }
+    );
+    return response.data;
+  },
+
+  // Clear cache method
+  clearCache: () => {
+    dashboardCache = null;
+    dashboardCacheTime = null;
+  },
+
   // Organizer methods
   getAllOrganizers: organizerService.getAllOrganizers,
   getOrganizerStats: organizerService.getOrganizerStats,

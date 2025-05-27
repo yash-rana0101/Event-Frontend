@@ -10,7 +10,7 @@ export default function EventCarousel({ carouselEvents = [] }) {
   const [isPaused, setIsPaused] = useState(false);
   const [loading, setLoading] = useState(false);
   const autoSlideTimerRef = useRef(null);
-  
+
   // Auto-slide interval in milliseconds
   const autoSlideInterval = 5000;
 
@@ -30,13 +30,17 @@ export default function EventCarousel({ carouselEvents = [] }) {
       const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000/api/v1';
       // Make sure the API URL is properly formatted
       const baseUrl = apiUrl.endsWith('/api/v1') ? apiUrl : `${apiUrl}/api/v1`;
-      
-      console.log('Fetching newest events from:', `${baseUrl}/events/newest`);
-      
-      const response = await axios.get(`${baseUrl}/events/newest`, {
-        params: { limit: 5 }
+
+      console.log('Fetching newest events from:', `${baseUrl}/events`);
+
+      const response = await axios.get(`${baseUrl}/events`, {
+        params: {
+          limit: 5,
+          sort: '-createdAt',
+          featured: 'true'
+        }
       });
-      
+
       // Determine the data structure and extract events
       let fetchedEvents = [];
       if (Array.isArray(response.data)) {
@@ -46,7 +50,7 @@ export default function EventCarousel({ carouselEvents = [] }) {
       } else if (response.data.data && Array.isArray(response.data.data)) {
         fetchedEvents = response.data.data;
       }
-      
+
       processEvents(fetchedEvents);
     } catch (error) {
       console.error('Error fetching carousel events:', error);
@@ -61,20 +65,29 @@ export default function EventCarousel({ carouselEvents = [] }) {
       setEvents([]);
       return;
     }
-    
+
+    console.log('Raw events received:', rawEvents); // Debug log
+
     // Format events to ensure consistent structure
-    const formattedEvents = rawEvents.map(event => ({
-      id: event.id || event._id,
-      title: event.title || "Unnamed Event",
-      date: event.date || new Date(event.startDate || event.createdAt || Date.now()).toLocaleDateString(),
-      image: event.image || event.images?.[0] || 'https://placehold.co/600x400?text=No+Image',
-      location: typeof event.location === 'object' 
-        ? (event.location.address || event.location.city || 'No location specified')
-        : (event.location || 'No location specified'),
-      category: event.category || 'Event',
-      description: event.description ? (event.description.substring(0, 100) + '...') : 'No description available',
-    }));
-    
+    const formattedEvents = rawEvents.map(event => {
+      console.log('Processing event:', event.title, 'Image:', event.image); // Debug log
+
+      return {
+        id: event.id || event._id,
+        title: event.title || "Unnamed Event",
+        date: event.date || new Date(event.startDate || event.createdAt || Date.now()).toLocaleDateString(),
+        image: event.image || 'https://placehold.co/600x400?text=No+Image',
+        location: typeof event.location === 'object'
+          ? (event.location.address || event.location.city || 'No location specified')
+          : (event.location || 'No location specified'),
+        category: event.category || 'Event',
+        description: event.description && event.description.length > 100
+          ? (event.description.substring(0, 100) + '...')
+          : (event.description || 'No description available'),
+      };
+    });
+
+    console.log('Formatted events:', formattedEvents); // Debug log
     setEvents(formattedEvents);
     setCurrentIndex(0); // Reset index when new events arrive
   };
@@ -83,12 +96,12 @@ export default function EventCarousel({ carouselEvents = [] }) {
   useEffect(() => {
     // Only run auto-slide if we have more than one event
     if (events.length <= 1 || isPaused) return;
-    
+
     // Clear any existing timer
     if (autoSlideTimerRef.current) {
       clearTimeout(autoSlideTimerRef.current);
     }
-    
+
     // Set up auto-slide timer
     autoSlideTimerRef.current = setTimeout(() => {
       if (!isAnimating) {
@@ -97,7 +110,7 @@ export default function EventCarousel({ carouselEvents = [] }) {
         setTimeout(() => setIsAnimating(false), 600);
       }
     }, autoSlideInterval);
-    
+
     // Clear the timer on component unmount
     return () => {
       if (autoSlideTimerRef.current) {
@@ -108,12 +121,12 @@ export default function EventCarousel({ carouselEvents = [] }) {
 
   const handleNext = () => {
     if (isAnimating) return;
-    
+
     // Clear auto-slide timer when manually navigating
     if (autoSlideTimerRef.current) {
       clearTimeout(autoSlideTimerRef.current);
     }
-    
+
     setIsAnimating(true);
     setCurrentIndex((prevIndex) => (prevIndex + 1) % events.length);
     setTimeout(() => setIsAnimating(false), 600);
@@ -121,12 +134,12 @@ export default function EventCarousel({ carouselEvents = [] }) {
 
   const handlePrev = () => {
     if (isAnimating) return;
-    
+
     // Clear auto-slide timer when manually navigating
     if (autoSlideTimerRef.current) {
       clearTimeout(autoSlideTimerRef.current);
     }
-    
+
     setIsAnimating(true);
     setCurrentIndex((prevIndex) => (prevIndex === 0 ? events.length - 1 : prevIndex - 1));
     setTimeout(() => setIsAnimating(false), 600);
@@ -145,7 +158,7 @@ export default function EventCarousel({ carouselEvents = [] }) {
       </div>
     );
   }
-  
+
   // If no events, don't render the component
   if (events.length === 0) return null;
 
@@ -159,15 +172,15 @@ export default function EventCarousel({ carouselEvents = [] }) {
           Featured Events
           <span className="absolute -bottom-2 left-0 w-1/2 h-1 bg-cyan-400 rounded-full"></span>
         </h2>
-        
+
         <div className="relative lg:flex lg:items-center lg:gap-6"
-             onMouseEnter={() => setIsPaused(true)}
-             onMouseLeave={() => setIsPaused(false)}>
+          onMouseEnter={() => setIsPaused(true)}
+          onMouseLeave={() => setIsPaused(false)}>
           {/* Main carousel */}
           <div className="w-full lg:w-3/4 relative">
             <div key={currentIndex} className="rounded-2xl overflow-hidden shadow-2xl relative">
               <div className="absolute inset-0 bg-gradient-to-t from-black via-black/70 to-transparent opacity-70 z-10"></div>
-              
+
               <div className="relative overflow-hidden h-[350px] sm:h-[400px] md:h-[450px] lg:h-[500px]">
                 <img
                   src={currentEvent.image}
@@ -179,7 +192,7 @@ export default function EventCarousel({ carouselEvents = [] }) {
                   }}
                 />
               </div>
-              
+
               <div className="absolute bottom-0 left-0 right-0 p-4 sm:p-6 md:p-8 z-20 transform transition-transform duration-500">
                 <div className="inline-block bg-cyan-400 text-black px-3 py-1 rounded-full text-xs font-bold tracking-wide mb-2">
                   {currentEvent.category?.toUpperCase() || 'FEATURED'}
@@ -187,11 +200,11 @@ export default function EventCarousel({ carouselEvents = [] }) {
                 <h2 className="text-2xl sm:text-3xl md:text-4xl text-white font-bold mb-2 tracking-tight">
                   {currentEvent.title}
                 </h2>
-                
+
                 <p className="text-gray-300 mb-4 line-clamp-2 max-w-3xl">
                   {currentEvent.description}
                 </p>
-                
+
                 <div className="flex flex-wrap gap-x-4 gap-y-2 mb-4 text-sm sm:text-base text-gray-300">
                   <div className="flex items-center">
                     <Calendar className="w-4 h-4 mr-1 text-cyan-400" />
@@ -202,7 +215,7 @@ export default function EventCarousel({ carouselEvents = [] }) {
                     {currentEvent.location}
                   </div>
                 </div>
-                
+
                 <div className="flex flex-wrap gap-3">
                   <Link to={`/event/${currentEvent.id}`} className="px-4 py-2 rounded-xl bg-gradient-to-r bg-cyan-400 text-black font-medium transition-colors cursor-pointer flex items-center space-x-2 hover:bg-black hover:text-cyan-400 hover:border hover:border-cyan-400">
                     View Details
@@ -290,24 +303,23 @@ export default function EventCarousel({ carouselEvents = [] }) {
                 className="group relative mx-1 focus:outline-none"
                 onClick={() => {
                   if (isAnimating) return;
-                  
+
                   // Clear auto-slide timer when clicking indicator
                   if (autoSlideTimerRef.current) {
                     clearTimeout(autoSlideTimerRef.current);
                   }
-                  
+
                   setIsAnimating(true);
                   setCurrentIndex(index);
                   setTimeout(() => setIsAnimating(false), 600);
                 }}
                 aria-label={`Go to slide ${index + 1}`}
               >
-                <span 
-                  className={`block w-8 h-1 rounded-full transition-all duration-300 ${
-                    index === currentIndex 
-                      ? "bg-cyan-400" 
+                <span
+                  className={`block w-8 h-1 rounded-full transition-all duration-300 ${index === currentIndex
+                      ? "bg-cyan-400"
                       : "bg-gray-600 group-hover:bg-gray-400"
-                  }`}
+                    }`}
                 ></span>
                 {index === currentIndex && (
                   <span className="absolute -bottom-3 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full bg-cyan-400"></span>

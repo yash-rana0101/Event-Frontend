@@ -1114,40 +1114,6 @@ export default function EventDetail() {
             {/* Social Engagement - Enhanced with dynamic functionality */}
             <div className="bg-gray-800 rounded-lg p-6 border border-gray-700 relative">
               <h2 className="text-xl font-semibold mb-4">Share & Engage</h2>
-              <div className="flex items-center justify-between mb-4">
-                <button
-                  className={`flex-1 flex items-center justify-center gap-2 py-2 transition-colors ${hasLiked ? 'text-cyan-400' : 'text-gray-300 hover:text-cyan-400'}`}
-                  onClick={handleLikeEvent}
-                >
-                  <Heart size={18} className={hasLiked ? "fill-cyan-400" : ""} />
-                  <span>{formattedEvent.socialShare.likes}</span>
-                </button>
-                <button
-                  className="flex-1 flex items-center justify-center gap-2 py-2 text-gray-300 hover:text-cyan-400 transition-colors"
-                  onClick={() => {
-                    const commentsSection = document.getElementById('comments-section');
-                    if (commentsSection) commentsSection.scrollIntoView({ behavior: 'smooth' });
-                  }}
-                >
-                  <MessageCircle size={18} />
-                  <span>{formattedEvent.socialShare.comments}</span>
-                </button>
-                <button
-                  className="flex-1 flex items-center justify-center gap-2 py-2 text-gray-300 hover:text-cyan-400 transition-colors relative"
-                  onClick={handleShareEvent}
-                >
-                  <Share2 size={18} />
-                  <span>{formattedEvent.socialShare.shares}</span>
-                </button>
-                <button
-                  className={`flex-1 flex items-center justify-center gap-2 py-2 transition-colors ${isSaved ? 'text-cyan-400' : 'text-gray-300 hover:text-cyan-400'}`}
-                  onClick={handleSaveEvent}
-                >
-                  <Bookmark size={18} className={isSaved ? "fill-cyan-400" : ""} />
-                  <span>{isSaved ? "Saved" : "Save"}</span>
-                </button>
-              </div>
-
               {/* Share options popup */}
               <AnimatePresence>
                 {showShareOptions && (

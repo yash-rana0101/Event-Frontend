@@ -8,11 +8,12 @@ import { safelyParseToken } from '../../utils/persistFix';
 import { toast } from 'react-toastify';
 import { useLoader } from '../../context/LoaderContext';
 import { Plus, X, Twitter, Linkedin, Globe, Instagram, Facebook } from 'lucide-react';
+import { setProfileComplete } from '../../redux/user/organizer';
 
 const OrganizerDetails = () => {
   const navigate = useNavigate();
   const dispatch = useDispatch();
-  const { user, token } = useSelector((state) => state.organizer);
+  const { user, token, profileComplete } = useSelector((state) => state.organizer);
   const { setIsLoading } = useLoader();
 
   const [loading, setLoading] = useState(false);
@@ -57,6 +58,16 @@ const OrganizerDetails = () => {
   };
 
   const organizerId = getOrganizerId();
+
+  // Check if profile is already complete and redirect to dashboard
+  useEffect(() => {
+    if (profileComplete && organizerId) {
+      toast.info('Your profile is already complete.');
+      navigate('/organizer/dashboard');
+    }
+  }, [profileComplete, organizerId, navigate]);
+
+  
 
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
@@ -174,98 +185,45 @@ const OrganizerDetails = () => {
     setSubmitting(true);
 
     try {
-      if (!organizerId || !token) {
-        throw new Error('Authentication required');
-      }
-
-      const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000/api/v1';
-      const parsedToken = safelyParseToken(token);
-
-      if (!formData.title.trim() || !formData.bio.trim() || !formData.location.trim()) {
-        toast.error('Title, bio, and location are required');
+      // Validate required fields
+      if (!formData.bio || !formData.phone || !formData.location) {
+        toast.error('Please fill in all required fields');
         setSubmitting(false);
         return;
       }
 
-      // Try multiple possible endpoint patterns
-      const possibleEndpoints = [
+      const apiUrl = import.meta.env.VITE_API_URL;
+      const cleanToken = safelyParseToken(token);
+
+      if (!cleanToken || !organizerId) {
+        toast.error('Authentication failed. Please log in again.');
+        setSubmitting(false);
+        return;
+      }
+
+      const response = await axios.post(
         `${apiUrl}/organizer/${organizerId}/details`,
-      ];
-
-      console.log("Submitting organizer details:", {
-        organizerId,
-        data: formData,
-        endpoints: possibleEndpoints
-      });
-
-      let response;
-      let lastError;
-
-      // Try each endpoint until one works
-      for (const endpoint of possibleEndpoints) {
-        try {
-          console.log(`Trying endpoint: ${endpoint}`);
-
-          response = await axios({
-            method: 'post',
-            url: endpoint,
-            data: formData,
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${parsedToken}`
-            }
-          });
-
-          console.log(`Success with endpoint: ${endpoint}`);
-          break; // If successful, break out of the loop
-        } catch (error) {
-          console.log(`Failed with endpoint ${endpoint}:`, error.response?.status);
-          lastError = error;
-
-          // If it's not a 404, don't try other endpoints
-          if (error.response?.status !== 404) {
-            throw error;
+        formData,
+        {
+          headers: {
+            Authorization: `Bearer ${cleanToken}`,
+            'Content-Type': 'application/json'
           }
         }
+      );
+
+      if (response.data.success) {
+        // Mark profile as complete in Redux store
+        dispatch(setProfileComplete(true));
+
+        toast.success('Profile details saved successfully!');
+        navigate('/organizer/dashboard');
+      } else {
+        throw new Error(response.data.message || 'Failed to save profile details');
       }
-
-      // If no endpoint worked, throw the last error
-      if (!response) {
-        throw lastError || new Error('All endpoints failed');
-      }
-
-      console.log('Profile data saved:', response.data);
-      toast.success('Profile details saved successfully');
-
-      localStorage.setItem('organizer_profile_complete', 'true');
-      localStorage.setItem('organizer_details_last_shown', new Date().getTime().toString());
-
-      if (response.data && response.data.data) {
-        dispatch({
-          type: 'organizer/setProfileDetails',
-          payload: response.data.data
-        });
-      }
-
-      dispatch({
-        type: 'organizer/setProfileComplete',
-        payload: true
-      });
-
-      setTimeout(() => {
-        navigate('/organizer/profile');
-      }, 1000);
-
     } catch (error) {
       console.error('Error saving profile details:', error);
-
-      if (error.response?.status === 404) {
-        toast.error('API endpoint not found. Please contact support.');
-      } else if (error.response?.status === 403) {
-        toast.error('Access denied. Please login again.');
-      } else {
-        toast.error(error.response?.data?.message || 'Failed to save profile details');
-      }
+      toast.error(error.response?.data?.message || 'Failed to save profile details');
     } finally {
       setSubmitting(false);
     }
@@ -560,7 +518,6 @@ const OrganizerDetails = () => {
                       placeholder="Client name"
                     />
                   </div>
-
                   <div>
                     <label className="block text-xs text-gray-400 mb-1">Position</label>
                     <input
@@ -615,7 +572,7 @@ const OrganizerDetails = () => {
               type="submit"
               disabled={submitting}
               className={`px-6 py-3 rounded-xl bg-gradient-to-r bg-cyan-400 text-black font-medium transition-colors cursor-pointer flex items-center space-x-2 hover:bg-black hover:text-cyan-400 hover:border hover:border-cyan-400
-                ${submitting ? 'opacity-70 cursor-not-allowed' : ''}`}
+          ${submitting ? 'opacity-70 cursor-not-allowed' : ''}`}
             >
               {submitting ? (
                 <>

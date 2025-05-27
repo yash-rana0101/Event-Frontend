@@ -139,6 +139,43 @@ export const fetchPublicOrganizerProfile = createAsyncThunk(
   }
 );
 
+// Add new async thunk to check profile completion
+export const checkProfileCompletion = createAsyncThunk(
+  "organizer/checkProfileCompletion",
+  async (organizerId, { rejectWithValue }) => {
+    try {
+      if (!organizerId) {
+        return rejectWithValue("No organizer ID provided");
+      }
+
+      const apiUrl = import.meta.env.VITE_API_URL;
+      const token = localStorage.getItem("organizer_token");
+
+      if (!token) {
+        return rejectWithValue("No authentication token");
+      }
+
+      const response = await axios.get(
+        `${apiUrl}/organizer/${organizerId}/details`,
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      );
+
+      // Check if profile has essential details filled
+      const profile = response.data;
+      const isComplete = !!(profile.bio && profile.location && profile.phone);
+
+      return { isComplete, profile };
+    } catch (error) {
+      console.error("Error checking profile completion:", error);
+      return rejectWithValue(
+        error.response?.data?.message || "Failed to check profile completion"
+      );
+    }
+  }
+);
+
 // Organizer slice
 const organizerSlice = createSlice({
   name: "organizer",
@@ -236,6 +273,19 @@ const organizerSlice = createSlice({
       state.publicProfileLoading = false;
       state.publicProfileError = action.payload;
     });
+
+    // Handle profile completion checking
+    builder
+      .addCase(checkProfileCompletion.fulfilled, (state, action) => {
+        state.profileComplete = action.payload.isComplete;
+        if (action.payload.profile) {
+          // Update user data if profile details are returned
+          state.user = { ...state.user, ...action.payload.profile };
+        }
+      })
+      .addCase(checkProfileCompletion.rejected, (state) => {
+        state.profileComplete = false;
+      });
   },
 });
 

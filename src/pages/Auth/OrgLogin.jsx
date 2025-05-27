@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
-import { loginOrganizer } from '../../redux/user/organizer';
+import { loginOrganizer, checkProfileCompletion } from '../../redux/user/organizer';
 import { motion } from 'framer-motion';
 import { toast } from 'react-toastify';
 import { FaEnvelope, FaLock, FaEye, FaEyeSlash, FaGoogle, FaTwitter } from 'react-icons/fa';
@@ -61,8 +61,34 @@ const OrgLogin = () => {
 
       // Check if login was successful
       if (loginOrganizer.fulfilled.match(resultAction)) {
-        toast.success('Welcome back, organizer!');
-        navigate(redirectTo);
+        const loginData = resultAction.payload;
+
+        // Extract organizer ID from login response
+        const organizerId = loginData.user?._id || loginData.user?.id;
+
+        if (organizerId) {
+          // Check if profile is complete
+          const profileCheck = await dispatch(checkProfileCompletion(organizerId));
+
+          if (checkProfileCompletion.fulfilled.match(profileCheck)) {
+            const isProfileComplete = profileCheck.payload.isComplete;
+
+            if (isProfileComplete) {
+              toast.success('Welcome back, organizer!');
+              navigate('/organizer/dashboard');
+            } else {
+              toast.success('Welcome! Please complete your profile to continue.');
+              navigate('/organizer/details');
+            }
+          } else {
+            // If profile check fails, redirect to details form as safe fallback
+            toast.success('Welcome! Please complete your profile setup.');
+            navigate('/organizer/details');
+          }
+        } else {
+          toast.success('Welcome back, organizer!');
+          navigate('/organizer/dashboard');
+        }
       } else if (loginOrganizer.rejected.match(resultAction)) {
         const error = resultAction.payload;
 

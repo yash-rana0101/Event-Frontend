@@ -86,13 +86,16 @@ export const useAuth = () => {
   const userId = getUserId();
   const profileLink = userId
     ? currentOrganizer
-      ? `/organizer/profile`
+      ? `/organizer/profile/${userId}`
       : `/user/profile/${userId}`
     : null;
 
   const activeUser = currentUser || currentOrganizer || null;
   const user = useSelector((state) => state.auth?.user);
   const organizer = useSelector((state) => state.organizer?.user);
+  const profileComplete = useSelector(
+    (state) => state.organizer?.profileComplete
+  );
   const isAdmin = user?.role === "admin" || user?.isAdmin === true;
   const adminData = isAdmin ? user : null;
 
@@ -184,6 +187,7 @@ export const useAuth = () => {
     activeUser,
     user,
     organizer,
+    profileComplete,
     isAdmin,
     adminData,
     debugAuthInfo,

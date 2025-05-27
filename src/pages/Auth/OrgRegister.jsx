@@ -77,7 +77,7 @@ const Register = () => {
       setRegistered(true);
 
       setTimeout(() => {
-        navigate('/organizer/login'); // Redirect to login instead of details
+        navigate('/auth/organizer-login'); // Redirect to organizer login specifically
       }, 2000);
     } catch (err) {
       console.error("Registration failed:", err);
@@ -118,10 +118,10 @@ const Register = () => {
               </div>
               <h2 className="text-2xl font-bold text-cyan-400 mb-2">Registration Successful!</h2>
               <p className="text-gray-400 mb-6">
-                Your account has been created. Please complete your profile details to continue.
+                Your account has been created and is pending approval. Please login once your account is verified to complete your profile.
               </p>
               <div className="mt-6">
-                <p className="text-gray-400 text-sm">Redirecting to profile details...</p>
+                <p className="text-gray-400 text-sm">Redirecting to login page...</p>
                 <div className="w-full bg-gray-800 h-1 mt-2 rounded overflow-hidden">
                   <div className="bg-cyan-500 h-full animate-pulse" style={{ width: "100%" }}></div>
                 </div>

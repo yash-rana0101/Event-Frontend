@@ -317,21 +317,6 @@ const Register = () => {
                 </div>
               </div>
 
-              <div className="flex justify-center space-x-4 mt-4">
-                <Link
-                  to="/auth/google-signup"
-                  className="flex justify-center py-4 px-4 border border-gray-700 rounded-full shadow-sm text-sm font-medium text-gray-400 bg-gray-800 hover:bg-gray-700"
-                >
-                  <FaGoogle size={18} />
-                </Link>
-                <Link
-                  to="/auth/twitter-signup"
-                  className="flex justify-center py-4 px-4 border border-gray-700 rounded-full shadow-sm text-sm font-medium text-gray-400 bg-gray-800 hover:bg-gray-700"
-                >
-                  <FaTwitter size={18} />
-                </Link>
-              </div>
-
               <div className="mt-6">
                 <Link
                   to="/auth/register"

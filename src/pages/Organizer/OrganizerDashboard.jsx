@@ -13,6 +13,7 @@ import { useSelector } from 'react-redux';
 import { safelyParseToken } from '../../utils/persistFix';
 import { toast } from 'react-toastify';
 import { getOrganizerMetrics, getRevenueMetrics } from '../../services/organizerService';
+import { FaEdit } from 'react-icons/fa';
 
 const OrganizerDashboard = () => {
   const [activeTab, setActiveTab] = useState('overview');
@@ -359,6 +360,16 @@ const OrganizerDashboard = () => {
             <span>My Profile</span>
           </motion.button>
 
+          <motion.button
+            className="bg-gray-800/60 backdrop-blur-sm text-white font-medium px-5 py-2.5 rounded-xl 
+                       flex items-center space-x-2 hover:bg-gray-700/80 transition-all duration-300 border border-gray-700/30 hover:cursor-pointer"
+            whileHover={{ scale: 1.05, y: -2 }}
+            whileTap={{ scale: 0.98 }}
+            onClick={() => navigate('/organizer/profile/edit')}
+          >
+            <FaEdit className="h-4 w-4" />
+            <span>Edit Profile</span>
+          </motion.button>
           <motion.button
             className="bg-gray-800/60 backdrop-blur-sm text-white font-medium px-5 py-2.5 rounded-xl 
                        flex items-center space-x-2 hover:bg-gray-700/80 transition-all duration-300 border border-gray-700/30 hover:cursor-pointer"

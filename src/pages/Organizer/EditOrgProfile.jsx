@@ -84,6 +84,7 @@ const EditOrgProfile = () => {
   const organizerData = useSelector(state => state.organizer);
   const loggedInUser = organizerData?.user;
 
+
   // Extract user ID from possibly nested JSON structure - improved function
   const getUserId = () => {
     if (!loggedInUser) return null;
@@ -162,7 +163,7 @@ const EditOrgProfile = () => {
         }
 
         // Get API URL from environment or use fallback
-        const apiUrl = import.meta.env.VITE_API_URL || '/api/v1';
+        const apiUrl = import.meta.env.VITE_API_URL;
 
         const token = organizerData?.token || localStorage.getItem('organizer_token');
         const cleanToken = safelyParseToken(token);
@@ -237,11 +238,11 @@ const EditOrgProfile = () => {
       };
 
       // Send update request
-      await axios.put(`${apiUrl}/organizer/${loggedInUserId}/details`, profile, config);
+      await axios.put(`${apiUrl}/organizer/profile/${loggedInUserId}`, profile, config);
 
       toast.success("Profile updated successfully!");
       setChangesMade(false);
-      navigate('/organizer/profile');
+      navigate(`/organizer/profile/${loggedInUserId}`);
       // Update original profile reference
       setOriginalProfile({ ...profile });
     } catch (err) {
@@ -469,7 +470,7 @@ const EditOrgProfile = () => {
                   ) : (
                     <Save className="w-4 h-4 mr-2" />
                   )}
-                  {isSaving ? 'Saving...' : 'Save Changes'}
+                  {isSaving ? 'Saving...' : 'Save '}
                 </motion.button>
               </div>
             </div>
@@ -570,29 +571,6 @@ const EditOrgProfile = () => {
                 {/* Stats and Certifications */}
                 <div className="bg-gray-900 rounded-2xl p-6 border-t-2 border-cyan-500">
                   <h3 className="text-xl mb-6">Statistics & Certifications</h3>
-
-                  {/* Stats */}
-                  <div className="mb-8">
-                    <h4 className="text-cyan-500 text-sm uppercase mb-3">Your Stats</h4>
-
-                    <div className="space-y-4">
-                      {Object.entries(profile.stats || {}).map(([key, value]) => (
-                        <div key={key} className="flex flex-col">
-                          <label className="text-sm text-gray-400 capitalize mb-1">
-                            {key.replace(/([A-Z])/g, ' $1').trim()}
-                          </label>
-                          <input
-                            type={key.toLowerCase().includes('satisfaction') ? 'text' : 'number'}
-                            name={`stats.${key}`}
-                            value={value}
-                            onChange={handleInputChange}
-                            min={0}
-                            className="w-full bg-gray-800 border border-gray-700 rounded-lg p-2 text-white focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 transition-colors"
-                          />
-                        </div>
-                      ))}
-                    </div>
-                  </div>
 
                   {/* Certifications */}
                   <div>
@@ -851,19 +829,19 @@ const EditOrgProfile = () => {
                     <Plus size={18} />
                   </button>
                 </div>
-                <div className="flex mb-6">
+                <div className=" mb-6">
                   <input
                     type="text"
                     value={newTestimonial.position}
                     onChange={(e) => setNewTestimonial({ ...newTestimonial, position: e.target.value })}
-                    className="flex-grow bg-gray-800 border border-gray-700 rounded-l-lg p-3 text-white focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 transition-colors"
+                    className="flex-grow w-full mr-4 mb-4 bg-gray-800 border border-gray-700 rounded-lg p-3 text-white focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 transition-colors"
                     placeholder="Client's position"
                   />
                   <input
                     type="text"
                     value={newTestimonial.comment}
                     onChange={(e) => setNewTestimonial({ ...newTestimonial, comment: e.target.value })}
-                    className="flex-grow bg-gray-800 border border-gray-700 rounded-l-lg p-3 text-white focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 transition-colors"
+                    className="flex-grow w-full bg-gray-800 border border-gray-700 rounded-lg p-3 text-white focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 transition-colors"
                     placeholder="Client's testimonial"
                   />
                 </div>

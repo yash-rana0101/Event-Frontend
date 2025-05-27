@@ -190,9 +190,6 @@ const OrganizerDetails = () => {
       // Try multiple possible endpoint patterns
       const possibleEndpoints = [
         `${apiUrl}/organizer/${organizerId}/details`,
-        `${apiUrl}/organizer/details/${organizerId}`,
-        `${apiUrl}/organizer/details`,
-        `${apiUrl}/organizers/${organizerId}/details`
       ];
 
       console.log("Submitting organizer details:", {

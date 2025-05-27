@@ -360,8 +360,10 @@ export default function EventManagement() {
                         className="bg-gray-800/50 rounded-xl border border-gray-700/50 overflow-hidden hover:border-cyan-500/30 transition-all duration-300 group"
                       >
                         {/* Event Image */}
-                        <div className="relative h-48 bg-gradient-to-br from-cyan-500/20 to-blue-500/20 flex items-center justify-center">
-                          <ImageIcon className="w-16 h-16 text-gray-600" />
+                        <div className="relative h-40 bg-gradient-to-br from-cyan-500/20 to-blue-500/20 flex items-center justify-center">
+                          <img
+                            src={event.image}
+                            className="text-gray-600" />
                           {event.featured && (
                             <div className="absolute top-3 left-3 px-2 py-1 bg-yellow-500/20 text-yellow-400 rounded-full text-xs font-medium border border-yellow-500/30">
                               Featured

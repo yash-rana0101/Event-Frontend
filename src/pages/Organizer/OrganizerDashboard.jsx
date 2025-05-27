@@ -9,11 +9,12 @@ import {
 import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate, Link } from 'react-router-dom';
 import { useLoader } from '../../context/LoaderContext';
-import { useSelector } from 'react-redux';
+import { useSelector, useDispatch } from 'react-redux';
 import { safelyParseToken } from '../../utils/persistFix';
 import { toast } from 'react-toastify';
 import { getOrganizerMetrics, getRevenueMetrics } from '../../services/organizerService';
 import { FaEdit } from 'react-icons/fa';
+import { checkProfileCompletion } from '../../redux/user/organizer';
 
 const OrganizerDashboard = () => {
   const [activeTab, setActiveTab] = useState('overview');
@@ -38,6 +39,7 @@ const OrganizerDashboard = () => {
   const [metricsError, setMetricsError] = useState(null);
 
   const navigate = useNavigate();
+  const dispatch = useDispatch();
   const { setIsLoading } = useLoader();
 
   // Get auth token from Redux store
@@ -61,6 +63,32 @@ const OrganizerDashboard = () => {
 
     return user?._id || user?.id || user?._doc?._id;
   };
+
+  const organizerId = getOrganizerId();
+
+  // Add profile completion check on dashboard load
+  useEffect(() => {
+    const checkProfileOnDashboard = async () => {
+      if (organizerId && token) {
+        try {
+          const profileCheck = await dispatch(checkProfileCompletion(organizerId));
+
+          if (checkProfileCompletion.fulfilled.match(profileCheck)) {
+            const isComplete = profileCheck.payload.isComplete;
+
+            if (!isComplete) {
+              toast.info('Please complete your profile to access all features.');
+              navigate('/organizer/details');
+            }
+          }
+        } catch (error) {
+          console.error('Error checking profile on dashboard:', error);
+        }
+      }
+    };
+
+    checkProfileOnDashboard();
+  }, [organizerId, token, dispatch, navigate]);
 
   useEffect(() => {
     setIsLoading(loading || eventsLoading);
@@ -493,7 +521,7 @@ const OrganizerDashboard = () => {
                       )}
                     </h3>
                     <span className={`text-xs font-medium ${stat.change?.includes('+') ? 'text-green-400' :
-                        stat.change?.includes('-') ? 'text-red-400' : 'text-gray-400'
+                      stat.change?.includes('-') ? 'text-red-400' : 'text-gray-400'
                       }`}>
                       {metricsLoading ? (
                         <div className="w-12 h-3 bg-gray-700 animate-pulse rounded"></div>
@@ -709,7 +737,7 @@ const OrganizerDashboard = () => {
                   <h3 className="font-medium text-lg">Event Report</h3>
                 </div>
                 <p className="text-gray-400 text-sm">
-                  Analyze the Report of your All events 
+                  Analyze the Report of your All events
                 </p>
               </motion.div>
             </div>

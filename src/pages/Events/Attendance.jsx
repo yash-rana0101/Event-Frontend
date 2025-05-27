@@ -18,7 +18,7 @@ import EventsGrid from '../../components/Attendance/EventsGrid';
 import Pagination from '../../components/Attendance/Pagination';
 
 // Import utils
-import { formatDate, getEventStatus, getRandomEventImage } from '../../utils/eventUtils';
+import { formatDate, getEventStatus } from '../../utils/eventUtils';
 import Skeleton from '../../components/UI/Skeleton';
 
 export default function Attendance() {

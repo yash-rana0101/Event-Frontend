@@ -142,7 +142,7 @@ export const fetchPublicOrganizerProfile = createAsyncThunk(
 // Add new async thunk to check profile completion
 export const checkProfileCompletion = createAsyncThunk(
   "organizer/checkProfileCompletion",
-  async (organizerId, { rejectWithValue }) => {
+  async (organizerId, { rejectWithValue, dispatch }) => {
     try {
       if (!organizerId) {
         return rejectWithValue("No organizer ID provided");
@@ -162,13 +162,24 @@ export const checkProfileCompletion = createAsyncThunk(
         }
       );
 
-      // Check if profile has essential details filled
+      // More comprehensive profile completion check
       const profile = response.data;
-      const isComplete = !!(profile.bio && profile.location && profile.phone);
+      const requiredFields = ["bio", "location", "phone"];
+      const isComplete = requiredFields.every(
+        (field) => profile[field] && profile[field].toString().trim().length > 0
+      );
+
+      // Automatically update the profileComplete state
+      dispatch(setProfileComplete(isComplete));
 
       return { isComplete, profile };
     } catch (error) {
       console.error("Error checking profile completion:", error);
+      // If profile doesn't exist, it's definitely not complete
+      if (error.response?.status === 404) {
+        dispatch(setProfileComplete(false));
+        return { isComplete: false, profile: null };
+      }
       return rejectWithValue(
         error.response?.data?.message || "Failed to check profile completion"
       );
@@ -194,7 +205,7 @@ const organizerSlice = createSlice({
       if (state.token === "null") state.token = null;
     },
     setProfileComplete: (state, action) => {
-      state.profileComplete = action.payload;
+      state.profileComplete = Boolean(action.payload); // Ensure it's always a boolean
     },
     setToken: (state, action) => {
       state.token = action.payload;
@@ -277,13 +288,17 @@ const organizerSlice = createSlice({
     // Handle profile completion checking
     builder
       .addCase(checkProfileCompletion.fulfilled, (state, action) => {
-        state.profileComplete = action.payload.isComplete;
-        if (action.payload.profile) {
-          // Update user data if profile details are returned
-          state.user = { ...state.user, ...action.payload.profile };
-        }
+        state.loading = false;
+        state.error = null;
+        state.profileComplete = Boolean(action.payload.isComplete);
       })
-      .addCase(checkProfileCompletion.rejected, (state) => {
+      .addCase(checkProfileCompletion.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
+      .addCase(checkProfileCompletion.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload;
         state.profileComplete = false;
       });
   },

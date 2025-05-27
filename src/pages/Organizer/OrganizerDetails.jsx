@@ -8,7 +8,7 @@ import { safelyParseToken } from '../../utils/persistFix';
 import { toast } from 'react-toastify';
 import { useLoader } from '../../context/LoaderContext';
 import { Plus, X, Twitter, Linkedin, Globe, Instagram, Facebook } from 'lucide-react';
-import { setProfileComplete } from '../../redux/user/organizer';
+import { checkProfileCompletion, setProfileComplete } from '../../redux/user/organizer';
 
 const OrganizerDetails = () => {
   const navigate = useNavigate();
@@ -44,6 +44,7 @@ const OrganizerDetails = () => {
   const getOrganizerId = () => {
     if (!user) return null;
 
+    // Handle string format (serialized JSON)
     if (typeof user === 'string') {
       try {
         const parsed = JSON.parse(user);
@@ -54,6 +55,7 @@ const OrganizerDetails = () => {
       }
     }
 
+    // Handle object format
     return user?._id || user?.id || user?._doc?._id;
   };
 
@@ -61,13 +63,31 @@ const OrganizerDetails = () => {
 
   // Check if profile is already complete and redirect to dashboard
   useEffect(() => {
-    if (profileComplete && organizerId) {
-      toast.info('Your profile is already complete.');
-      navigate('/organizer/dashboard');
-    }
-  }, [profileComplete, organizerId, navigate]);
+    const checkAndRedirect = async () => {
+      if (organizerId) {
+        try {
+          // Dispatch the profile completion check
+          const profileCheck = await dispatch(checkProfileCompletion(organizerId));
 
-  
+          if (checkProfileCompletion.fulfilled.match(profileCheck)) {
+            const isComplete = profileCheck.payload.isComplete;
+
+            if (isComplete) {
+              toast.info('Your profile is already complete.');
+              navigate('/organizer/dashboard');
+            }
+          }
+        } catch (error) {
+          console.error('Error checking profile completion:', error);
+          // Don't redirect on error, let user fill the form
+        }
+      }
+    };
+
+    checkAndRedirect();
+  }, [organizerId, dispatch, navigate]);
+
+
 
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
@@ -187,7 +207,7 @@ const OrganizerDetails = () => {
     try {
       // Validate required fields
       if (!formData.bio || !formData.phone || !formData.location) {
-        toast.error('Please fill in all required fields');
+        toast.error('Please fill in all required fields (Bio, Phone, Location)');
         setSubmitting(false);
         return;
       }
@@ -196,8 +216,8 @@ const OrganizerDetails = () => {
       const cleanToken = safelyParseToken(token);
 
       if (!cleanToken || !organizerId) {
-        toast.error('Authentication failed. Please log in again.');
-        setSubmitting(false);
+        toast.error('Authentication error. Please login again.');
+        navigate('/auth/organizer-login');
         return;
       }
 
@@ -205,25 +225,23 @@ const OrganizerDetails = () => {
         `${apiUrl}/organizer/${organizerId}/details`,
         formData,
         {
-          headers: {
-            Authorization: `Bearer ${cleanToken}`,
-            'Content-Type': 'application/json'
-          }
+          headers: { Authorization: `Bearer ${cleanToken}` }
         }
       );
 
       if (response.data.success) {
-        // Mark profile as complete in Redux store
+        // Update Redux state to mark profile as complete
         dispatch(setProfileComplete(true));
 
-        toast.success('Profile details saved successfully!');
+        // Also verify the profile completion by re-checking
+        await dispatch(checkProfileCompletion(organizerId));
+
+        toast.success('Profile completed successfully!');
         navigate('/organizer/dashboard');
-      } else {
-        throw new Error(response.data.message || 'Failed to save profile details');
       }
     } catch (error) {
-      console.error('Error saving profile details:', error);
-      toast.error(error.response?.data?.message || 'Failed to save profile details');
+      console.error('Error updating profile:', error);
+      toast.error(error.response?.data?.message || 'Failed to update profile');
     } finally {
       setSubmitting(false);
     }

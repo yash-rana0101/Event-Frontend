@@ -63,31 +63,53 @@ const OrgLogin = () => {
       if (loginOrganizer.fulfilled.match(resultAction)) {
         const loginData = resultAction.payload;
 
-        // Extract organizer ID from login response
-        const organizerId = loginData.user?._id || loginData.user?.id;
+        // Extract organizer ID with better handling
+        const getOrganizerIdFromLogin = (userData) => {
+          if (!userData) return null;
+
+          // Handle different response structures
+          if (userData._id) return userData._id;
+          if (userData.id) return userData.id;
+          if (userData.user?._id) return userData.user._id;
+          if (userData.user?.id) return userData.user.id;
+          if (userData._doc?._id) return userData._doc._id;
+
+          return null;
+        };
+
+        const organizerId = getOrganizerIdFromLogin(loginData);
 
         if (organizerId) {
-          // Check if profile is complete
-          const profileCheck = await dispatch(checkProfileCompletion(organizerId));
+          // Check if profile is complete with a small delay to ensure state is updated
+          setTimeout(async () => {
+            try {
+              const profileCheck = await dispatch(checkProfileCompletion(organizerId));
 
-          if (checkProfileCompletion.fulfilled.match(profileCheck)) {
-            const isProfileComplete = profileCheck.payload.isComplete;
+              if (checkProfileCompletion.fulfilled.match(profileCheck)) {
+                const isProfileComplete = profileCheck.payload.isComplete;
 
-            if (isProfileComplete) {
-              toast.success('Welcome back, organizer!');
-              navigate('/organizer/dashboard');
-            } else {
-              toast.success('Welcome! Please complete your profile to continue.');
+                if (isProfileComplete) {
+                  toast.success('Welcome back, organizer!');
+                  navigate('/organizer/dashboard');
+                } else {
+                  toast.success('Welcome! Please complete your profile to continue.');
+                  navigate('/organizer/details');
+                }
+              } else {
+                // If profile check fails, redirect to details form as safe fallback
+                toast.success('Welcome! Please complete your profile setup.');
+                navigate('/organizer/details');
+              }
+            } catch (error) {
+              console.error('Profile check error:', error);
+              toast.success('Welcome! Please complete your profile setup.');
               navigate('/organizer/details');
             }
-          } else {
-            // If profile check fails, redirect to details form as safe fallback
-            toast.success('Welcome! Please complete your profile setup.');
-            navigate('/organizer/details');
-          }
+          }, 500);
         } else {
-          toast.success('Welcome back, organizer!');
-          navigate('/organizer/dashboard');
+          // Fallback: redirect to profile setup
+          toast.success('Welcome! Please complete your profile setup.');
+          navigate('/organizer/details');
         }
       } else if (loginOrganizer.rejected.match(resultAction)) {
         const error = resultAction.payload;

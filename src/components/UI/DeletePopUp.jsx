@@ -69,7 +69,7 @@ const DeletePopUp = ({ isOpen, onClose, deleteProject }) => {
                   className="text-xl font-semibold text-white"
                   id="modal-headline"
                 >
-                  Delete Project
+                  Delete Event
                 </h3>
               </div>
 

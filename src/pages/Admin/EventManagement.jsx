@@ -82,7 +82,7 @@ export default function EventManagement() {
   const getStatusColor = (status) => {
     switch (status) {
       case 'draft': return 'bg-gray-500/20 text-gray-400 border-gray-500/30';
-      case 'published': return 'bg-green-500/20 text-green-400 border-green-500/30';
+      case 'published': return 'bg-green-800/80 text-black border-green-500/30';
       case 'suspended': return 'bg-orange-500/20 text-orange-400 border-orange-500/30';
       case 'cancelled': return 'bg-red-500/20 text-red-400 border-red-500/30';
       case 'completed': return 'bg-blue-500/20 text-blue-400 border-blue-500/30';
@@ -360,12 +360,12 @@ export default function EventManagement() {
                         className="bg-gray-800/50 rounded-xl border border-gray-700/50 overflow-hidden hover:border-cyan-500/30 transition-all duration-300 group"
                       >
                         {/* Event Image */}
-                        <div className="relative h-40 bg-gradient-to-br from-cyan-500/20 to-blue-500/20 flex items-center justify-center">
+                        <div className="relative h-28 bg-gradient-to-br from-cyan-500/20 to-blue-500/20 flex items-center justify-center">
                           <img
                             src={event.image}
                             className="text-gray-600" />
                           {event.featured && (
-                            <div className="absolute top-3 left-3 px-2 py-1 bg-yellow-500/20 text-yellow-400 rounded-full text-xs font-medium border border-yellow-500/30">
+                            <div className="absolute top-3 right-3 px-2 py-1 bg-yellow-500/90 text-black rounded-full text-xs font-medium border border-yellow-500/80">
                               Featured
                             </div>
                           )}
@@ -387,10 +387,6 @@ export default function EventManagement() {
                               <h3 className="text-white font-bold text-lg truncate mb-1">{event.title}</h3>
                               <p className="text-gray-400 text-sm truncate">{event.organizer}</p>
                             </div>
-                            <div className="flex items-center space-x-1 ml-2">
-                              <Star className="w-4 h-4 text-yellow-400 fill-current" />
-                              <span className="text-white text-sm">{event.rating || 'N/A'}</span>
-                            </div>
                           </div>
 
                           <p className="text-gray-400 text-sm mb-3 line-clamp-2">{event.description}</p>
@@ -410,19 +406,9 @@ export default function EventManagement() {
                             </div>
                           </div>
 
-                          <div className="flex items-center justify-between pt-3 border-t border-gray-700/50">
-                            <div className="flex items-center space-x-3">
-                              <div className="flex items-center space-x-1">
-                                <Heart className="w-4 h-4 text-gray-400" />
-                                <span className="text-gray-400 text-xs">{event.likesCount}</span>
-                              </div>
-                              <div className="flex items-center space-x-1">
-                                <MessageSquare className="w-4 h-4 text-gray-400" />
-                                <span className="text-gray-400 text-xs">{event.reviewsCount}</span>
-                              </div>
-                            </div>
+                          <div className="flex items-center justify-center pt-3 border-t border-gray-700/50">
 
-                            <div className="flex items-center space-x-1">
+                            <div className="flex items-center space-x-16  ">
                               <motion.button
                                 whileHover={{ scale: 1.1 }}
                                 whileTap={{ scale: 0.9 }}

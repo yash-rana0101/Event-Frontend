@@ -519,7 +519,7 @@ export default function AdminDashboard() {
                 className="p-2 sm:p-2.5 rounded-xl bg-gray-800/60 text-gray-400 hover:text-cyan-400 transition-colors backdrop-blur-sm border border-gray-700/50 self-start sm:self-auto"
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
-                onClick={() => navigate('/admin/event-management')}
+                onClick={() => navigate('/admin/events')}
               >
                 <Eye className="w-4 h-4" />
               </motion.button>
@@ -543,9 +543,7 @@ export default function AdminDashboard() {
                     </div>
                   </div>
                   <div className="flex flex-wrap items-center gap-2 sm:gap-4 text-sm">
-                    <span className={`px-2 sm:px-3 py-1 sm:py-1.5 rounded-full text-xs font-medium ${getStatusColor(event.status)}`}>
-                      {event.status.charAt(0).toUpperCase() + event.status.slice(1)}
-                    </span>
+                  
                     <span className="text-gray-300">{event.attendees} Attendees</span>
                     <span className="text-gray-300">{event.revenue}</span>
                     <span className="text-gray-500 text-xs">{event.time}</span>
@@ -569,7 +567,7 @@ export default function AdminDashboard() {
                 className="p-2 sm:p-2.5 rounded-xl bg-gray-800/60 text-gray-400 hover:text-cyan-400 transition-colors backdrop-blur-sm border border-gray-700/50 self-start sm:self-auto"
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
-                onClick={() => navigate('/admin/organizer-management')}
+                onClick={() => navigate('/admin/organizer')}
               >
                 <Eye className="w-4 h-4" />
               </motion.button>

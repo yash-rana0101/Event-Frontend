@@ -34,15 +34,17 @@ export const checkApiStatus = async () => {
       const isAvailable = await checkServerStatus(checkUrl);
 
       if (isAvailable) {
-        console.log(`API available at: ${baseUrl}`);
-        return baseUrl;
+        console.log(`API server available at: ${baseUrl}`);
+        return { available: true, baseUrl };
       }
     } catch (error) {
-      console.log(`Failed to connect to ${baseUrl}: ${error.message}`);
+      console.log(`API server at ${baseUrl} is not available:`, error.message);
+      continue;
     }
   }
 
-  return null; // No available API found
+  console.log("No API servers are available");
+  return { available: false, baseUrl: null };
 };
 
 // Helper to get base API URL without /api/v1 suffix

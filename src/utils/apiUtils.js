@@ -327,7 +327,7 @@ export const createAuthenticatedClient = (tokenType = "user") => {
 };
 
 /**
- * Event attendees API
+ * Attendees API functions
  */
 export const attendeesApi = {
   /**
@@ -395,6 +395,82 @@ export const attendeesApi = {
       return await client.get(`/reports/events/${eventId}/attendance`);
     } catch (error) {
       console.error("Error fetching event report:", error);
+      throw handleApiError(error);
+    }
+  },
+
+  /**
+   * Generate AI-powered event insights
+   * @param {string} eventId - Event ID
+   * @param {string} reportType - Type of report (comprehensive, executive, sponsor)
+   * @returns {Promise} - API response with AI insights
+   */
+  generateAIInsights: async (eventId, reportType = "comprehensive") => {
+    try {
+      const client = createAuthenticatedClient("organizer");
+      return await client.get(`/reports/events/${eventId}/ai-insights`, {
+        params: { reportType },
+      });
+    } catch (error) {
+      console.error("Error generating AI insights:", error);
+      throw handleApiError(error);
+    }
+  },
+
+  /**
+   * Export event data in various formats
+   * @param {string} eventId - Event ID
+   * @param {string} format - Export format (pdf, csv, json)
+   * @returns {Promise} - Export response
+   */
+  exportEventData: async (eventId, format = "pdf") => {
+    try {
+      const client = createAuthenticatedClient("organizer");
+      const response = await client.get(`/reports/events/${eventId}/export`, {
+        params: { format },
+        responseType: format === "pdf" ? "blob" : "json",
+      });
+      return response;
+    } catch (error) {
+      console.error("Error exporting event data:", error);
+      throw handleApiError(error);
+    }
+  },
+
+  /**
+   * Generate and download PDF report using proper PDF generation
+   * @param {string} eventId - Event ID
+   * @param {Object} options - Report generation options
+   * @returns {Promise} - PDF blob response
+   */
+  generatePDFReport: async (eventId, options = {}) => {
+    try {
+      const client = createAuthenticatedClient("organizer");
+      const response = await client.post(
+        `/reports/events/${eventId}/generate-pdf-report`,
+        options,
+        {
+          responseType: "blob",
+        }
+      );
+      return response;
+    } catch (error) {
+      console.error("Error generating PDF report:", error);
+      throw handleApiError(error);
+    }
+  },
+
+  /**
+   * Get cached AI insights for an event
+   * @param {string} eventId - Event ID
+   * @returns {Promise} - Cached insights if available
+   */
+  getCachedInsights: async (eventId) => {
+    try {
+      const client = createAuthenticatedClient("organizer");
+      return await client.get(`/reports/events/${eventId}/ai-insights`);
+    } catch (error) {
+      console.error("Error fetching cached insights:", error);
       throw handleApiError(error);
     }
   },

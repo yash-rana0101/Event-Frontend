@@ -2,16 +2,17 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import {
   ChevronLeft, Calendar, MapPin, Users, BarChart3,
   CheckCircle, Clock, Search, ArrowRight, RefreshCw,
-  AlertCircle, Filter, ChevronDown, FileText
+  AlertCircle, Filter, ChevronDown, FileText, Zap, Eye
 } from 'lucide-react';
 import { useSelector } from 'react-redux';
 import { safelyParseToken } from '../../utils/persistFix';
 import { toast } from 'react-toastify';
 import { useLoader } from '../../context/LoaderContext';
+import { attendeesApi } from '../../utils/apiUtils';
 
 const EventReport = () => {
   const [events, setEvents] = useState([]);
@@ -24,6 +25,13 @@ const EventReport = () => {
   const [sortBy, setSortBy] = useState('date');
   const [sortDirection, setSortDirection] = useState('desc');
   const [selectedTimeframe, setSelectedTimeframe] = useState('all');
+  const [selectedEvents, setSelectedEvents] = useState([]);
+  const [aiInsights, setAiInsights] = useState({});
+  const [loadingInsights, setLoadingInsights] = useState({});
+  const [generatingPDF, setGeneratingPDF] = useState({});
+  const [showAIModal, setShowAIModal] = useState(false);
+  const [selectedEventForAI, setSelectedEventForAI] = useState(null);
+  const [reportType, setReportType] = useState('comprehensive');
 
   const navigate = useNavigate();
   const organizerToken = useSelector(state => state.organizer?.token);
@@ -57,7 +65,7 @@ const EventReport = () => {
         return;
       }
 
-      const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000/api/v1';
+      const apiUrl = import.meta.env.VITE_API_URL;
 
       const response = await axios.get(
         `${apiUrl}/organizer/events/completed`,
@@ -185,6 +193,84 @@ const EventReport = () => {
     }
   };
 
+  const handleGenerateAIReport = async (event) => {
+    setSelectedEventForAI(event);
+    setShowAIModal(true);
+  };
+
+  const generateAIInsights = async (eventId, type = 'comprehensive') => {
+    setLoadingInsights(prev => ({ ...prev, [eventId]: true }));
+
+    try {
+      const response = await attendeesApi.generateAIInsights(eventId, type);
+
+      if (response.data.success) {
+        setAiInsights(prev => ({
+          ...prev,
+          [eventId]: {
+            ...response.data.data,
+            generatedAt: new Date()
+          }
+        }));
+        toast.success('AI insights generated successfully!');
+        return response.data.data;
+      } else {
+        throw new Error('Failed to generate insights');
+      }
+    } catch (error) {
+      console.error('Error generating AI insights:', error);
+      toast.error('Failed to generate AI insights: ' + error.message);
+      return null;
+    } finally {
+      setLoadingInsights(prev => ({ ...prev, [eventId]: false }));
+    }
+  };
+
+  const downloadPDFReport = async (eventId, reportOptions = {}) => {
+    setGeneratingPDF(prev => ({ ...prev, [eventId]: true }));
+
+    try {
+      const response = await attendeesApi.generatePDFReport(eventId, {
+        reportType,
+        includeCharts: true,
+        ...reportOptions
+      });
+
+      // Create blob and download
+      const blob = new Blob([response.data], { type: 'application/pdf' });
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `ai-enhanced-report-${eventId}-${Date.now()}.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+
+      toast.success('AI-enhanced PDF report downloaded successfully!');
+    } catch (error) {
+      console.error('Error downloading PDF:', error);
+      toast.error('Failed to generate PDF report: ' + error.message);
+    } finally {
+      setGeneratingPDF(prev => ({ ...prev, [eventId]: false }));
+    }
+  };
+
+  const handleConfirmAIReport = async () => {
+    if (!selectedEventForAI) return;
+
+    // First generate insights
+    const insights = await generateAIInsights(selectedEventForAI.id, reportType);
+
+    if (insights) {
+      // Then generate PDF
+      await downloadPDFReport(selectedEventForAI.id, { reportType });
+    }
+
+    setShowAIModal(false);
+    setSelectedEventForAI(null);
+  };
+
   // Card animation variants for Framer Motion
   const containerVariants = {
     hidden: { opacity: 0 },
@@ -200,6 +286,170 @@ const EventReport = () => {
     hidden: { opacity: 0, y: 20 },
     visible: { opacity: 1, y: 0 }
   };
+
+  const renderEventCard = (event) => (
+    <motion.div
+      key={event.id}
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="bg-gradient-to-br from-gray-900/80 to-gray-800/60 backdrop-blur-xl rounded-2xl p-6 border border-gray-700/50 hover:border-cyan-500/30 transition-all duration-300 group"
+    >
+      {/* Color overlay based on event type */}
+      <div className="absolute inset-0 opacity-40 bg-gradient-to-br from-cyan-950/20 to-transparent"></div>
+
+      {/* Success indicator */}
+      <div className="absolute top-4 right-4 w-6 h-6 rounded-full bg-green-500/20 border border-green-500/30 flex items-center justify-center">
+        <CheckCircle className="w-3 h-3 text-green-500" />
+      </div>
+
+      <div className="p-6 relative z-10">
+        <div className="mb-6">
+          <div className="flex items-center mb-2">
+            <span className="px-3 py-1 text-xs rounded-full bg-cyan-500/10 text-cyan-400 border border-cyan-500/20">
+              {event.eventType || 'Event'}
+            </span>
+          </div>
+          <h3 className="text-xl font-bold text-white group-hover:text-cyan-300 transition-colors mb-2">
+            {event.title}
+          </h3>
+
+          <div className="space-y-2 mb-4 text-sm">
+            <div className="flex items-center text-gray-400">
+              <Calendar className="w-4 h-4 mr-2 text-cyan-500" />
+              {formatEventDate(event.endDate)}
+            </div>
+            <div className="flex items-center text-gray-400">
+              <MapPin className="w-4 h-4 mr-2 text-cyan-500" />
+              {event.location?.address || 'Online'}
+            </div>
+            <div className="flex items-center text-gray-400">
+              <Users className="w-4 h-4 mr-2 text-cyan-500" />
+              {event.attendeesCount || 0} Attendees
+            </div>
+          </div>
+        </div>
+
+        {/* Stats preview */}
+        <div className="mb-6 grid grid-cols-3 gap-2">
+          <div className="bg-gray-900/60 rounded-lg p-2 text-center">
+            <div className="text-cyan-400 text-lg font-semibold">
+              {Math.round((event.attendeesCount || 0) / (event.capacity || 1) * 100)}%
+            </div>
+            <div className="text-xs text-gray-500">Capacity</div>
+          </div>
+          <div className="bg-gray-900/60 rounded-lg p-2 text-center">
+            <div className="text-cyan-400 text-lg font-semibold">
+              {event.checkInRate || '0%'}
+            </div>
+            <div className="text-xs text-gray-500">Check-in</div>
+          </div>
+          <div className="bg-gray-900/60 rounded-lg p-2 text-center">
+            <div className="text-cyan-400 text-lg font-semibold">
+              {event.rating || '-'}
+            </div>
+            <div className="text-xs text-gray-500">Rating</div>
+          </div>
+        </div>
+
+        <div className="flex items-center justify-between">
+          <div className="text-xs text-cyan-500">
+            <Clock className="w-3 h-3 inline mr-1" />
+            {new Date(event.endDate).toLocaleDateString()}
+          </div>
+
+          <motion.button
+            className="px-4 py-2 bg-cyan-600 hover:bg-cyan-500 text-black font-medium rounded-lg flex items-center space-x-2 group-hover:shadow-lg group-hover:shadow-cyan-500/20 transition-all duration-300"
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
+            onClick={() => handleViewReport(event._id)}
+          >
+            <FileText size={16} className="mr-1" />
+            <span>View Report</span>
+            <ArrowRight size={16} className="ml-1 opacity-0 group-hover:opacity-100 group-hover:translate-x-1 transition-all duration-300" />
+          </motion.button>
+        </div>
+      </div>
+
+      {/* AI Report Actions */}
+      <div className="mt-6 pt-4 border-t border-gray-700/50">
+        <div className="flex flex-wrap gap-3">
+          {/* Generate AI Insights Button */}
+          <motion.button
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
+            onClick={() => handleGenerateAIReport(event)}
+            disabled={loadingInsights[event.id] || generatingPDF[event.id]}
+            className="flex-1 min-w-48 px-4 py-2.5 bg-gradient-to-r from-purple-500/20 to-pink-500/20 text-purple-400 rounded-lg border border-purple-500/30 hover:bg-purple-500/30 transition-all font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <div className="flex items-center justify-center space-x-2">
+              {loadingInsights[event.id] ? (
+                <>
+                  <RefreshCw className="w-4 h-4 animate-spin" />
+                  <span>Generating AI Insights...</span>
+                </>
+              ) : (
+                <>
+                  <Zap className="w-4 h-4" />
+                  <span>Generate AI Report</span>
+                </>
+              )}
+            </div>
+          </motion.button>
+
+          {/* Quick Insights Preview */}
+          {aiInsights[event.id] && (
+            <motion.button
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              onClick={() => setSelectedEventForAI(event)}
+              className="px-4 py-2.5 bg-cyan-500/20 text-cyan-400 rounded-lg border border-cyan-500/30 hover:bg-cyan-500/30 transition-all font-medium"
+            >
+              <Eye className="w-4 h-4" />
+            </motion.button>
+          )}
+
+          {/* Download PDF Button */}
+          <motion.button
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
+            onClick={() => downloadPDFReport(event.id)}
+            disabled={!aiInsights[event.id] || generatingPDF[event.id]}
+            className="px-4 py-2.5 bg-green-500/20 text-green-400 rounded-lg border border-green-500/30 hover:bg-green-500/30 transition-all font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <div className="flex items-center space-x-2">
+              {generatingPDF[event.id] ? (
+                <RefreshCw className="w-4 h-4 animate-spin" />
+              ) : (
+                <FileText className="w-4 h-4" />
+              )}
+            </div>
+          </motion.button>
+        </div>
+
+        {/* AI Insights Preview */}
+        {aiInsights[event.id] && (
+          <motion.div
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: 'auto' }}
+            className="mt-4 p-4 bg-gray-800/50 rounded-lg border border-gray-700/30"
+          >
+            <h4 className="text-sm font-semibold text-cyan-400 mb-2">AI Insights Preview</h4>
+            <p className="text-gray-300 text-sm leading-relaxed">
+              {aiInsights[event.id].insights?.executiveSummary?.substring(0, 150) + '...'}
+            </p>
+            <div className="flex items-center justify-between mt-3">
+              <span className="text-xs text-gray-500">
+                Generated {new Date(aiInsights[event.id].generatedAt).toLocaleString()}
+              </span>
+              <span className="text-xs px-2 py-1 bg-purple-500/20 text-purple-400 rounded-full">
+                AI Enhanced
+              </span>
+            </div>
+          </motion.div>
+        )}
+      </div>
+    </motion.div>
+  );
 
   return (
     <div className="min-h-screen bg-black text-white pb-20">
@@ -433,6 +683,85 @@ const EventReport = () => {
                     </motion.button>
                   </div>
                 </div>
+
+                {/* AI Report Actions */}
+                <div className="mt-6 pt-4 border-t border-gray-700/50">
+                  <div className="flex flex-wrap gap-3">
+                    {/* Generate AI Insights Button */}
+                    <motion.button
+                      whileHover={{ scale: 1.05 }}
+                      whileTap={{ scale: 0.95 }}
+                      onClick={() => handleGenerateAIReport(event)}
+                      disabled={loadingInsights[event.id] || generatingPDF[event.id]}
+                      className="flex-1 min-w-48 px-4 py-2.5 bg-gradient-to-r from-purple-500/20 to-pink-500/20 text-purple-400 rounded-lg border border-purple-500/30 hover:bg-purple-500/30 transition-all font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      <div className="flex items-center justify-center space-x-2">
+                        {loadingInsights[event.id] ? (
+                          <>
+                            <RefreshCw className="w-4 h-4 animate-spin" />
+                            <span>Generating AI Insights...</span>
+                          </>
+                        ) : (
+                          <>
+                            <Zap className="w-4 h-4" />
+                            <span>Generate AI Report</span>
+                          </>
+                        )}
+                      </div>
+                    </motion.button>
+
+                    {/* Quick Insights Preview */}
+                    {aiInsights[event.id] && (
+                      <motion.button
+                        whileHover={{ scale: 1.05 }}
+                        whileTap={{ scale: 0.95 }}
+                        onClick={() => setSelectedEventForAI(event)}
+                        className="px-4 py-2.5 bg-cyan-500/20 text-cyan-400 rounded-lg border border-cyan-500/30 hover:bg-cyan-500/30 transition-all font-medium"
+                      >
+                        <Eye className="w-4 h-4" />
+                      </motion.button>
+                    )}
+
+                    {/* Download PDF Button */}
+                    <motion.button
+                      whileHover={{ scale: 1.05 }}
+                      whileTap={{ scale: 0.95 }}
+                      onClick={() => downloadPDFReport(event.id)}
+                      disabled={!aiInsights[event.id] || generatingPDF[event.id]}
+                      className="px-4 py-2.5 bg-green-500/20 text-green-400 rounded-lg border border-green-500/30 hover:bg-green-500/30 transition-all font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      <div className="flex items-center space-x-2">
+                        {generatingPDF[event.id] ? (
+                          <RefreshCw className="w-4 h-4 animate-spin" />
+                        ) : (
+                          <FileText className="w-4 h-4" />
+                        )}
+                      </div>
+                    </motion.button>
+                  </div>
+
+                  {/* AI Insights Preview */}
+                  {aiInsights[event.id] && (
+                    <motion.div
+                      initial={{ opacity: 0, height: 0 }}
+                      animate={{ opacity: 1, height: 'auto' }}
+                      className="mt-4 p-4 bg-gray-800/50 rounded-lg border border-gray-700/30"
+                    >
+                      <h4 className="text-sm font-semibold text-cyan-400 mb-2">AI Insights Preview</h4>
+                      <p className="text-gray-300 text-sm leading-relaxed">
+                        {aiInsights[event.id].insights?.executiveSummary?.substring(0, 150) + '...'}
+                      </p>
+                      <div className="flex items-center justify-between mt-3">
+                        <span className="text-xs text-gray-500">
+                          Generated {new Date(aiInsights[event.id].generatedAt).toLocaleString()}
+                        </span>
+                        <span className="text-xs px-2 py-1 bg-purple-500/20 text-purple-400 rounded-full">
+                          AI Enhanced
+                        </span>
+                      </div>
+                    </motion.div>
+                  )}
+                </div>
               </motion.div>
             ))}
           </motion.div>
@@ -460,6 +789,91 @@ const EventReport = () => {
           </div>
         )}
       </div>
+
+      {/* AI Report Generation Modal */}
+      <AnimatePresence>
+        {showAIModal && selectedEventForAI && (
+          <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.9 }}
+              className="bg-gradient-to-br from-gray-900/95 to-gray-800/95 backdrop-blur-xl rounded-2xl p-6 border border-gray-700/50 max-w-md w-full"
+            >
+              <div className="flex items-center space-x-3 mb-4">
+                <div className="p-2 bg-purple-500/20 rounded-lg">
+                  <Zap className="w-6 h-6 text-purple-400" />
+                </div>
+                <h3 className="text-xl font-bold text-white">Generate AI Report</h3>
+              </div>
+
+              <p className="text-gray-400 mb-4">
+                Generate an AI-enhanced report for "{selectedEventForAI.title}" with comprehensive insights and recommendations.
+              </p>
+
+              {/* Report Type Selection */}
+              <div className="mb-6">
+                <label className="block text-sm font-medium text-gray-300 mb-3">Report Type</label>
+                <div className="space-y-2">
+                  {[{
+                    value: 'comprehensive', label: 'Comprehensive Analysis', desc: 'Full detailed report with all insights'
+                  },
+                  {
+                    value: 'executive', label: 'Executive Summary', desc: 'High-level overview for leadership'
+                  },
+                  {
+                    value: 'sponsor', label: 'Sponsor Report', desc: 'Focus on sponsor value and ROI'
+                  }
+                  ].map((type) => (
+                  <motion.label
+                    key={type.value}
+                    className={`flex items-start space-x-3 p-3 rounded-lg border cursor-pointer transition-all ${reportType === type.value
+                        ? 'border-cyan-500/50 bg-cyan-500/10'
+                        : 'border-gray-700/50 hover:border-gray-600/50'
+                      }`}
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
+                  >
+                    <input
+                      type="radio"
+                      name="reportType"
+                      value={type.value}
+                      checked={reportType === type.value}
+                      onChange={(e) => setReportType(e.target.value)}
+                      className="mt-1 text-cyan-500 focus:ring-cyan-500"
+                    />
+                    <div>
+                      <div className="text-white font-medium">{type.label}</div>
+                      <div className="text-gray-400 text-sm">{type.desc}</div>
+                    </div>
+                  </motion.label>
+                  ))}
+                </div>
+              </div>
+
+              <div className="flex gap-3">
+                <motion.button
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  onClick={() => setShowAIModal(false)}
+                  className="flex-1 px-4 py-2 rounded-lg bg-gray-800/60 text-gray-400 hover:text-white transition-colors border border-gray-700/50"
+                >
+                  Cancel
+                </motion.button>
+                <motion.button
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  onClick={handleConfirmAIReport}
+                  disabled={loadingInsights[selectedEventForAI?.id] || generatingPDF[selectedEventForAI?.id]}
+                  className="flex-1 px-4 py-2 rounded-lg bg-gradient-to-r from-purple-500/20 to-cyan-500/20 text-purple-400 hover:from-purple-500/30 hover:to-cyan-500/30 transition-all font-medium border border-purple-500/30 disabled:opacity-50"
+                >
+                  Generate Report
+                </motion.button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   );
 };

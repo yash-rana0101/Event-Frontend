@@ -2,491 +2,254 @@
 # Provider: aws
 
 {
-  "terraform": {
-    "required_version": ">= 1.0",
-    "required_providers": {
-      "aws": {
-        "source": "hashicorp/aws",
-        "version": "~> 5.0"
-      }
+  "terraform_version": "~> 1.6.0",
+  "provider_config": {
+    "region": "us-east-1",
+    "default_tags": {
+      "Project": "Event-Frontend",
+      "ManagedBy": "Terraform",
+      "Environment": "production",
+      "Repository": "yash-rana0101/Event-Frontend"
     }
   },
-  "provider": {
-    "aws": {
-      "region": "us-east-1"
-    }
-  },
-  "locals": {
-    "project_name": "react-app",
-    "environment": "production",
+  "vpc": {
+    "cidr_block": "10.0.0.0/16",
+    "enable_dns_hostnames": true,
+    "enable_dns_support": true,
+    "public_subnets": [
+      "10.0.1.0/24",
+      "10.0.2.0/24"
+    ],
+    "private_subnets": [
+      "10.0.10.0/24",
+      "10.0.11.0/24"
+    ],
     "availability_zones": [
       "us-east-1a",
       "us-east-1b"
-    ],
-    "common_tags": {
-      "Project": "react-app",
-      "Environment": "production",
-      "ManagedBy": "Terraform"
+    ]
+  },
+  "ecr": {
+    "repository_name": "event-frontend",
+    "image_tag_mutability": "MUTABLE",
+    "scan_on_push": true,
+    "lifecycle_policy": {
+      "rules": [
+        {
+          "rulePriority": 1,
+          "description": "Keep last 10 images",
+          "selection": {
+            "tagStatus": "any",
+            "countType": "imageCountMoreThan",
+            "countNumber": 10
+          },
+          "action": {
+            "type": "expire"
+          }
+        }
+      ]
     }
   },
-  "data": {
-    "aws_caller_identity": {
-      "current": {}
-    }
-  },
-  "resource": {
-    "aws_vpc": {
-      "main": {
-        "cidr_block": "10.0.0.0/16",
-        "enable_dns_hostnames": true,
-        "enable_dns_support": true,
-        "tags": {
-          "Name": "${local.project_name}-vpc",
-          "Environment": "${local.environment}"
-        }
-      }
-    },
-    "aws_subnet": {
-      "public_1": {
-        "vpc_id": "${aws_vpc.main.id}",
-        "cidr_block": "10.0.1.0/24",
-        "availability_zone": "${local.availability_zones[0]}",
-        "map_public_ip_on_launch": true,
-        "tags": {
-          "Name": "${local.project_name}-public-subnet-1",
-          "Type": "Public"
-        }
-      },
-      "public_2": {
-        "vpc_id": "${aws_vpc.main.id}",
-        "cidr_block": "10.0.2.0/24",
-        "availability_zone": "${local.availability_zones[1]}",
-        "map_public_ip_on_launch": true,
-        "tags": {
-          "Name": "${local.project_name}-public-subnet-2",
-          "Type": "Public"
-        }
-      },
-      "private_1": {
-        "vpc_id": "${aws_vpc.main.id}",
-        "cidr_block": "10.0.10.0/24",
-        "availability_zone": "${local.availability_zones[0]}",
-        "tags": {
-          "Name": "${local.project_name}-private-subnet-1",
-          "Type": "Private"
-        }
-      },
-      "private_2": {
-        "vpc_id": "${aws_vpc.main.id}",
-        "cidr_block": "10.0.11.0/24",
-        "availability_zone": "${local.availability_zones[1]}",
-        "tags": {
-          "Name": "${local.project_name}-private-subnet-2",
-          "Type": "Private"
-        }
-      }
-    },
-    "aws_internet_gateway": {
-      "main": {
-        "vpc_id": "${aws_vpc.main.id}",
-        "tags": {
-          "Name": "${local.project_name}-igw"
-        }
-      }
-    },
-    "aws_eip": {
-      "nat_1": {
-        "domain": "vpc",
-        "tags": {
-          "Name": "${local.project_name}-nat-eip-1"
-        }
-      },
-      "nat_2": {
-        "domain": "vpc",
-        "tags": {
-          "Name": "${local.project_name}-nat-eip-2"
-        }
-      }
-    },
-    "aws_nat_gateway": {
-      "nat_1": {
-        "allocation_id": "${aws_eip.nat_1.id}",
-        "subnet_id": "${aws_subnet.public_1.id}",
-        "tags": {
-          "Name": "${local.project_name}-nat-gateway-1"
-        },
-        "depends_on": [
-          "aws_internet_gateway.main"
-        ]
-      },
-      "nat_2": {
-        "allocation_id": "${aws_eip.nat_2.id}",
-        "subnet_id": "${aws_subnet.public_2.id}",
-        "tags": {
-          "Name": "${local.project_name}-nat-gateway-2"
-        },
-        "depends_on": [
-          "aws_internet_gateway.main"
-        ]
-      }
-    },
-    "aws_route_table": {
-      "public": {
-        "vpc_id": "${aws_vpc.main.id}",
-        "route": [
+  "ecs": {
+    "cluster_name": "event-frontend-cluster",
+    "service_name": "event-frontend-service",
+    "task_definition": {
+      "family": "event-frontend",
+      "network_mode": "awsvpc",
+      "requires_compatibilities": [
+        "FARGATE"
+      ],
+      "cpu": "512",
+      "memory": "1024",
+      "container_definitions": {
+        "name": "event-frontend",
+        "image": "${aws_ecr_repository.event_frontend.repository_url}:latest",
+        "essential": true,
+        "portMappings": [
           {
-            "cidr_block": "0.0.0.0/0",
-            "gateway_id": "${aws_internet_gateway.main.id}"
+            "containerPort": 8080,
+            "protocol": "tcp"
           }
         ],
-        "tags": {
-          "Name": "${local.project_name}-public-rt"
-        }
-      },
-      "private_1": {
-        "vpc_id": "${aws_vpc.main.id}",
-        "route": [
-          {
-            "cidr_block": "0.0.0.0/0",
-            "nat_gateway_id": "${aws_nat_gateway.nat_1.id}"
-          }
-        ],
-        "tags": {
-          "Name": "${local.project_name}-private-rt-1"
-        }
-      },
-      "private_2": {
-        "vpc_id": "${aws_vpc.main.id}",
-        "route": [
-          {
-            "cidr_block": "0.0.0.0/0",
-            "nat_gateway_id": "${aws_nat_gateway.nat_2.id}"
-          }
-        ],
-        "tags": {
-          "Name": "${local.project_name}-private-rt-2"
-        }
-      }
-    },
-    "aws_route_table_association": {
-      "public_1": {
-        "subnet_id": "${aws_subnet.public_1.id}",
-        "route_table_id": "${aws_route_table.public.id}"
-      },
-      "public_2": {
-        "subnet_id": "${aws_subnet.public_2.id}",
-        "route_table_id": "${aws_route_table.public.id}"
-      },
-      "private_1": {
-        "subnet_id": "${aws_subnet.private_1.id}",
-        "route_table_id": "${aws_route_table.private_1.id}"
-      },
-      "private_2": {
-        "subnet_id": "${aws_subnet.private_2.id}",
-        "route_table_id": "${aws_route_table.private_2.id}"
-      }
-    },
-    "aws_security_group": {
-      "alb": {
-        "name": "${local.project_name}-alb-sg",
-        "description": "Security group for Application Load Balancer",
-        "vpc_id": "${aws_vpc.main.id}",
-        "ingress": [
-          {
-            "description": "HTTP from Internet",
-            "from_port": 80,
-            "to_port": 80,
-            "protocol": "tcp",
-            "cidr_blocks": [
-              "0.0.0.0/0"
-            ]
-          },
-          {
-            "description": "HTTPS from Internet",
-            "from_port": 443,
-            "to_port": 443,
-            "protocol": "tcp",
-            "cidr_blocks": [
-              "0.0.0.0/0"
-            ]
-          }
-        ],
-        "egress": [
-          {
-            "description": "Allow all outbound",
-            "from_port": 0,
-            "to_port": 0,
-            "protocol": "-1",
-            "cidr_blocks": [
-              "0.0.0.0/0"
-            ]
-          }
-        ],
-        "tags": {
-          "Name": "${local.project_name}-alb-sg"
-        }
-      },
-      "ecs": {
-        "name": "${local.project_name}-ecs-sg",
-        "description": "Security group for ECS tasks",
-        "vpc_id": "${aws_vpc.main.id}",
-        "ingress": [
-          {
-            "description": "Allow traffic from ALB",
-            "from_port": 80,
-            "to_port": 80,
-            "protocol": "tcp",
-            "security_groups": [
-              "${aws_security_group.alb.id}"
-            ]
-          },
-          {
-            "description": "Allow traffic from ALB on port 3000",
-            "from_port": 3000,
-            "to_port": 3000,
-            "protocol": "tcp",
-            "security_groups": [
-              "${aws_security_group.alb.id}"
-            ]
-          }
-        ],
-        "egress": [
-          {
-            "description": "Allow all outbound",
-            "from_port": 0,
-            "to_port": 0,
-            "protocol": "-1",
-            "cidr_blocks": [
-              "0.0.0.0/0"
-            ]
-          }
-        ],
-        "tags": {
-          "Name": "${local.project_name}-ecs-sg"
-        }
-      }
-    },
-    "aws_ecr_repository": {
-      "main": {
-        "name": "${local.project_name}",
-        "image_tag_mutability": "MUTABLE",
-        "image_scanning_configuration": {
-          "scan_on_push": true
-        },
-        "tags": {
-          "Name": "${local.project_name}-ecr"
-        }
-      }
-    },
-    "aws_ecr_lifecycle_policy": {
-      "main": {
-        "repository": "${aws_ecr_repository.main.name}",
-        "policy": "{\"rules\":[{\"rulePriority\":1,\"description\":\"Keep last 10 images\",\"selection\":{\"tagStatus\":\"any\",\"countType\":\"imageCountMoreThan\",\"countNumber\":10},\"action\":{\"type\":\"expire\"}}]}"
-      }
-    },
-    "aws_cloudwatch_log_group": {
-      "ecs": {
-        "name": "/ecs/${local.project_name}",
-        "retention_in_days": 30,
-        "tags": {
-          "Name": "${local.project_name}-logs"
-        }
-      }
-    },
-    "aws_iam_role": {
-      "ecs_execution_role": {
-        "name": "${local.project_name}-ecs-execution-role",
-        "assume_role_policy": "{\"Version\":\"2012-10-17\",\"Statement\":[{\"Effect\":\"Allow\",\"Principal\":{\"Service\":\"ecs-tasks.amazonaws.com\"},\"Action\":\"sts:AssumeRole\"}]}",
-        "tags": {
-          "Name": "${local.project_name}-ecs-execution-role"
-        }
-      },
-      "ecs_task_role": {
-        "name": "${local.project_name}-ecs-task-role",
-        "assume_role_policy": "{\"Version\":\"2012-10-17\",\"Statement\":[{\"Effect\":\"Allow\",\"Principal\":{\"Service\":\"ecs-tasks.amazonaws.com\"},\"Action\":\"sts:AssumeRole\"}]}",
-        "tags": {
-          "Name": "${local.project_name}-ecs-task-role"
-        }
-      }
-    },
-    "aws_iam_role_policy_attachment": {
-      "ecs_execution_role_policy": {
-        "role": "${aws_iam_role.ecs_execution_role.name}",
-        "policy_arn": "arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy"
-      },
-      "ecs_execution_role_ecr": {
-        "role": "${aws_iam_role.ecs_execution_role.name}",
-        "policy_arn": "arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly"
-      }
-    },
-    "aws_iam_role_policy": {
-      "ecs_task_cloudwatch": {
-        "name": "cloudwatch-logs-policy",
-        "role": "${aws_iam_role.ecs_task_role.id}",
-        "policy": "{\"Version\":\"2012-10-17\",\"Statement\":[{\"Effect\":\"Allow\",\"Action\":[\"logs:CreateLogGroup\",\"logs:CreateLogStream\",\"logs:PutLogEvents\"],\"Resource\":\"*\"}]}"
-      }
-    },
-    "aws_ecs_cluster": {
-      "main": {
-        "name": "${local.project_name}-cluster",
-        "setting": [
-          {
-            "name": "containerInsights",
-            "value": "enabled"
-          }
-        ],
-        "tags": {
-          "Name": "${local.project_name}-cluster"
-        }
-      }
-    },
-    "aws_ecs_task_definition": {
-      "main": {
-        "family": "${local.project_name}",
-        "network_mode": "awsvpc",
-        "requires_compatibilities": [
-          "FARGATE"
-        ],
-        "cpu": "512",
-        "memory": "1024",
-        "execution_role_arn": "${aws_iam_role.ecs_execution_role.arn}",
-        "task_role_arn": "${aws_iam_role.ecs_task_role.arn}",
-        "container_definitions": "[{\"name\":\"${local.project_name}\",\"image\":\"${aws_ecr_repository.main.repository_url}:latest\",\"essential\":true,\"portMappings\":[{\"containerPort\":80,\"protocol\":\"tcp\"},{\"containerPort\":3000,\"protocol\":\"tcp\"}],\"logConfiguration\":{\"logDriver\":\"awslogs\",\"options\":{\"awslogs-group\":\"${aws_cloudwatch_log_group.ecs.name}\",\"awslogs-region\":\"us-east-1\",\"awslogs-stream-prefix\":\"ecs\"}},\"environment\":[{\"name\":\"NODE_ENV\",\"value\":\"production\"}]}]",
-        "tags": {
-          "Name": "${local.project_name}-task"
-        }
-      }
-    },
-    "aws_lb": {
-      "main": {
-        "name": "${local.project_name}-alb",
-        "internal": false,
-        "load_balancer_type": "application",
-        "security_groups": [
-          "${aws_security_group.alb.id}"
-        ],
-        "subnets": [
-          "${aws_subnet.public_1.id}",
-          "${aws_subnet.public_2.id}"
-        ],
-        "enable_deletion_protection": false,
-        "enable_http2": true,
-        "tags": {
-          "Name": "${local.project_name}-alb"
-        }
-      }
-    },
-    "aws_lb_target_group": {
-      "main": {
-        "name": "${local.project_name}-tg",
-        "port": 80,
-        "protocol": "HTTP",
-        "vpc_id": "${aws_vpc.main.id}",
-        "target_type": "ip",
-        "deregistration_delay": 30,
-        "health_check": {
-          "enabled": true,
-          "healthy_threshold": 2,
-          "unhealthy_threshold": 3,
-          "timeout": 5,
+        "healthCheck": {
+          "command": [
+            "CMD-SHELL",
+            "curl -f http://localhost:8080/health || exit 1"
+          ],
           "interval": 30,
-          "path": "/",
-          "protocol": "HTTP",
-          "matcher": "200-299"
+          "timeout": 5,
+          "retries": 3,
+          "startPeriod": 60
         },
-        "tags": {
-          "Name": "${local.project_name}-tg"
-        }
+        "logConfiguration": {
+          "logDriver": "awslogs",
+          "options": {
+            "awslogs-group": "/ecs/event-frontend",
+            "awslogs-region": "us-east-1",
+            "awslogs-stream-prefix": "ecs"
+          }
+        },
+        "environment": []
       }
     },
-    "aws_lb_listener": {
-      "http": {
-        "load_balancer_arn": "${aws_lb.main.arn}",
+    "service_config": {
+      "desired_count": 2,
+      "launch_type": "FARGATE",
+      "deployment_configuration": {
+        "maximum_percent": 200,
+        "minimum_healthy_percent": 100
+      },
+      "enable_execute_command": true
+    }
+  },
+  "alb": {
+    "name": "event-frontend-alb",
+    "internal": false,
+    "load_balancer_type": "application",
+    "enable_deletion_protection": false,
+    "enable_http2": true,
+    "enable_cross_zone_load_balancing": true,
+    "target_group": {
+      "name": "event-frontend-tg",
+      "port": 8080,
+      "protocol": "HTTP",
+      "target_type": "ip",
+      "deregistration_delay": 30,
+      "health_check": {
+        "enabled": true,
+        "path": "/health",
+        "port": "traffic-port",
+        "protocol": "HTTP",
+        "healthy_threshold": 2,
+        "unhealthy_threshold": 3,
+        "timeout": 5,
+        "interval": 30,
+        "matcher": "200-299"
+      }
+    },
+    "listeners": [
+      {
         "port": 80,
         "protocol": "HTTP",
-        "default_action": [
-          {
-            "type": "redirect",
-            "redirect": {
-              "port": "443",
-              "protocol": "HTTPS",
-              "status_code": "HTTP_301"
-            }
+        "default_action": {
+          "type": "redirect",
+          "redirect": {
+            "port": "443",
+            "protocol": "HTTPS",
+            "status_code": "HTTP_301"
           }
-        ]
+        }
       },
-      "https": {
-        "load_balancer_arn": "${aws_lb.main.arn}",
+      {
         "port": 443,
         "protocol": "HTTPS",
         "ssl_policy": "ELBSecurityPolicy-TLS-1-2-2017-01",
-        "certificate_arn": "arn:aws:acm:us-east-1:${data.aws_caller_identity.current.account_id}:certificate/REPLACE_WITH_YOUR_CERTIFICATE_ARN",
-        "default_action": [
-          {
-            "type": "forward",
-            "target_group_arn": "${aws_lb_target_group.main.arn}"
-          }
-        ]
+        "certificate_arn": "${aws_acm_certificate.main.arn}",
+        "default_action": {
+          "type": "forward",
+          "target_group_arn": "${aws_lb_target_group.event_frontend.arn}"
+        }
       }
+    ]
+  },
+  "security_groups": {
+    "alb_sg": {
+      "name": "event-frontend-alb-sg",
+      "description": "Security group for ALB",
+      "ingress": [
+        {
+          "from_port": 80,
+          "to_port": 80,
+          "protocol": "tcp",
+          "cidr_blocks": [
+            "0.0.0.0/0"
+          ]
+        },
+        {
+          "from_port": 443,
+          "to_port": 443,
+          "protocol": "tcp",
+          "cidr_blocks": [
+            "0.0.0.0/0"
+          ]
+        }
+      ],
+      "egress": [
+        {
+          "from_port": 0,
+          "to_port": 0,
+          "protocol": "-1",
+          "cidr_blocks": [
+            "0.0.0.0/0"
+          ]
+        }
+      ]
     },
-    "aws_ecs_service": {
-      "main": {
-        "name": "${local.project_name}-service",
-        "cluster": "${aws_ecs_cluster.main.id}",
-        "task_definition": "${aws_ecs_task_definition.main.arn}",
-        "desired_count": 2,
-        "launch_type": "FARGATE",
-        "platform_version": "LATEST",
-        "scheduling_strategy": "REPLICA",
-        "deployment_minimum_healthy_percent": 100,
-        "deployment_maximum_percent": 200,
-        "health_check_grace_period_seconds": 60,
-        "network_configuration": {
-          "subnets": [
-            "${aws_subnet.private_1.id}",
-            "${aws_subnet.private_2.id}"
-          ],
-          "security_groups": [
-            "${aws_security_group.ecs.id}"
-          ],
-          "assign_public_ip": false
-        },
-        "load_balancer": [
-          {
-            "target_group_arn": "${aws_lb_target_group.main.arn}",
-            "container_name": "${local.project_name}",
-            "container_port": 80
-          }
-        ],
-        "deployment_circuit_breaker": {
-          "enable": true,
-          "rollback": true
-        },
-        "tags": {
-          "Name": "${local.project_name}-service"
-        },
-        "depends_on": [
-          "aws_lb_listener.http",
-          "aws_lb_listener.https"
-        ]
+    "ecs_sg": {
+      "name": "event-frontend-ecs-sg",
+      "description": "Security group for ECS tasks",
+      "ingress": [
+        {
+          "from_port": 8080,
+          "to_port": 8080,
+          "protocol": "tcp",
+          "source_security_group_id": "${aws_security_group.alb_sg.id}"
+        }
+      ],
+      "egress": [
+        {
+          "from_port": 0,
+          "to_port": 0,
+          "protocol": "-1",
+          "cidr_blocks": [
+            "0.0.0.0/0"
+          ]
+        }
+      ]
+    }
+  },
+  "cloudwatch": {
+    "log_group": {
+      "name": "/ecs/event-frontend",
+      "retention_in_days": 30
+    },
+    "alarms": [
+      {
+        "alarm_name": "event-frontend-high-cpu",
+        "comparison_operator": "GreaterThanThreshold",
+        "evaluation_periods": 2,
+        "metric_name": "CPUUtilization",
+        "namespace": "AWS/ECS",
+        "period": 300,
+        "statistic": "Average",
+        "threshold": 80,
+        "alarm_description": "This metric monitors ECS CPU utilization"
+      },
+      {
+        "alarm_name": "event-frontend-high-memory",
+        "comparison_operator": "GreaterThanThreshold",
+        "evaluation_periods": 2,
+        "metric_name": "MemoryUtilization",
+        "namespace": "AWS/ECS",
+        "period": 300,
+        "statistic": "Average",
+        "threshold": 80,
+        "alarm_description": "This metric monitors ECS memory utilization"
       }
+    ]
+  },
+  "autoscaling": {
+    "target": {
+      "max_capacity": 10,
+      "min_capacity": 2,
+      "resource_id": "service/event-frontend-cluster/event-frontend-service",
+      "scalable_dimension": "ecs:service:DesiredCount",
+      "service_namespace": "ecs"
     },
-    "aws_appautoscaling_target": {
-      "ecs": {
-        "max_capacity": 10,
-        "min_capacity": 2,
-        "resource_id": "service/${aws_ecs_cluster.main.name}/${aws_ecs_service.main.name}",
-        "scalable_dimension": "ecs:service:DesiredCount",
-        "service_namespace": "ecs"
-      }
-    },
-    "aws_appautoscaling_policy": {
-      "cpu": {
-        "name": "${local.project_name}-cpu-autoscaling",
+    "policies": [
+      {
+        "name": "cpu-scaling",
         "policy_type": "TargetTrackingScaling",
-        "resource_id": "${aws_appautoscaling_target.ecs.resource_id}",
-        "scalable_dimension": "${aws_appautoscaling_target.ecs.scalable_dimension}",
-        "service_namespace": "${aws_appautoscaling_target.ecs.service_namespace}",
         "target_tracking_scaling_policy_configuration": {
           "predefined_metric_specification": {
             "predefined_metric_type": "ECSServiceAverageCPUUtilization"
@@ -496,135 +259,186 @@
           "scale_out_cooldown": 60
         }
       },
-      "memory": {
-        "name": "${local.project_name}-memory-autoscaling",
+      {
+        "name": "memory-scaling",
         "policy_type": "TargetTrackingScaling",
-        "resource_id": "${aws_appautoscaling_target.ecs.resource_id}",
-        "scalable_dimension": "${aws_appautoscaling_target.ecs.scalable_dimension}",
-        "service_namespace": "${aws_appautoscaling_target.ecs.service_namespace}",
         "target_tracking_scaling_policy_configuration": {
           "predefined_metric_specification": {
             "predefined_metric_type": "ECSServiceAverageMemoryUtilization"
           },
-          "target_value": 80,
+          "target_value": 70,
           "scale_in_cooldown": 300,
           "scale_out_cooldown": 60
         }
       }
-    },
-    "aws_cloudfront_distribution": {
-      "main": {
-        "enabled": true,
-        "is_ipv6_enabled": true,
-        "comment": "CloudFront distribution for ${local.project_name}",
-        "default_root_object": "index.html",
-        "price_class": "PriceClass_100",
-        "origin": [
+    ]
+  },
+  "iam": {
+    "ecs_task_execution_role": {
+      "name": "event-frontend-ecs-task-execution-role",
+      "assume_role_policy": {
+        "Version": "2012-10-17",
+        "Statement": [
           {
-            "domain_name": "${aws_lb.main.dns_name}",
-            "origin_id": "alb",
-            "custom_origin_config": {
-              "http_port": 80,
-              "https_port": 443,
-              "origin_protocol_policy": "http-only",
-              "origin_ssl_protocols": [
-                "TLSv1.2"
-              ],
-              "origin_read_timeout": 60,
-              "origin_keepalive_timeout": 5
-            }
-          }
-        ],
-        "default_cache_behavior": {
-          "allowed_methods": [
-            "DELETE",
-            "GET",
-            "HEAD",
-            "OPTIONS",
-            "PATCH",
-            "POST",
-            "PUT"
-          ],
-          "cached_methods": [
-            "GET",
-            "HEAD"
-          ],
-          "target_origin_id": "alb",
-          "viewer_protocol_policy": "redirect-to-https",
-          "compress": true,
-          "forwarded_values": {
-            "query_string": true,
-            "cookies": {
-              "forward": "all"
+            "Effect": "Allow",
+            "Principal": {
+              "Service": "ecs-tasks.amazonaws.com"
             },
-            "headers": [
-              "Host",
-              "Origin",
-              "Accept",
-              "Accept-Language",
-              "Accept-Encoding"
-            ]
-          },
-          "min_ttl": 0,
-          "default_ttl": 3600,
-          "max_ttl": 86400
-        },
-        "restrictions": {
-          "geo_restriction": {
-            "restriction_type": "none"
+            "Action": "sts:AssumeRole"
           }
-        },
-        "viewer_certificate": {
-          "cloudfront_default_certificate": true
-        },
-        "custom_error_response": [
+        ]
+      },
+      "managed_policy_arns": [
+        "arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy"
+      ]
+    },
+    "ecs_task_role": {
+      "name": "event-frontend-ecs-task-role",
+      "assume_role_policy": {
+        "Version": "2012-10-17",
+        "Statement": [
           {
-            "error_code": 404,
-            "response_code": 200,
-            "response_page_path": "/index.html",
-            "error_caching_min_ttl": 300
-          },
-          {
-            "error_code": 403,
-            "response_code": 200,
-            "response_page_path": "/index.html",
-            "error_caching_min_ttl": 300
+            "Effect": "Allow",
+            "Principal": {
+              "Service": "ecs-tasks.amazonaws.com"
+            },
+            "Action": "sts:AssumeRole"
           }
-        ],
-        "tags": {
-          "Name": "${local.project_name}-cloudfront"
-        }
+        ]
       }
     }
   },
-  "output": {
-    "ecr_repository_url": {
-      "description": "ECR Repository URL",
-      "value": "${aws_ecr_repository.main.repository_url}"
-    },
+  "cloudfront": {
+    "enabled": true,
+    "distribution": {
+      "enabled": true,
+      "is_ipv6_enabled": true,
+      "comment": "Event Frontend CDN",
+      "default_root_object": "index.html",
+      "price_class": "PriceClass_100",
+      "origin": {
+        "domain_name": "${aws_lb.event_frontend.dns_name}",
+        "origin_id": "ALB",
+        "custom_origin_config": {
+          "http_port": 80,
+          "https_port": 443,
+          "origin_protocol_policy": "https-only",
+          "origin_ssl_protocols": [
+            "TLSv1.2"
+          ]
+        }
+      },
+      "default_cache_behavior": {
+        "allowed_methods": [
+          "GET",
+          "HEAD",
+          "OPTIONS",
+          "PUT",
+          "POST",
+          "PATCH",
+          "DELETE"
+        ],
+        "cached_methods": [
+          "GET",
+          "HEAD",
+          "OPTIONS"
+        ],
+        "target_origin_id": "ALB",
+        "viewer_protocol_policy": "redirect-to-https",
+        "compress": true,
+        "min_ttl": 0,
+        "default_ttl": 3600,
+        "max_ttl": 86400,
+        "forwarded_values": {
+          "query_string": true,
+          "cookies": {
+            "forward": "all"
+          }
+        }
+      },
+      "restrictions": {
+        "geo_restriction": {
+          "restriction_type": "none"
+        }
+      },
+      "viewer_certificate": {
+        "cloudfront_default_certificate": true
+      }
+    }
+  },
+  "waf": {
+    "enabled": true,
+    "web_acl": {
+      "name": "event-frontend-waf",
+      "scope": "REGIONAL",
+      "default_action": {
+        "allow": {}
+      },
+      "rules": [
+        {
+          "name": "RateLimitRule",
+          "priority": 1,
+          "statement": {
+            "rate_based_statement": {
+              "limit": 2000,
+              "aggregate_key_type": "IP"
+            }
+          },
+          "action": {
+            "block": {}
+          },
+          "visibility_config": {
+            "sampled_requests_enabled": true,
+            "cloud_watch_metrics_enabled": true,
+            "metric_name": "RateLimitRule"
+          }
+        },
+        {
+          "name": "AWSManagedRulesCommonRuleSet",
+          "priority": 2,
+          "override_action": {
+            "none": {}
+          },
+          "statement": {
+            "managed_rule_group_statement": {
+              "vendor_name": "AWS",
+              "name": "AWSManagedRulesCommonRuleSet"
+            }
+          },
+          "visibility_config": {
+            "sampled_requests_enabled": true,
+            "cloud_watch_metrics_enabled": true,
+            "metric_name": "AWSManagedRulesCommonRuleSet"
+          }
+        }
+      ],
+      "visibility_config": {
+        "sampled_requests_enabled": true,
+        "cloud_watch_metrics_enabled": true,
+        "metric_name": "event-frontend-waf"
+      }
+    }
+  },
+  "outputs": {
     "alb_dns_name": {
-      "description": "Application Load Balancer DNS Name",
-      "value": "${aws_lb.main.dns_name}"
+      "description": "DNS name of the Application Load Balancer",
+      "value": "${aws_lb.event_frontend.dns_name}"
     },
     "cloudfront_domain_name": {
-      "description": "CloudFront Distribution Domain Name",
-      "value": "${aws_cloudfront_distribution.main.domain_name}"
+      "description": "CloudFront distribution domain name",
+      "value": "${aws_cloudfront_distribution.event_frontend.domain_name}"
     },
-    "cloudfront_distribution_id": {
-      "description": "CloudFront Distribution ID",
-      "value": "${aws_cloudfront_distribution.main.id}"
+    "ecr_repository_url": {
+      "description": "ECR repository URL",
+      "value": "${aws_ecr_repository.event_frontend.repository_url}"
     },
     "ecs_cluster_name": {
-      "description": "ECS Cluster Name",
-      "value": "${aws_ecs_cluster.main.name}"
+      "description": "ECS cluster name",
+      "value": "${aws_ecs_cluster.event_frontend.name}"
     },
     "ecs_service_name": {
-      "description": "ECS Service Name",
-      "value": "${aws_ecs_service.main.name}"
-    },
-    "vpc_id": {
-      "description": "VPC ID",
-      "value": "${aws_vpc.main.id}"
+      "description": "ECS service name",
+      "value": "${aws_ecs_service.event_frontend.name}"
     }
   }
 }

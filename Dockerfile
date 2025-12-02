@@ -1,5 +1,5 @@
-# Multi-stage build for React + Vite application
-# Stage 1: Build
+# Multi-stage Dockerfile for React + Vite application
+# Stage 1: Build stage
 FROM node:20-alpine AS builder
 
 # Set working directory
@@ -17,10 +17,10 @@ COPY . .
 # Build the application
 RUN npm run build
 
-# Stage 2: Production
-FROM nginx:alpine AS production
+# Stage 2: Production stage with Nginx
+FROM nginx:1.25-alpine AS production
 
-# Install curl for healthchecks
+# Install curl for health checks
 RUN apk add --no-cache curl
 
 # Copy custom nginx configuration
@@ -35,7 +35,6 @@ RUN addgroup -g 1001 -S nodejs && \
     chown -R nodejs:nodejs /usr/share/nginx/html && \
     chown -R nodejs:nodejs /var/cache/nginx && \
     chown -R nodejs:nodejs /var/log/nginx && \
-    chown -R nodejs:nodejs /etc/nginx/conf.d && \
     touch /var/run/nginx.pid && \
     chown -R nodejs:nodejs /var/run/nginx.pid
 
@@ -49,5 +48,5 @@ EXPOSE 8080
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
     CMD curl -f http://localhost:8080/health || exit 1
 
-# Start nginx
+# Start Nginx
 CMD ["nginx", "-g", "daemon off;"]
